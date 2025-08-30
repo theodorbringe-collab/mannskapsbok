@@ -1,173 +1,289 @@
 <!DOCTYPE html>
 <html lang="no">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Mannskapsbok</title>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Mannskapsbok (demo)</title>
   <style>
-    :root{--rcb-accent:#2b4dcb}
-    body{margin:0;font-family:Arial,sans-serif;background:#fafafa}
-    .rcb-wrap{max-width:1100px;margin:40px auto;padding:0 16px}
-    .rcb-title{font-size:28px;font-weight:800;color:var(--rcb-accent);margin-bottom:12px}
-    .rcb-row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:8px}
-    .rcb-badge{padding:4px 8px;border-radius:8px;border:1px solid #ddd;background:#fff;font-size:12px}
-    .rcb-btn{padding:8px 12px;border-radius:8px;border:1px solid #ddd;background:#fff;cursor:pointer}
-    .rcb-btn.primary{background:#111;color:#fff;border-color:#111}
-    .rcb-grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));margin:16px 0 8px}
-    .rcb-card{border:1px solid #eee;border-radius:12px;background:#f7f7f7}
-    .rcb-card button{width:100%;padding:14px;font-weight:700;border:0;border-radius:12px;cursor:pointer}
+    :root{--accent:#2b4dcb}
+    *{box-sizing:border-box}
+    body{margin:0;background:#fafafa;font:14px/1.4 Arial, sans-serif;color:#111}
+    .wrap{max-width:1100px;margin:40px auto;padding:0 16px}
+    .title{font-size:28px;font-weight:800;color:var(--accent);margin:0 0 6px}
+    .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:8px 0 14px}
+    .badge{padding:4px 8px;border-radius:999px;border:1px solid #ddd;background:#fff;font-size:12px}
+    .note{font-size:12px;color:#666}
+    .grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));margin:16px 0 8px}
+    .card{border:1px solid #eee;border-radius:14px;background:#f7f7f7}
+    .card button{width:100%;padding:16px 14px;border:0;border-radius:12px;font-weight:700;cursor:pointer;box-shadow:0 2px 5px rgba(0,0,0,.08)}
+    .card .sub{display:block;font-weight:400;font-size:12px;opacity:.85;margin-top:2px}
     .gray{background:#e5e5e5}.yellow{background:#ffe08a}.green{background:#9be29b}
-    .rcb-card .sub{display:block;font-weight:400;font-size:12px;opacity:.85;margin-top:2px}
-    .rcb-tabs{display:flex;gap:8px;margin:12px 0;flex-wrap:wrap}
-    .rcb-tab{padding:8px 12px;border-radius:8px;border:1px solid #ddd;background:#fff;cursor:pointer}
-    .rcb-tab.active{background:#111;color:#fff}
-    .rcb-table{width:100%;border-collapse:collapse;background:#fff;border:1px solid #ddd;border-radius:12px;overflow:hidden}
-    .rcb-table th,.rcb-table td{border-bottom:1px solid #eee;padding:6px;text-align:left;font-size:14px}
-    .rcb-table th{background:#fafafa}
-    .rcb-empty{padding:16px;color:#666}
-    #rcbOverlay{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.55);z-index:1000}
-    #rcbOverlay.open{display:flex}
-    #rcbWrap{width:min(500px,90%);background:#fff;border-radius:12px;padding:20px}
-    #rcbWrap input{display:block;width:100%;padding:10px;margin:6px 0;border:1px solid #ddd;border-radius:8px}
-    .note{font-size:12px;color:#555}
+    .tabs{display:flex;gap:8px;margin:12px 0;flex-wrap:wrap}
+    .tab{padding:10px 12px;border-radius:10px;border:1px solid #ddd;background:#fff;cursor:pointer}
+    .tab.active{background:#111;color:#fff;border-color:#111}
+    .tag{display:inline-block;font-size:12px;padding:4px 8px;border-radius:999px;background:#f1f1f1;margin:0 0 6px}
+    .table{width:100%;border-collapse:collapse;background:#fff;border:1px solid #ddd;border-radius:12px;overflow:hidden}
+    .table th,.table td{border-bottom:1px solid #eee;padding:10px 8px;text-align:left;vertical-align:top}
+    .table th{background:#fafafa;font-weight:700}
+    .table tr:last-child td{border-bottom:0}
+    .table input[type="text"],.table input[type="date"]{width:100%;padding:6px 8px;border:1px solid #ddd;border-radius:8px}
+    .empty{padding:16px;color:#666}
+    /* save bar */
+    #savebar{position:fixed;left:12px;right:12px;bottom:12px;display:none;align-items:center;gap:10px;padding:10px 12px;border:1px solid #ddd;border-radius:12px;background:#fff;box-shadow:0 10px 28px rgba(0,0,0,.15);z-index:1000}
+    #savebar .pill{font-size:12px;padding:4px 8px;border-radius:999px;background:#f1f1f1}
+    #savebar .btn{padding:10px 14px;border-radius:10px;border:1px solid #ddd;background:#111;color:#fff;cursor:pointer}
+    #toast{position:fixed;right:16px;bottom:16px;background:#111;color:#fff;padding:10px 12px;border-radius:10px;opacity:0;transform:translateY(8px);transition:.25s}
+    #toast.show{opacity:1;transform:translateY(0)}
   </style>
 </head>
 <body>
-<div id="app" class="rcb-wrap"></div>
+  <div class="wrap">
+    <div class="title">Mannskapsbok</div>
+    <div class="row">
+      <span class="badge">Demo – ingen innlogging</span>
+      <span class="note">Alt lagres lokalt i nettleseren (kan trygt byttes ut med Supabase senere).</span>
+    </div>
 
-<div id="rcbOverlay">
-  <div id="rcbWrap">
-    <h3>Logg inn</h3>
-    <input id="email" type="email" placeholder="din@epost.no">
-    <input id="otp" type="text" maxlength="6" placeholder="6-sifret kode (valgfritt)">
-    <div id="msg" class="note"></div>
-    <button id="send" class="rcb-btn primary">Send lenke</button>
-    <button id="check" class="rcb-btn">Sjekk innlogging</button>
-    <button id="verify" class="rcb-btn">Verifiser kode</button>
+    <div id="cards" class="grid"></div>
+    <div id="tabs" class="tabs"></div>
+    <div id="panel"></div>
   </div>
-</div>
+
+  <div id="savebar">
+    <span id="savecount" class="pill">0 endringer</span>
+    <span id="savemsg" class="note">Endringer ikke lagret.</span>
+    <div style="flex:1"></div>
+    <button id="savebtn" class="btn">Lagre nå</button>
+  </div>
+  <div id="toast">Lagret ✅</div>
 
 <script>
-(async()=>{
-  // === Supabase-konfig ===
-  const SUPABASE_URL  = "https://pmrkhwpshbnnbjfkslyw.supabase.co";
-  const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBtcmtod3BzaGJubmJqZmtzbHl3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYwNDEyODAsImV4cCI6MjA3MTYxNzI4MH0.NKaeyjbEoSsJ1mHRUMyclkbdWx5ClylaILNjr1l3Tas";
-  const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+(function(){
+  // ---- Demo-katalog ----
+  const ROLES = ['Fartøysjef','NK','Matros','Aspirant','Rescuerunner'];
 
-  const ROLES=["Fartøysjef","NK","Matros","Aspirant","Rescuerunner"];
-  let me=null; let catalog={}; let progress={};
+  const DEMO = {
+    'Fartøysjef': [
+      { title:'Sikkerhet & ledelse', items:[
+        'Utføre sikkerhetsbrief for mannskap',
+        'Planlegge operasjon med risikovurdering',
+        'Loggføre hendelser etter aksjon',
+        'Dele ut oppgaver og følge opp'
+      ]},
+      { title:'Navigasjon', items:[
+        'Planlegge rute basert på vær og strøm',
+        'Bruke radar/GPS korrekt',
+        'Kommunikasjon på VHF (kanaler/protokoll)',
+        'Nattnavigasjon – utkikk og lysbruk'
+      ]},
+      { title:'Maskin & vedlikehold', items:[
+        'Start-/stopp-prosedyre motor',
+        'Daglig kontroll av olje/kjøl',
+        'Feilsøk ved alarm',
+        'Fylle drivstoff sikkert'
+      ]},
+    ],
+    'NK': [
+      { title:'Operativ støtte', items:[
+        'Koordinere mannskap under aksjon',
+        'Føre enkel logg',
+        'Sikre bruk av verneutstyr',
+        'Forberede til kai/ankring'
+      ]},
+      { title:'Navigasjon', items:[
+        'Avlese og melde posisjon',
+        'Plotte kursendringer',
+        'Oppfatte hinder/fare',
+        'Håndtere møtende trafikk'
+      ]},
+      { title:'Fartøyhåndtering', items:[
+        'Fortøyning – spring og kryss',
+        'Bakke og manøvrere i trange farvann',
+        'RIB-utsetting/innhenting',
+        'Man-over-bord rutiner'
+      ]},
+    ],
+    'Matros': [
+      { title:'Dekksarbeid', items:[
+        'Korrekt bruk av knuter/spleis',
+        'Fendere og tau – plassering og sikring',
+        'Sikring av last/utstyr',
+        'Spyling og vask av dekk'
+      ]},
+      { title:'Sikkerhet', items:[
+        'Redningsvest korrekt tilpasset',
+        'Brannslukking – slokkemidler',
+        'Nødutstyr: nødraketter/pyro',
+        'MOB-øvelse deltatt'
+      ]},
+      { title:'Maskinrom', items:[
+        'Sjekk av nivåer før avgang',
+        'Filterkontroll',
+        'Steng av hovedstrøm',
+        'Orden i maskinrom'
+      ]},
+    ],
+    'Aspirant': [
+      { title:'Grunnleggende', items:[
+        'Kjenne til roller om bord',
+        'Sikkerhetsrunde på fartøyet',
+        'Påkledning og verneutstyr',
+        'Enkel knutebok'
+      ]},
+      { title:'Kommunikasjon', items:[
+        'Lytte på VHF',
+        'Alfabet/NUM-koder',
+        'Enkle meldinger',
+        'Rapportere observasjoner'
+      ]},
+      { title:'Fartøysrutiner', items:[
+        'Rydde og sikre utstyr',
+        'Assistere ved fortøyning',
+        'Delta i øvelser',
+        'Orden etter aksjon'
+      ]},
+    ],
+    'Rescuerunner': [
+      { title:'Kjøring', items:[
+        'Oppstart og sjekkliste',
+        'Planing og svingteknikk',
+        'Sikker fart i sjø',
+        'Nødstopp og retur'
+      ]},
+      { title:'Søk & redning', items:[
+        'Plassering i søkemønster',
+        'Ta opp person fra vann',
+        'Sleperutiner',
+        'Sikker kommunikasjon'
+      ]},
+      { title:'Vedlikehold', items:[
+        'Etter-skylling og konservering',
+        'Brensel & olje-kontroll',
+        'Transport på henger',
+        'Lagring og sikring'
+      ]},
+    ]
+  };
 
-  const $=(s,r=document)=>r.querySelector(s);
-  const esc=s=>(s||"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m]));
-  const chipCls=(done,total)=> total===0||done===0?"gray":(done<total?"yellow":"green");
-
-  function openOverlay(){ $('#rcbOverlay').classList.add('open'); }
-  function closeOverlay(){ $('#rcbOverlay').classList.remove('open'); }
-
-  async function gate(){
-    const {data:{session}}=await sb.auth.getSession();
-    if(!session){ openOverlay(); return false; }
-    me=session.user;
-    await sb.from("profiles").upsert({id:me.id,email:me.email},{onConflict:"id"});
-    return true;
+  // ---- Bygg "katalog" med id’er (så det ligner ekte data) ----
+  let catalog = {};
+  let autoId = 1;
+  for(const role of ROLES){
+    catalog[role] = DEMO[role].map(sec=>{
+      const items = sec.items.map(txt=>({ id: (autoId++).toString(), text: txt }));
+      return { id: 's'+(autoId++), title: sec.title, items };
+    });
   }
 
-  async function loadCatalog(){
-    catalog={};
-    for(const role of ROLES){
-      const {data:secs}=await sb.from("sections").select("id,title,position").eq("role",role).order("position");
-      const list=[];
-      for(const s of secs||[]){
-        const {data:its}=await sb.from("items").select("id,text,position").eq("section_id",s.id).order("position");
-        list.push({id:s.id,title:s.title,items:its||[]});
-      }
-      catalog[role]=list;
-    }
-  }
-  async function loadProgress(){
-    const {data}=await sb.from("progress").select("item_id,done,date,signed_by").eq("user_id",me.id);
-    progress={}; (data||[]).forEach(r=>progress[r.item_id]=r);
-  }
-  async function saveProgress(itemId,row){
-    row.user_id=me.id; row.item_id=itemId;
-    await sb.from("progress").upsert(row,{onConflict:"user_id,item_id"});
+  // ---- State + lagring ----
+  const KEY = 'mannskapsbok_demo_v1';
+  let progress = load() || {};           // { itemId: {done,date,signed_by} }
+  const saveQ = new Map();
+  let idle = null;
+
+  function load(){ try{ return JSON.parse(localStorage.getItem(KEY)||'{}'); }catch{ return {}; } }
+  function persist(){
+    const obj = { ...progress, ...Object.fromEntries(saveQ.entries()) };
+    localStorage.setItem(KEY, JSON.stringify(obj));
+    progress = obj; saveQ.clear(); updateSavebar(); toast('Lagret ✅');
+    renderCards(); // oppdater tellerne
   }
 
-  function render(){
-    const host=$("#app");
-    host.innerHTML=`<div class="rcb-title">Mannskapsbok</div>
-      <div class="rcb-row"><span>Innlogget som <b>${esc(me.email)}</b></span>
-        <button id="logout" class="rcb-btn">Logg ut</button>
-      </div>
-      <div class="rcb-grid" id="cards"></div>
-      <div class="rcb-tabs" id="tabs"></div>
-      <div id="panel"></div>`;
-
-    $("#logout").onclick = async ()=>{ await sb.auth.signOut(); location.reload(); };
-
-    renderCards(); renderTabs(ROLES[0]); renderRole(ROLES[0]);
+  function queue(itemId, patch){
+    const cur = progress[itemId] || {};
+    saveQ.set(itemId, { ...cur, ...patch });
+    updateSavebar();
+    schedule();
   }
+  function schedule(){ clearTimeout(idle); idle = setTimeout(persist, 1500); }
 
+  // ---- UI helpers ----
+  const $ = (s,r=document)=>r.querySelector(s);
+  function clsFor(done,total){ if(total===0 || done===0) return 'gray'; if(done<total) return 'yellow'; return 'green'; }
+  function fmt(v){ return v??''; }
+  function toast(msg){ const t=$('#toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),1000); }
+
+  // ---- Render kort (oversikt) ----
   function renderCards(){
-    const grid=$("#cards"); grid.innerHTML="";
-    ROLES.forEach(r=>{
-      const items=(catalog[r]||[]).flatMap(s=>s.items);
-      const total=items.length; const done=items.filter(it=>progress[it.id]?.done).length;
-      const card=document.createElement("div");card.className="rcb-card";
-      const btn=document.createElement("button");btn.className=chipCls(done,total);
-      btn.innerHTML=`${r}<span class="sub">${done}/${total} fullført</span>`;
-      btn.onclick=()=>{renderTabs(r);renderRole(r)};
-      card.appendChild(btn);grid.appendChild(card);
+    const grid = $('#cards'); grid.innerHTML='';
+    ROLES.forEach(role=>{
+      const its = (catalog[role]||[]).flatMap(s=>s.items);
+      const total = its.length;
+      const done = its.filter(it => (progress[it.id]||saveQ.get(it.id)||{}).done).length;
+      const card = document.createElement('div'); card.className='card';
+      const btn  = document.createElement('button'); btn.className = clsFor(done,total);
+      btn.innerHTML = `${role}<span class="sub">${done}/${total} fullført</span>`;
+      btn.onclick = ()=>{ renderTabs(role); renderRole(role); };
+      card.appendChild(btn); grid.appendChild(card);
     });
   }
 
+  // ---- Tabs ----
   function renderTabs(active){
-    const tabs=$("#tabs");tabs.innerHTML="";
+    const tabs = $('#tabs'); tabs.innerHTML='';
     ROLES.forEach(r=>{
-      const b=document.createElement("button");b.className="rcb-tab"+(r===active?" active":"");b.textContent=r;
-      b.onclick=()=>{renderTabs(r);renderRole(r)};tabs.appendChild(b);
+      const b=document.createElement('button'); b.className='tab'+(r===active?' active':''); b.textContent=r;
+      b.onclick=()=>{ renderTabs(r); renderRole(r); };
+      tabs.appendChild(b);
     });
   }
 
+  // ---- Panel for valgt rolle ----
   function renderRole(role){
-    const panel=$("#panel");
-    const secs=catalog[role]||[]; if(!secs.length){panel.innerHTML="<div class='rcb-empty'>Ingen punkter</div>";return;}
-    panel.innerHTML=secs.map((s,si)=>`
-      <div><div class="rcb-badge">${esc(s.title)}</div>
-      <table class="rcb-table"><thead><tr><th>#</th><th>Beskrivelse</th><th>Dato</th><th>Signert</th><th>Ferdig</th></tr></thead>
-      <tbody>${s.items.map((it,pi)=>`
-        <tr data-id="${it.id}">
-          <td>${si+1}.${pi+1}</td><td>${esc(it.text)}</td>
-          <td><input type="date" value="${progress[it.id]?.date||""}"></td>
-          <td><input type="text" value="${esc(progress[it.id]?.signed_by||"")}" placeholder="Signert av"></td>
-          <td><input type="checkbox" ${progress[it.id]?.done?"checked":""}></td>
-        </tr>`).join("")}</tbody></table></div>`).join("");
-    panel.querySelectorAll("tbody tr").forEach(tr=>{
-      const id=tr.getAttribute("data-id");
-      const d=tr.querySelector("input[type=date]"),s=tr.querySelector("input[type=text]"),c=tr.querySelector("input[type=checkbox]");
-      function commit(){ if(c.checked && !d.value) d.value=new Date().toISOString().slice(0,10);
-        saveProgress(id,{done:c.checked,date:d.value||null,signed_by:s.value||null}); renderCards(); }
-      d.onchange=commit; s.onchange=commit; c.onchange=commit;
+    const panel = $('#panel'); const secs = catalog[role]||[];
+    if(!secs.length){ panel.innerHTML = '<div class="empty">Ingen punkter.</div>'; return; }
+
+    panel.innerHTML = secs.map((s,si)=>`
+      <div style="margin:10px 0 14px">
+        <div class="tag">${s.title}</div>
+        <table class="table">
+          <thead><tr><th style="width:66px">#</th><th>Beskrivelse</th><th style="width:140px">Dato</th><th style="width:180px">Signert</th><th style="width:80px">Ferdig</th></tr></thead>
+          <tbody>
+            ${s.items.map((it,pi)=>{
+              const pr = saveQ.get(it.id) || progress[it.id] || {};
+              return `
+                <tr data-id="${it.id}">
+                  <td>${si+1}.${pi+1}</td>
+                  <td>${it.text.replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]))}</td>
+                  <td><input type="date" value="${fmt(pr.date)}"></td>
+                  <td><input type="text" placeholder="Signert av" value="${fmt(pr.signed_by||'')}"></td>
+                  <td><input type="checkbox" ${pr.done?'checked':''}></td>
+                </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+    `).join('');
+
+    // bind inputs
+    panel.querySelectorAll('tbody tr').forEach(tr=>{
+      const id = tr.getAttribute('data-id');
+      const d  = tr.querySelector('input[type="date"]');
+      const s  = tr.querySelector('input[type="text"]');
+      const c  = tr.querySelector('input[type="checkbox"]');
+      function commit(){
+        if(c.checked && !d.value){ d.value = new Date().toISOString().slice(0,10); }
+        queue(id,{ date: d.value||null, signed_by: s.value||null, done: !!c.checked });
+      }
+      d.addEventListener('change', commit);
+      s.addEventListener('change', commit);
+      c.addEventListener('change', commit);
     });
   }
 
-  // Overlay-knapper
-  $("#send").onclick=async()=>{
-    const email=$("#email").value.trim();
-    const {error}=await sb.auth.signInWithOtp({ email, options:{ emailRedirectTo: location.href } });
-    $("#msg").textContent=error?error.message:"Lenke sendt!";
-  };
-  $("#verify").onclick=async()=>{
-    const email=$("#email").value.trim();
-    const otp=$("#otp").value.trim();
-    const {error}=await sb.auth.verifyOtp({type:"email",email,token:otp});
-    $("#msg").textContent=error?error.message:"Innlogget!"; if(!error) location.reload();
-  };
-  $("#check").onclick=()=>location.reload();
+  // ---- Savebar ----
+  function updateSavebar(){
+    const bar = $('#savebar');
+    const n = saveQ.size;
+    if(n>0){ bar.style.display='flex'; $('#savecount').textContent = `${n} endringer`; $('#savemsg').textContent = 'Endringer ikke lagret.'; }
+    else { bar.style.display='none'; }
+  }
+  $('#savebtn').onclick = persist;
 
-  // Start app
-  if(await gate()){ closeOverlay(); await loadCatalog(); await loadProgress(); render(); }
+  // start
+  renderCards();
+  renderTabs(ROLES[0]);
+  renderRole(ROLES[0]);
 })();
 </script>
 </body>
