@@ -46,6 +46,7 @@
     .chip.green{background:#c9f7c9}
     .muted{opacity:.7}
     .rowline{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+
     /* overlay (login) */
     #ov{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.55);z-index:1000}
     #ov.open{display:flex}
@@ -55,6 +56,7 @@
     #dlg .ft{padding:12px 16px;border-top:1px solid #eee;display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
     .field{display:block;width:100%;padding:10px 12px;border:1px solid #ddd;border-radius:10px;margin:8px 0}
     .err{color:#b00020;font-size:12px;min-height:16px;margin-top:6px}
+
     /* toast */
     #toast{position:fixed;right:16px;bottom:16px;background:#111;color:#fff;padding:10px 12px;border-radius:10px;opacity:0;transform:translateY(8px);transition:.25s}
     #toast.show{opacity:1;transform:translateY(0)}
@@ -83,7 +85,7 @@
 
         <!-- Admin -->
         <div id="paneAdmin" style="display:none">
-          <input id="adminEmail" class="field" type="email" placeholder="rcbjorgvin@no-login.local" value="rcbjorgvin@no-login.local">
+          <input id="adminEmail" class="field" type="email" placeholder="post@rcbjorgvin.no" value="post@rcbjorgvin.no">
           <input id="adminPass" class="field" type="password" placeholder="fergehallen">
           <div id="aMsg" class="err"></div>
         </div>
@@ -109,6 +111,7 @@
   const SUPABASE_URL  = "https://pmrkhwpshbnnbjfkslyw.supabase.co";
   const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBtcmtod3BzaGJubmJqZmtzbHl3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYwNDEyODAsImV4cCI6MjA3MTYxNzI4MH0.NKaeyjbEoSsJ1mHRUMyclkbdWx5ClylaILNjr1l3Tas";
   const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+
   const ROLES = ['Fartøysjef','NK','Matros','Aspirant','Rescuerunner'];
 
   // ===== State =====
@@ -131,12 +134,15 @@
 
   // ===== Auth actions =====
   $('#send').onclick=async()=>{
-    const email=$('#email').value.trim(); $('#sMsg').textContent='Sender …';
+    const email=$('#email').value.trim(); if(!email){ $('#sMsg').textContent='Skriv inn e-post.'; return; }
+    $('#sMsg').textContent='Sender …';
     const { error } = await sb.auth.signInWithOtp({ email, options:{ emailRedirectTo: location.href } });
     $('#sMsg').textContent = error? error.message : 'Lenke sendt! Åpne e-posten, eller bruk 6-sifret kode her.';
   };
   $('#verify').onclick=async()=>{
-    const email=$('#email').value.trim(); const otp=$('#otp').value.trim(); $('#sMsg').textContent='Verifiserer …';
+    const email=$('#email').value.trim(); const otp=$('#otp').value.trim();
+    if(!email || !otp){ $('#sMsg').textContent='Skriv e-post + kode.'; return; }
+    $('#sMsg').textContent='Verifiserer …';
     const { error } = await sb.auth.verifyOtp({ type:'email', email, token: otp });
     if(error){ $('#sMsg').textContent=error.message; return; }
     location.reload();
@@ -144,12 +150,12 @@
   $('#check').onclick=()=>location.reload();
 
   $('#adminLogin').onclick=async()=>{
-    const email=$('#adminEmail').value.trim(); const password=$('#adminPass').value; $('#aMsg').textContent='Logger inn …';
+    const email=$('#adminEmail').value.trim(); const password=$('#adminPass').value;
+    if(!email || !password){ $('#aMsg').textContent='Skriv e-post og passord.'; return; }
+    $('#aMsg').textContent='Logger inn …';
     const { data, error } = await sb.auth.signInWithPassword({ email, password });
     if(error){ $('#aMsg').textContent=error.message; return; }
-    // ensure profile
     await sb.from('profiles').upsert({ id:data.user.id, email:data.user.email, name:data.user.email }, { onConflict:'id' });
-    // check admin
     const { data:prof } = await sb.from('profiles').select('is_admin').eq('id',data.user.id).maybeSingle();
     if(!prof?.is_admin){ $('#aMsg').textContent='Innlogget, men ikke admin. Kontakt ansvarlig.'; return; }
     location.reload();
@@ -205,13 +211,13 @@
     return data||[];
   }
 
-  // ===== Save helpers =====
+  // ===== Save/helpers =====
   async function upsertProgress(itemId, patch, uid=me.id){
     const row = { user_id: uid, item_id: itemId,
       done: !!patch.done, date: patch.date || null, signed_by: patch.signed_by || null };
     const { error } = await sb.from('progress').upsert(row, { onConflict:'user_id,item_id' });
     if(!error){
-      if(uid===me.id){ myProg.set(itemId, row); }
+      if(uid===me.id){ myProg.set(itemId, { ...myProg.get(itemId), ...row }); }
       await sb.from('logs').insert({ actor_id: me.id, message: `progress updated for user ${uid}` });
     }
   }
@@ -258,6 +264,19 @@
     await sb.from('items').update({ position:b.position }).eq('id', a.id);
     await sb.from('items').update({ position:a.position }).eq('id', b.id);
     await sb.from('logs').insert({ actor_id: me.id, message: `item moved` });
+  }
+  async function setAdmin(uid, flag){
+    if(uid === me.id && !flag){
+      const ok = confirm('Du er i ferd med å fjerne din egen admin-tilgang. Fortsette?');
+      if(!ok) return;
+    }
+    const { error } = await sb.from('profiles').update({ is_admin: !!flag }).eq('id', uid);
+    if(error){ alert('Kunne ikke oppdatere admin-status: ' + error.message); return; }
+    await sb.from('logs').insert({ actor_id: me.id, message: `is_admin ${flag?'ON':'OFF'} for ${uid}` });
+    if(uid === me.id){
+      isAdmin = !!flag;
+      if(!isAdmin){ renderStudent(); return; }
+    }
   }
 
   // ===== Render: Student =====
@@ -408,7 +427,6 @@
     $('#btnBack').onclick=renderStudent;
     $('#logout').onclick=async()=>{ await sb.auth.signOut(); location.reload(); };
 
-    // users
     function totalsFor(uid){
       const its=Object.values(catalog).flatMap(secs=>secs.flatMap(s=>s.items));
       return loadProgressFor(uid).then(map=>{
@@ -416,24 +434,47 @@
         return { done, total: its.length, map };
       });
     }
+
     async function drawUsers(){
       const q=($('#userSearch').value||'').toLowerCase();
       const list=$('#userList');
       const arr=users.filter(u=>(u.name||'').toLowerCase().includes(q)||(u.email||'').toLowerCase().includes(q));
       if(!arr.length){ list.innerHTML='<li><span class="note">Ingen brukere</span></li>'; return; }
-      // render with sums (lazy: no await all here; update rows after)
-      list.innerHTML = arr.map(u=>`<li data-id="${u.id}">
-        <span>${esc(u.name||u.email||u.id)} ${u.is_admin?'<span class="chip">admin</span>':''}</span>
-        <span class="chip" id="sum-${u.id}">…</span>
-      </li>`).join('');
-      $$('#userList li').forEach(li=>li.onclick=()=>selectUser(li.getAttribute('data-id')));
-      // fill sums
+
+      list.innerHTML = arr.map(u=>`
+        <li data-id="${u.id}">
+          <span>${esc(u.name||u.email||u.id)}</span>
+          <span class="rowline">
+            <label class="note" title="Gi/fjern admin-tilgang">
+              <input type="checkbox" class="makeAdmin" data-id="${u.id}" ${u.is_admin?'checked':''}>
+              Admin
+            </label>
+            <span class="chip" id="sum-${u.id}">…</span>
+          </span>
+        </li>
+      `).join('');
+
+      // klikk på rad = velg bruker (men ikke når man klikker på checkbox)
+      $$('#userList li').forEach(li => li.onclick = (e)=>{
+        if(e.target && e.target.classList.contains('makeAdmin')) return;
+        selectUser(li.getAttribute('data-id'));
+      });
+
+      // toggle admin
+      $$('#userList .makeAdmin').forEach(ch=>{
+        ch.onchange = async ()=>{
+          const uid = ch.dataset.id;
+          const flag = ch.checked;
+          await setAdmin(uid, flag);
+        };
+      });
+
+      // fyll summer pr bruker
       for(const u of arr){
         totalsFor(u.id).then(t=>{ const el=$(`#sum-${u.id}`); if(el) el.textContent=`${t.done}/${t.total}`; });
       }
     }
 
-    // catalog editor
     async function drawCatalogEditor(){
       const role=$('#catRole').value; const wrap=$('#catWrap'); const secs=catalog[role]||[];
       if(!secs.length){ wrap.innerHTML='<div class="note">Ingen inndelinger. Legg til med knappen over.</div>'; return; }
@@ -572,7 +613,7 @@
     await drawUsers();
     await drawLog();
 
-    // select first user automatically (if any)
+    // auto-velg første bruker hvis noen finnes
     const first = users[0]; if(first){ selectUser(first.id); }
   }
 
@@ -608,50 +649,3 @@
 </script>
 </body>
 </html>
-async function setAdmin(uid, flag){
-  // hvis du forsøker å fjerne din egen admin-tilgang, spør først
-  if(uid === me.id && !flag){
-    const ok = confirm('Du er i ferd med å fjerne din egen admin-tilgang. Fortsette?');
-    if(!ok) return;
-  }
-  const { error } = await sb.from('profiles').update({ is_admin: !!flag }).eq('id', uid);
-  if(error){ alert('Kunne ikke oppdatere admin-status: ' + error.message); return; }
-  await sb.from('logs').insert({ actor_id: me.id, message: `is_admin ${flag?'ON':'OFF'} for ${uid}` });
-
-  // oppdater lokalt UI
-  if(uid === me.id){
-    isAdmin = !!flag;
-    if(!isAdmin){
-      // mister admin der og da → tilbake til elev-siden
-      renderStudent();
-      return;
-    }
-  }
-}
-list.innerHTML = arr.map(u=>`
-  <li data-id="${u.id}">
-    <span>${esc(u.name||u.email||u.id)}</span>
-    <span class="rowline">
-      <label class="note" title="Gi/fjern admin-tilgang">
-        <input type="checkbox" class="makeAdmin" data-id="${u.id}" ${u.is_admin?'checked':''}>
-        Admin
-      </label>
-      <span class="chip" id="sum-${u.id}">…</span>
-    </span>
-  </li>
-`).join('');
-// klikk på rad = velg bruker
-$$('#userList li').forEach(li => li.onclick = (e)=>{
-  // ignorér klikk på selve checkboxen (den har egen handler)
-  if(e.target && e.target.classList.contains('makeAdmin')) return;
-  selectUser(li.getAttribute('data-id'));
-});
-
-// toggle admin
-$$('#userList .makeAdmin').forEach(ch=>{
-  ch.onchange = async ()=>{
-    const uid = ch.dataset.id;
-    const flag = ch.checked;
-    await setAdmin(uid, flag);
-  };
-});
