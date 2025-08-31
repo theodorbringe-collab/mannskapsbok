@@ -25,7 +25,7 @@
     .gray{background:#e5e5e5}.yellow{background:#ffe08a}.green{background:#9be29b}
     .tabs{display:flex;gap:8px;margin:12px 0;flex-wrap:wrap}
     .tab{padding:10px 12px;border-radius:10px;border:1px solid #ddd;background:#fff;cursor:pointer}
-    .tab.active{background:#111;color:#fff;border-color:#111}
+    .tab.active{background:#111;color:#fff}
     .tag{display:inline-block;font-size:12px;padding:4px 8px;border-radius:999px;background:#f1f1f1;margin:0 0 6px}
     .table{width:100%;border-collapse:collapse;background:#fff;border:1px solid #ddd;border-radius:12px;overflow:hidden}
     .table th,.table td{border-bottom:1px solid #eee;padding:10px 8px;text-align:left;vertical-align:top}
@@ -85,28 +85,29 @@
 
 <script>
 (async()=>{
-  // ===== Supabase-konfig =====
+  // ===== Supabase =====
   const SUPABASE_URL  = "https://pmrkhwpshbnnbjfkslyw.supabase.co";
   const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBtcmtod3BzaGJubmJqZmtzbHl3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYwNDEyODAsImV4cCI6MjA3MTYxNzI4MH0.NKaeyjbEoSsJ1mHRUMyclkbdWx5ClylaILNjr1l3Tas";
   const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
 
   const ROLES = ['Fartøysjef','NK','Matros','Aspirant','Rescuerunner'];
+  const FORCE_ADMIN_EMAIL = 'theodor.eide@rodekors.org'; // <- tvungen admin i UI
 
   // ===== State =====
   let me=null, isAdmin=false, catalog={}, myProg=new Map();
-  let rt=null; // realtime channel
+  let rt=null;
 
   // ===== Helpers =====
   const $=(s,r=document)=>r.querySelector(s);
   const $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
   const esc=s=>(s||'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[m]));
   const fmt=v=>v??'';
-  function clsFor(done,total){ if(total===0||done===0) return 'gray'; if(done<total) return 'yellow'; return 'green'; }
-  function toast(msg){ const t=$('#toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),1200); }
-  function openOverlay(){ $('#ov').classList.add('open'); }
-  function closeOverlay(){ $('#ov').classList.remove('open'); }
+  const clsFor=(done,total)=> total===0||done===0?'gray':(done<total?'yellow':'green');
+  const toast=msg=>{ const t=$('#toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),1200); };
+  const openOverlay=()=>$('#ov').classList.add('open');
+  const closeOverlay=()=>$('#ov').classList.remove('open');
 
-  // ===== Auth (kun e-post) =====
+  // ===== Auth (email) =====
   $('#send').onclick=async()=>{
     const email=$('#email').value.trim(); if(!email){ $('#sMsg').textContent='Skriv inn e-post.'; return; }
     $('#sMsg').textContent='Sender …';
@@ -129,12 +130,17 @@
     if(!session){ openOverlay(); return false; }
     me = session.user;
     await sb.from('profiles').upsert({ id: me.id, email: me.email, name: me.email }, { onConflict:'id' });
+
     const { data:adm } = await sb.from('profiles').select('is_admin').eq('id', me.id).maybeSingle();
     isAdmin = !!adm?.is_admin;
+
+    // Tving admin i UI for spesifikk e-post
+    if (me?.email && me.email.toLowerCase() === FORCE_ADMIN_EMAIL) isAdmin = true;
+
     return true;
   }
 
-  // ===== Data loaders =====
+  // ===== Loaders =====
   async function loadCatalog(){
     catalog={};
     for(const role of ROLES){
@@ -143,9 +149,7 @@
       if(secs?.length){
         const ids = secs.map(s=>s.id);
         const { data:items } = await sb.from('items').select('id,section_id,text,position').in('section_id', ids).order('position',{ascending:true});
-        for(const s of secs){
-          list.push({ id:s.id, title:s.title, position:s.position, items:(items||[]).filter(i=>i.section_id===s.id) });
-        }
+        for(const s of secs) list.push({ id:s.id, title:s.title, position:s.position, items:(items||[]).filter(i=>i.section_id===s.id) });
       }
       catalog[role]=list;
     }
@@ -154,7 +158,7 @@
     const { data } = await sb.from('progress').select('item_id,done,date,signed_by').eq('user_id', me.id);
     myProg = new Map(); (data||[]).forEach(r=>myProg.set(r.item_id, r));
   }
-  async function loadUsers(){ // admin
+  async function loadUsers(){
     const { data } = await sb.from('profiles').select('id,email,name,is_admin').order('email',{ascending:true});
     return data||[];
   }
@@ -172,10 +176,9 @@
     return data||[];
   }
 
-  // ===== Save/helpers =====
+  // ===== Saves =====
   async function upsertProgress(itemId, patch, uid=me.id){
-    const row = { user_id: uid, item_id: itemId,
-      done: !!patch.done, date: patch.date || null, signed_by: patch.signed_by || null };
+    const row = { user_id: uid, item_id: itemId, done: !!patch.done, date: patch.date || null, signed_by: patch.signed_by || null };
     const { error } = await sb.from('progress').upsert(row, { onConflict:'user_id,item_id' });
     if(!error){
       if(uid===me.id){ myProg.set(itemId, { ...myProg.get(itemId), ...row }); }
@@ -186,61 +189,23 @@
     await sb.from('comments').insert({ user_id: uid, author_id: me.id, text });
     await sb.from('logs').insert({ actor_id: me.id, message: `comment added for user ${uid}` });
   }
-  async function addSection(role){
-    await sb.from('sections').insert({ role, title:'Ny inndeling', position: Date.now() });
-    await sb.from('logs').insert({ actor_id: me.id, message: `section added in ${role}` });
-  }
-  async function updateSectionTitle(id, title){
-    await sb.from('sections').update({ title }).eq('id', id);
-    await sb.from('logs').insert({ actor_id: me.id, message: `section title updated` });
-  }
-  async function deleteSection(id){
-    await sb.from('sections').delete().eq('id', id);
-    await sb.from('logs').insert({ actor_id: me.id, message: `section deleted` });
-  }
-  async function moveSection(role, si, dir){
-    const secs = catalog[role]; const j = si + (dir==='up'?-1:+1);
-    if(j<0 || j>=secs.length) return;
-    const a=secs[si], b=secs[j];
-    await sb.from('sections').update({ position:b.position }).eq('id', a.id);
-    await sb.from('sections').update({ position:a.position }).eq('id', b.id);
-    await sb.from('logs').insert({ actor_id: me.id, message: `section moved` });
-  }
-  async function addItem(section_id, text){
-    await sb.from('items').insert({ section_id, text, position: Date.now() });
-    await sb.from('logs').insert({ actor_id: me.id, message: `item added` });
-  }
-  async function editItem(id, text){
-    await sb.from('items').update({ text }).eq('id', id);
-    await sb.from('logs').insert({ actor_id: me.id, message: `item edited` });
-  }
-  async function deleteItem(id){
-    await sb.from('items').delete().eq('id', id);
-    await sb.from('logs').insert({ actor_id: me.id, message: `item deleted` });
-  }
-  async function moveItem(role, si, ii, dir){
-    const sec=catalog[role][si]; const arr=sec.items; const j=ii+(dir==='up'?-1:+1);
-    if(j<0 || j>=arr.length) return;
-    const a=arr[ii], b=arr[j];
-    await sb.from('items').update({ position:b.position }).eq('id', a.id);
-    await sb.from('items').update({ position:a.position }).eq('id', b.id);
-    await sb.from('logs').insert({ actor_id: me.id, message: `item moved` });
-  }
+  async function addSection(role){ await sb.from('sections').insert({ role, title:'Ny inndeling', position: Date.now() }); await sb.from('logs').insert({ actor_id: me.id, message: `section added in ${role}` }); }
+  async function updateSectionTitle(id, title){ await sb.from('sections').update({ title }).eq('id', id); await sb.from('logs').insert({ actor_id: me.id, message: `section title updated` }); }
+  async function deleteSection(id){ await sb.from('sections').delete().eq('id', id); await sb.from('logs').insert({ actor_id: me.id, message: `section deleted` }); }
+  async function moveSection(role, si, dir){ const secs=catalog[role]; const j=si+(dir==='up'?-1:+1); if(j<0||j>=secs.length) return; const a=secs[si], b=secs[j]; await sb.from('sections').update({ position:b.position }).eq('id', a.id); await sb.from('sections').update({ position:a.position }).eq('id', b.id); await sb.from('logs').insert({ actor_id: me.id, message: `section moved` }); }
+  async function addItem(section_id, text){ await sb.from('items').insert({ section_id, text, position: Date.now() }); await sb.from('logs').insert({ actor_id: me.id, message: `item added` }); }
+  async function editItem(id, text){ await sb.from('items').update({ text }).eq('id', id); await sb.from('logs').insert({ actor_id: me.id, message: `item edited` }); }
+  async function deleteItem(id){ await sb.from('items').delete().eq('id', id); await sb.from('logs').insert({ actor_id: me.id, message: `item deleted` }); }
+  async function moveItem(role, si, ii, dir){ const sec=catalog[role][si]; const arr=sec.items; const j=ii+(dir==='up'?-1:+1); if(j<0||j>=arr.length) return; const a=arr[ii], b=arr[j]; await sb.from('items').update({ position:b.position }).eq('id', a.id); await sb.from('items').update({ position:a.position }).eq('id', b.id); await sb.from('logs').insert({ actor_id: me.id, message: `item moved` }); }
   async function setAdmin(uid, flag){
-    if(uid === me.id && !flag){
-      const ok = confirm('Du er i ferd med å fjerne din egen admin-tilgang. Fortsette?');
-      if(!ok) return;
-    }
+    if(uid===me.id && !flag){ const ok=confirm('Du er i ferd med å fjerne din egen admin-tilgang. Fortsette?'); if(!ok) return; }
     const { error } = await sb.from('profiles').update({ is_admin: !!flag }).eq('id', uid);
     if(error){ alert('Kunne ikke oppdatere admin-status: ' + error.message); return; }
     await sb.from('logs').insert({ actor_id: me.id, message: `is_admin ${flag?'ON':'OFF'} for ${uid}` });
-    if(uid === me.id){
-      isAdmin = !!flag;
-      if(!isAdmin){ renderStudent(); return; }
-    }
+    if(uid===me.id){ isAdmin=!!flag; if(!isAdmin){ renderStudent(); return; } }
   }
 
-  // ===== Render: Student =====
+  // ===== Student UI =====
   function renderStudent(){
     const host=$('#app');
     host.innerHTML=`
@@ -248,7 +213,7 @@
       <div class="row">
         <span>Innlogget som <b>${esc(me.email||me.id)}</b></span>
         <span class="badge">Sky OK</span>
-        ${isAdmin?'<button id="btnAdmin" class="btn">Admin</button>':''}
+        <button id="btnAdmin" class="btn">Admin</button>
         <button id="logout" class="btn">Logg ut</button>
       </div>
       <div id="cards" class="grid"></div>
@@ -256,7 +221,7 @@
       <div id="panel"></div>
     `;
     $('#logout').onclick=async()=>{ await sb.auth.signOut(); location.reload(); };
-    if(isAdmin) $('#btnAdmin').onclick=renderAdmin;
+    $('#btnAdmin').onclick=()=>{ if(isAdmin) renderAdmin(); else alert('Du har ikke admin-tilgang.'); };
     renderCards(); renderTabs(ROLES[0]); renderRole(ROLES[0]);
   }
   function renderCards(){
@@ -316,8 +281,10 @@
     });
   }
 
-  // ===== Render: Admin =====
+  // ===== Admin UI =====
   async function renderAdmin(){
+    if(!isAdmin){ alert('Du har ikke admin-tilgang.'); return; } // sikkerhetsnett i UI
+
     const users = await loadUsers();
     const host=$('#app');
     host.innerHTML=`
@@ -414,22 +381,10 @@
         </li>
       `).join('');
 
-      $$('#userList li').forEach(li => li.onclick = (e)=>{
-        if(e.target && e.target.classList.contains('makeAdmin')) return;
-        selectUser(li.getAttribute('data-id'));
-      });
+      $$('#userList li').forEach(li => li.onclick = (e)=>{ if(e.target && e.target.classList.contains('makeAdmin')) return; selectUser(li.getAttribute('data-id')); });
+      $$('#userList .makeAdmin').forEach(ch=>{ ch.onchange = async ()=>{ const uid=ch.dataset.id; await setAdmin(uid, ch.checked); }; });
 
-      $$('#userList .makeAdmin').forEach(ch=>{
-        ch.onchange = async ()=>{
-          const uid = ch.dataset.id;
-          const flag = ch.checked;
-          await setAdmin(uid, flag);
-        };
-      });
-
-      for(const u of arr){
-        totalsFor(u.id).then(t=>{ const el=$(`#sum-${u.id}`); if(el) el.textContent=`${t.done}/${t.total}`; });
-      }
+      for(const u of arr){ totalsFor(u.id).then(t=>{ const el=$(`#sum-${u.id}`); if(el) el.textContent=`${t.done}/${t.total}`; }); }
     }
 
     async function drawCatalogEditor(){
@@ -469,26 +424,23 @@
         </div>
       `).join('');
 
-      $$('#catWrap .secTitle').forEach(inp=>{
-        inp.onchange=async()=>{ const si=+inp.dataset.si; await updateSectionTitle(secs[si].id, inp.value.trim()||secs[si].title); await loadCatalog(); await drawCatalogEditor(); };
-      });
+      $$('#catWrap .secTitle').forEach(inp=>{ inp.onchange=async()=>{ const si=+inp.dataset.si; await updateSectionTitle(secs[si].id, inp.value.trim()||secs[si].title); await loadCatalog(); await drawCatalogEditor(); }; });
       $$('#catWrap [data-act]').forEach(btn=>{
         btn.onclick=async()=>{
           const act=btn.dataset.act; const si=+btn.dataset.si;
           if(act==='secDel'){ if(!confirm('Slette inndeling?')) return; await deleteSection(secs[si].id); await loadCatalog(); await drawCatalogEditor(); return; }
-          if(act==='secUp')  { await moveSection(role, si, 'up'); await loadCatalog(); await drawCatalogEditor(); return; }
+          if(act==='secUp'){ await moveSection(role, si, 'up'); await loadCatalog(); await drawCatalogEditor(); return; }
           if(act==='secDown'){ await moveSection(role, si, 'down'); await loadCatalog(); await drawCatalogEditor(); return; }
           if(act==='addItem'){ const inp=$(`#catWrap .newItem[data-si="${si}"]`); const txt=(inp.value||'').trim(); if(!txt) return; await addItem(secs[si].id, txt); inp.value=''; await loadCatalog(); await drawCatalogEditor(); return; }
         };
       });
       $$('#catWrap li [data-act]').forEach(btn=>{
         btn.onclick=async()=>{
-          const li=btn.closest('li'); const si=+li.dataset.si; const ii=+li.dataset.ii;
-          const role=$('#catRole').value;
-          if(btn.dataset.act==='itUp')   { await moveItem(role, si, ii, 'up');   await loadCatalog(); await drawCatalogEditor(); }
-          if(btn.dataset.act==='itDown') { await moveItem(role, si, ii, 'down'); await loadCatalog(); await drawCatalogEditor(); }
+          const li=btn.closest('li'); const si=+li.dataset.si; const ii=+li.dataset.ii; const role=$('#catRole').value;
+          if(btn.dataset.act==='itUp'){ await moveItem(role, si, ii, 'up'); await loadCatalog(); await drawCatalogEditor(); }
+          if(btn.dataset.act==='itDown'){ await moveItem(role, si, ii, 'down'); await loadCatalog(); await drawCatalogEditor(); }
           if(btn.dataset.act==='itEdit'){ const cur=catalog[role][si].items[ii]; const nt=prompt('Rediger beskrivelse:', cur.text); if(nt!=null){ await editItem(cur.id, nt.trim()); await loadCatalog(); await drawCatalogEditor(); } }
-          if(btn.dataset.act==='itDel') { if(!confirm('Slette punkt?')) return; const cur=catalog[role][si].items[ii]; await deleteItem(cur.id); await loadCatalog(); await drawCatalogEditor(); }
+          if(btn.dataset.act==='itDel'){ if(!confirm('Slette punkt?')) return; const cur=catalog[role][si].items[ii]; await deleteItem(cur.id); await loadCatalog(); await drawCatalogEditor(); }
         };
       });
     }
@@ -501,10 +453,7 @@
       await renderUserBook(uid, $('#editToggle').checked, totals.map);
       await drawComments(uid);
       $('#editToggle').onchange=()=> renderUserBook(uid, $('#editToggle').checked, totals.map);
-      $('#addComment').onclick=async()=>{
-        const t=$('#commentTxt').value.trim(); if(!t) return;
-        await addComment(uid, t); $('#commentTxt').value=''; await drawComments(uid);
-      };
+      $('#addComment').onclick=async()=>{ const t=$('#commentTxt').value.trim(); if(!t) return; await addComment(uid, t); $('#commentTxt').value=''; await drawComments(uid); };
     }
 
     async function renderUserBook(uid, editable, progMap){
@@ -560,7 +509,6 @@
       </div>`).join('') || '<div class="note">Loggen er tom.</div>';
     }
 
-    // bind
     $('#userSearch').oninput=drawUsers;
     $('#addSec').onclick=async()=>{ await addSection($('#catRole').value); await loadCatalog(); await drawCatalogEditor(); };
     $('#catRole').onchange=drawCatalogEditor;
@@ -594,7 +542,11 @@
     closeOverlay();
     await loadCatalog();
     await loadMyProgress();
-    renderStudent();
+
+    // Åpne admin automatisk for tvungen admin/ekte admin
+    if (isAdmin) renderAdmin();
+    else renderStudent();
+
     bindRealtime();
   }catch(e){
     $('#app').innerHTML = '<div class="wrap"><div class="title">Mannskapsbok</div><div class="note">Feil ved oppstart: '+esc(e.message||e)+'</div></div>';
