@@ -93,7 +93,7 @@
       <div class="ft">
         <div id="studentBtns">
           <button id="send" class="btn primary">Send lenke</button>
-          <button id="check" class="btn">Sjekk innlogging</button>
+          <button id="check" class="btn">Jeg har åpnet lenken</button>
           <button id="verify" class="btn">Verifiser kode</button>
         </div>
         <div id="adminBtns" style="display:none">
@@ -128,6 +128,19 @@
   function openOverlay(){ $('#ov').classList.add('open'); }
   function closeOverlay(){ $('#ov').classList.remove('open'); }
 
+  // ===== Håndter magisk lenke (#access_token i URL) =====
+  async function handleHashLogin(){
+    const hash = location.hash ? location.hash.replace(/^#/, '') : '';
+    if(!hash) return;
+    const p = new URLSearchParams(hash);
+    const at = p.get('access_token');
+    const rt = p.get('refresh_token');
+    if(at && rt){
+      await sb.auth.setSession({ access_token: at, refresh_token: rt });
+      history.replaceState({}, document.title, location.pathname + location.search); // fjern tokens fra URL
+    }
+  }
+
   // ===== Login overlay tabs =====
   $('#tabStudent').onclick=()=>{ $('#paneStudent').style.display='block'; $('#paneAdmin').style.display='none'; $('#studentBtns').style.display=''; $('#adminBtns').style.display='none'; $('#tabStudent').classList.add('primary'); $('#tabAdmin').classList.remove('primary'); };
   $('#tabAdmin').onclick=()=>{ $('#paneStudent').style.display='none'; $('#paneAdmin').style.display='block'; $('#studentBtns').style.display='none'; $('#adminBtns').style.display=''; $('#tabAdmin').classList.add('primary'); $('#tabStudent').classList.remove('primary'); };
@@ -136,8 +149,8 @@
   $('#send').onclick=async()=>{
     const email=$('#email').value.trim(); if(!email){ $('#sMsg').textContent='Skriv inn e-post.'; return; }
     $('#sMsg').textContent='Sender …';
-    const { error } = await sb.auth.signInWithOtp({ email, options:{ emailRedirectTo: location.href } });
-    $('#sMsg').textContent = error? error.message : 'Lenke sendt! Åpne e-posten, eller bruk 6-sifret kode her.';
+    const { error } = await sb.auth.signInWithOtp({ email, options:{ emailRedirectTo: location.origin + location.pathname } });
+    $('#sMsg').textContent = error? error.message : 'Lenke sendt! Åpne e-posten, og kom tilbake hit.';
   };
   $('#verify').onclick=async()=>{
     const email=$('#email').value.trim(); const otp=$('#otp').value.trim();
@@ -163,6 +176,7 @@
 
   // ===== Gate =====
   async function gate(){
+    await handleHashLogin(); // <-- viktig: plukk opp tokens før vi sjekker sesjon
     const { data:{ session } } = await sb.auth.getSession();
     if(!session){ openOverlay(); return false; }
     me = session.user;
@@ -176,8 +190,7 @@
   async function loadCatalog(){
     catalog={};
     for(const role of ROLES){
-      const { data:secs, error:e1 } = await sb.from('sections').select('id,title,position').eq('role',role).order('position',{ascending:true});
-      if(e1){ console.warn(e1); catalog[role]=[]; continue; }
+      const { data:secs } = await sb.from('sections').select('id,title,position').eq('role',role).order('position',{ascending:true});
       const list=[];
       if(secs?.length){
         const ids = secs.map(s=>s.id);
@@ -193,7 +206,7 @@
     const { data } = await sb.from('progress').select('item_id,done,date,signed_by').eq('user_id', me.id);
     myProg = new Map(); (data||[]).forEach(r=>myProg.set(r.item_id, r));
   }
-  async function loadUsers(){ // admin
+  async function loadUsers(){
     const { data } = await sb.from('profiles').select('id,email,name,is_admin').order('email',{ascending:true});
     return data||[];
   }
@@ -237,7 +250,7 @@
     await sb.from('sections').delete().eq('id', id);
     await sb.from('logs').insert({ actor_id: me.id, message: `section deleted` });
   }
-  async function moveSection(role, si, dir){ // swap positions
+  async function moveSection(role, si, dir){
     const secs = catalog[role]; const j = si + (dir==='up'?-1:+1);
     if(j<0 || j>=secs.length) return;
     const a=secs[si], b=secs[j];
@@ -341,7 +354,6 @@
           </tbody>
         </table>
       </div>`).join('');
-    // bindings
     $$('#panel tbody tr').forEach(tr=>{
       const id=tr.getAttribute('data-id');
       const d=tr.querySelector('input[type="date"]');
@@ -454,13 +466,11 @@
         </li>
       `).join('');
 
-      // klikk på rad = velg bruker (men ikke når man klikker på checkbox)
       $$('#userList li').forEach(li => li.onclick = (e)=>{
         if(e.target && e.target.classList.contains('makeAdmin')) return;
         selectUser(li.getAttribute('data-id'));
       });
 
-      // toggle admin
       $$('#userList .makeAdmin').forEach(ch=>{
         ch.onchange = async ()=>{
           const uid = ch.dataset.id;
@@ -469,7 +479,6 @@
         };
       });
 
-      // fyll summer pr bruker
       for(const u of arr){
         totalsFor(u.id).then(t=>{ const el=$(`#sum-${u.id}`); if(el) el.textContent=`${t.done}/${t.total}`; });
       }
@@ -512,7 +521,6 @@
         </div>
       `).join('');
 
-      // handlers
       $$('#catWrap .secTitle').forEach(inp=>{
         inp.onchange=async()=>{ const si=+inp.dataset.si; await updateSectionTitle(secs[si].id, inp.value.trim()||secs[si].title); await loadCatalog(); await drawCatalogEditor(); };
       });
@@ -604,7 +612,6 @@
       </div>`).join('') || '<div class="note">Loggen er tom.</div>';
     }
 
-    // bind
     $('#userSearch').oninput=drawUsers;
     $('#addSec').onclick=async()=>{ await addSection($('#catRole').value); await loadCatalog(); await drawCatalogEditor(); };
     $('#catRole').onchange=drawCatalogEditor;
@@ -613,7 +620,6 @@
     await drawUsers();
     await drawLog();
 
-    // auto-velg første bruker hvis noen finnes
     const first = users[0]; if(first){ selectUser(first.id); }
   }
 
