@@ -288,3 +288,528 @@
 </script>
 </body>
 </html>
+<!DOCTYPE html>
+<html lang="no">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Mannskapsbok (demo + admin)</title>
+  <style>
+    :root{--accent:#2b4dcb}
+    *{box-sizing:border-box}
+    body{margin:0;background:#fafafa;font:14px/1.4 Arial, sans-serif;color:#111}
+    a{color:inherit}
+    .wrap{max-width:1100px;margin:40px auto;padding:0 16px}
+    .title{font-size:28px;font-weight:800;color:var(--accent);margin:0 0 6px}
+    .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:8px 0 14px}
+    .badge{padding:4px 8px;border-radius:999px;border:1px solid #ddd;background:#fff;font-size:12px}
+    .note{font-size:12px;color:#666}
+    .btn{padding:8px 12px;border-radius:8px;border:1px solid #ddd;background:#fff;cursor:pointer}
+    .btn.primary{background:#111;color:#fff;border-color:#111}
+    .btn.small{padding:6px 8px;font-size:12px}
+    .grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));margin:16px 0 8px}
+    .card{border:1px solid #eee;border-radius:14px;background:#f7f7f7}
+    .card button{width:100%;padding:16px 14px;border:0;border-radius:12px;font-weight:700;cursor:pointer;box-shadow:0 2px 5px rgba(0,0,0,.08)}
+    .card .sub{display:block;font-weight:400;font-size:12px;opacity:.85;margin-top:2px}
+    .gray{background:#e5e5e5}.yellow{background:#ffe08a}.green{background:#9be29b}
+    .tabs{display:flex;gap:8px;margin:12px 0;flex-wrap:wrap}
+    .tab{padding:10px 12px;border-radius:10px;border:1px solid #ddd;background:#fff;cursor:pointer}
+    .tab.active{background:#111;color:#fff;border-color:#111}
+    .tag{display:inline-block;font-size:12px;padding:4px 8px;border-radius:999px;background:#f1f1f1;margin:0 0 6px}
+    .table{width:100%;border-collapse:collapse;background:#fff;border:1px solid #ddd;border-radius:12px;overflow:hidden}
+    .table th,.table td{border-bottom:1px solid #eee;padding:10px 8px;text-align:left;vertical-align:top}
+    .table th{background:#fafafa;font-weight:700}
+    .table tr:last-child td{border-bottom:0}
+    .table input[type="text"],.table input[type="date"]{width:100%;padding:6px 8px;border:1px solid #ddd;border-radius:8px}
+    .empty{padding:16px;color:#666}
+    .split{display:grid;grid-template-columns:300px 1fr;gap:12px}
+    @media (max-width:900px){ .split{grid-template-columns:1fr} }
+    .box{border:1px solid #eee;border-radius:12px;background:#fff;overflow:hidden}
+    .box .hd{padding:10px 12px;border-bottom:1px solid #eee;background:#fafafa;font-weight:700}
+    .box .bd{padding:10px 12px}
+    .list{list-style:none;margin:0;padding:0;max-height:420px;overflow:auto}
+    .list li{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border-bottom:1px solid #f6f6f6;cursor:pointer}
+    .list li:hover{background:#f9f9f9}
+    .chip{font-size:12px;padding:3px 6px;border-radius:999px;background:#eee}
+    .chip.red{background:#ffd2d2}
+    .chip.green{background:#c9f7c9}
+    .muted{opacity:.7}
+    .rowline{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+    /* save bar */
+    #savebar{position:fixed;left:12px;right:12px;bottom:12px;display:none;align-items:center;gap:10px;padding:10px 12px;border:1px solid #ddd;border-radius:12px;background:#fff;box-shadow:0 10px 28px rgba(0,0,0,.15);z-index:1000}
+    #savebar .pill{font-size:12px;padding:4px 8px;border-radius:999px;background:#f1f1f1}
+    #savebar .btn{padding:10px 14px;border-radius:10px;border:1px solid #ddd;background:#111;color:#fff;cursor:pointer}
+    #toast{position:fixed;right:16px;bottom:16px;background:#111;color:#fff;padding:10px 12px;border-radius:10px;opacity:0;transform:translateY(8px);transition:.25s}
+    #toast.show{opacity:1;transform:translateY(0)}
+    /* editor */
+    .inp{border:1px solid #ddd;border-radius:8px;padding:6px 8px}
+    .ul{list-style:none;margin:0;padding:0;border:1px dashed #ddd;border-radius:8px}
+    .ul li{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid #f4f4f4;background:#fff;border-radius:6px}
+    .ul li:last-child{border-bottom:0}
+    .n{font:600 12px/1.2 Arial;margin-right:6px;opacity:.75;width:34px;text-align:right}
+  </style>
+</head>
+<body>
+  <div class="wrap" id="app"></div>
+
+  <!-- Savebar -->
+  <div id="savebar">
+    <span id="savecount" class="pill">0 endringer</span>
+    <span id="savemsg" class="note">Endringer ikke lagret.</span>
+    <div style="flex:1"></div>
+    <button id="savebtn" class="btn">Lagre nå</button>
+  </div>
+  <div id="toast">Lagret ✅</div>
+
+<script>
+(function(){
+  // --------- DEMO DATA (kan byttes med Supabase senere) ----------
+  const ROLES = ['Fartøysjef','NK','Matros','Aspirant','Rescuerunner'];
+
+  const DEMO = {
+    'Fartøysjef': [
+      { title:'Sikkerhet & ledelse', items:[
+        'Utføre sikkerhetsbrief for mannskap',
+        'Planlegge operasjon med risikovurdering',
+        'Loggføre hendelser etter aksjon',
+        'Dele ut oppgaver og følge opp'
+      ]},
+      { title:'Navigasjon', items:[
+        'Planlegge rute basert på vær og strøm',
+        'Bruke radar/GPS korrekt',
+        'Kommunikasjon på VHF (kanaler/protokoll)',
+        'Nattnavigasjon – utkikk og lysbruk'
+      ]},
+    ],
+    'NK': [
+      { title:'Operativ støtte', items:[
+        'Koordinere mannskap under aksjon',
+        'Føre enkel logg',
+        'Sikre bruk av verneutstyr',
+        'Forberede til kai/ankring'
+      ]},
+    ],
+    'Matros': [
+      { title:'Dekksarbeid', items:[
+        'Korrekt bruk av knuter/spleis',
+        'Fendere og tau – plassering og sikring',
+        'Sikring av last/utstyr',
+        'Spyling og vask av dekk'
+      ]},
+    ],
+    'Aspirant': [
+      { title:'Grunnleggende', items:[
+        'Kjenne til roller om bord',
+        'Sikkerhetsrunde på fartøyet',
+        'Påkledning og verneutstyr',
+        'Enkel knutebok'
+      ]},
+    ],
+    'Rescuerunner': [
+      { title:'Kjøring', items:[
+        'Oppstart og sjekkliste',
+        'Planing og svingteknikk',
+        'Sikker fart i sjø',
+        'Nødstopp og retur'
+      ]},
+    ]
+  };
+
+  const KEY = 'mannskapsbok_demo_admin_v1';
+
+  // master state i localStorage
+  let state = loadState() || bootstrap();
+
+  function bootstrap(){
+    // bygg katalog med id’er
+    let auto=1; const catalog={};
+    for(const role of ROLES){
+      catalog[role]=(DEMO[role]||[]).map(sec=>{
+        const items=sec.items.map(txt=>({id:String(auto++), text:txt}));
+        return { id:'s'+(auto++), title:sec.title, items };
+      });
+    }
+    // noen demo-brukere
+    const users={
+      u1:{ id:'u1', name:'Anna Hansen',  email:'anna@demo.no',   progress:{}, comments:[] },
+      u2:{ id:'u2', name:'Bjørn Nilsen', email:'bjorn@demo.no',  progress:{}, comments:[] },
+      u3:{ id:'u3', name:'Caroline Li',  email:'caro@demo.no',   progress:{}, comments:[] },
+    };
+    return { catalog, users, logs:[], currentUserId:'u1' };
+  }
+
+  // utils
+  const $=(s,r=document)=>r.querySelector(s);
+  const $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
+  const esc=s=>(s||'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  const fmt=v=>v??'';
+  const ts=ms=>new Date(ms).toLocaleString('no-NO');
+  function clsFor(done,total){ if(total===0||done===0) return 'gray'; if(done<total) return 'yellow'; return 'green'; }
+
+  function loadState(){ try{ return JSON.parse(localStorage.getItem(KEY)||''); }catch{ return null; } }
+  function saveState(){ localStorage.setItem(KEY, JSON.stringify(state)); }
+  function log(text){ state.logs.unshift({ts:Date.now(), text}); saveState(); }
+
+  // ---------- STUDENT VISNING ----------
+  let saveQ=new Map(), idle=null;
+  function queue(itemId, patch){
+    const uid=state.currentUserId;
+    const cur=state.users[uid].progress[itemId]||{};
+    saveQ.set(itemId,{...cur,...patch});
+    updateSavebar();
+    clearTimeout(idle); idle=setTimeout(()=>persistStudent(),1500);
+  }
+  function persistStudent(){
+    const uid=state.currentUserId;
+    const prog=state.users[uid].progress;
+    for(const [k,v] of saveQ.entries()) prog[k]=v;
+    saveQ.clear();
+    saveState();
+    updateSavebar();
+    toast('Lagret ✅');
+    renderCards(); // oppdater tellerne
+    log(`Elev ${state.users[uid].name} oppdaterte progresjon.`);
+  }
+  function updateSavebar(){
+    const bar=$('#savebar'); const n=saveQ.size;
+    if(n>0){ bar.style.display='flex'; $('#savecount').textContent=`${n} endringer`; $('#savemsg').textContent='Endringer ikke lagret.'; }
+    else bar.style.display='none';
+  }
+  $('#savebtn').onclick = persistStudent;
+  function toast(msg){ const t=$('#toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),1000); }
+
+  function renderStudent(){
+    const me=state.users[state.currentUserId];
+    const host=$('#app');
+    host.innerHTML=`
+      <div class="title">Mannskapsbok</div>
+      <div class="row">
+        <span>Innlogget som <b>${esc(me.name)}</b> <span class="note">(${esc(me.email)})</span></span>
+        <span class="badge">Demo – lokal lagring</span>
+        <button id="btnAdmin" class="btn">Admin</button>
+        <span class="note">Bytt elev (demo):</span>
+        <select id="demoUser" class="inp">
+          ${Object.values(state.users).map(u=>`<option value="${u.id}" ${u.id===state.currentUserId?'selected':''}>${esc(u.name)}</option>`).join('')}
+        </select>
+      </div>
+      <div id="cards" class="grid"></div>
+      <div id="tabs" class="tabs"></div>
+      <div id="panel"></div>
+    `;
+    $('#btnAdmin').onclick=renderAdmin;
+    $('#demoUser').onchange=e=>{ state.currentUserId=e.target.value; saveState(); renderStudent(); };
+    renderCards(); renderTabs(ROLES[0]); renderRole(ROLES[0]);
+  }
+
+  function renderCards(){
+    const uid=state.currentUserId; const grid=$('#cards'); grid.innerHTML='';
+    ROLES.forEach(role=>{
+      const its=(state.catalog[role]||[]).flatMap(s=>s.items);
+      const total=its.length;
+      const done=its.filter(it=> (saveQ.get(it.id)||state.users[uid].progress[it.id]||{}).done).length;
+      const card=document.createElement('div'); card.className='card';
+      const btn=document.createElement('button'); btn.className=clsFor(done,total);
+      btn.innerHTML=`${role}<span class="sub">${done}/${total} fullført</span>`;
+      btn.onclick=()=>{ renderTabs(role); renderRole(role); };
+      card.appendChild(btn); grid.appendChild(card);
+    });
+  }
+  function renderTabs(active){
+    const tabs=$('#tabs'); tabs.innerHTML='';
+    ROLES.forEach(r=>{
+      const b=document.createElement('button'); b.className='tab'+(r===active?' active':''); b.textContent=r;
+      b.onclick=()=>{ renderTabs(r); renderRole(r); };
+      tabs.appendChild(b);
+    });
+  }
+  function renderRole(role){
+    const uid=state.currentUserId;
+    const panel=$('#panel'); const secs=state.catalog[role]||[];
+    if(!secs.length){ panel.innerHTML='<div class="empty">Ingen punkter.</div>'; return; }
+    panel.innerHTML = secs.map((s,si)=>`
+      <div style="margin:10px 0 14px">
+        <div class="tag">${esc(s.title)}</div>
+        <table class="table">
+          <thead><tr><th style="width:66px">#</th><th>Beskrivelse</th><th style="width:140px">Dato</th><th style="width:180px">Signert</th><th style="width:80px">Ferdig</th></tr></thead>
+          <tbody>
+            ${s.items.map((it,pi)=>{
+              const pr=saveQ.get(it.id)||state.users[uid].progress[it.id]||{};
+              return `<tr data-id="${it.id}">
+                <td>${si+1}.${pi+1}</td>
+                <td>${esc(it.text)}</td>
+                <td><input type="date" value="${fmt(pr.date)}"></td>
+                <td><input type="text" value="${esc(pr.signed_by||'')}" placeholder="Signert av"></td>
+                <td><input type="checkbox" ${pr.done?'checked':''}></td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>`).join('');
+    // bind
+    $$('#panel tbody tr').forEach(tr=>{
+      const id=tr.getAttribute('data-id');
+      const d=tr.querySelector('input[type="date"]');
+      const s=tr.querySelector('input[type="text"]');
+      const c=tr.querySelector('input[type="checkbox"]');
+      function commit(){ if(c.checked && !d.value) d.value=new Date().toISOString().slice(0,10);
+        queue(id,{date:d.value||null,signed_by:s.value||null,done:!!c.checked});
+      }
+      d.onchange=commit; s.onchange=commit; c.onchange=commit;
+    });
+  }
+
+  // ---------- ADMIN ----------
+  function renderAdmin(){
+    const host=$('#app');
+    host.innerHTML=`
+      <div class="title">Admin</div>
+      <div class="row">
+        <button id="btnBack" class="btn">← Til elev-siden</button>
+        <span class="badge">Demo – alt synkes til samme lagring</span>
+      </div>
+
+      <div class="split">
+        <div>
+          <div class="box">
+            <div class="hd">Brukere</div>
+            <div class="bd">
+              <input id="userSearch" class="inp" placeholder="Søk navn/epost …" style="width:100%;margin-bottom:8px">
+              <ul id="userList" class="list"></ul>
+            </div>
+          </div>
+
+          <div class="box" style="margin-top:12px">
+            <div class="hd">Katalog (punkter)</div>
+            <div class="bd">
+              <div class="rowline">
+                <label>Rolle:
+                  <select id="catRole" class="inp">
+                    ${ROLES.map(r=>`<option value="${r}">${r}</option>`).join('')}
+                  </select>
+                </label>
+                <button id="addSec" class="btn small primary">+ Inndeling</button>
+              </div>
+              <div id="catWrap" style="margin-top:8px"></div>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <div class="box">
+            <div class="hd">
+              <span id="selName">Velg en bruker</span>
+              <span id="selSum" class="note"></span>
+              <span style="float:right">
+                <label class="note"><input type="checkbox" id="editToggle"> Rediger som admin</label>
+              </span>
+            </div>
+            <div class="bd" id="userBook"><div class="note">Ingen valgt.</div></div>
+          </div>
+
+          <div class="box" style="margin-top:12px">
+            <div class="hd">Kommentarer</div>
+            <div class="bd">
+              <div class="rowline">
+                <input id="commentTxt" class="inp" placeholder="Skriv en kommentar til eleven" style="flex:1">
+                <button id="addComment" class="btn small">Legg til</button>
+              </div>
+              <ul id="commentList" class="list" style="margin-top:8px"></ul>
+            </div>
+          </div>
+
+          <div class="box" style="margin-top:12px">
+            <div class="hd">Logg</div>
+            <div class="bd" id="logWrap" style="max-height:260px;overflow:auto"></div>
+          </div>
+        </div>
+      </div>
+    `;
+    $('#btnBack').onclick=renderStudent;
+    drawUsers();
+    drawCatalogEditor();
+    drawLog();
+
+    // events
+    $('#userSearch').oninput=drawUsers;
+    $('#catRole').onchange=drawCatalogEditor;
+    $('#addSec').onclick=()=>{ const role=$('#catRole').value;
+      state.catalog[role].push({id:'s'+Date.now(), title:'Ny inndeling', items:[]}); saveState(); drawCatalogEditor(); log(`Admin la til inndeling i ${role}.`); };
+
+    function drawUsers(){
+      const q=($('#userSearch').value||'').toLowerCase();
+      const list=$('#userList');
+      const arr=Object.values(state.users).filter(u=>(u.name||'').toLowerCase().includes(q)||(u.email||'').toLowerCase().includes(q));
+      if(!arr.length){ list.innerHTML='<li><span class="note">Ingen brukere</span></li>'; return; }
+      list.innerHTML = arr.map(u=>{
+        const totals=countTotals(u.id);
+        const sum=`${totals.done}/${totals.total}`;
+        return `<li data-id="${u.id}">
+          <span>${esc(u.name)} <span class="muted">(${esc(u.email)})</span></span>
+          <span class="chip">${sum}</span>
+        </li>`;
+      }).join('');
+      $$('#userList li').forEach(li=>li.onclick=()=>selectUser(li.getAttribute('data-id')));
+    }
+
+    let selectedUserId=null;
+    function selectUser(uid){
+      selectedUserId=uid; const u=state.users[uid];
+      $('#selName').textContent = u.name+' ('+u.email+')';
+      const totals=countTotals(uid);
+      $('#selSum').textContent = `— ${totals.done}/${totals.total} fullført, ${totals.total - totals.done} mangler`;
+      renderUserBook(uid, $('#editToggle').checked);
+      drawComments(uid);
+
+      $('#addComment').onclick=()=>{
+        const t=$('#commentTxt').value.trim(); if(!t) return;
+        u.comments.unshift({ts:Date.now(), text:t});
+        $('#commentTxt').value=''; saveState(); drawComments(uid); log(`Admin kommenterte på ${u.name}.`);
+      };
+      $('#editToggle').onchange=()=> renderUserBook(uid, $('#editToggle').checked);
+    }
+
+    function renderUserBook(uid, editable){
+      const el=$('#userBook'); const prog=state.users[uid].progress;
+      el.innerHTML = ROLES.map(role=>{
+        const secs=state.catalog[role]||[];
+        return secs.map((s,si)=>`
+          <div style="margin-bottom:12px">
+            <div class="tag">${role} / ${esc(s.title)}</div>
+            <table class="table"><thead><tr><th style="width:66px">#</th><th>Beskrivelse</th><th style="width:140px">Dato</th><th style="width:180px">Signert</th><th style="width:80px">Ferdig</th></tr></thead>
+              <tbody>
+                ${s.items.map((it,pi)=>{
+                  const pr=prog[it.id]||{};
+                  const dis=editable?'':'disabled';
+                  return `<tr data-id="${it.id}">
+                    <td>${si+1}.${pi+1}</td>
+                    <td>${esc(it.text)}</td>
+                    <td><input ${dis} type="date" value="${fmt(pr.date)}"></td>
+                    <td><input ${dis} type="text" value="${esc(pr.signed_by||'')}" placeholder="Signert av"></td>
+                    <td><input ${dis} type="checkbox" ${pr.done?'checked':''}></td>
+                  </tr>`;
+                }).join('')}
+              </tbody>
+            </table>
+          </div>`).join('');
+      }).join('') || '<div class="empty">Ingen punkter.</div>';
+
+      if(editable){
+        $$('#userBook tbody tr').forEach(tr=>{
+          const id=tr.getAttribute('data-id');
+          const d=tr.querySelector('input[type="date"]');
+          const s=tr.querySelector('input[type="text"]');
+          const c=tr.querySelector('input[type="checkbox"]');
+          function commit(){ if(c.checked && !d.value) d.value=new Date().toISOString().slice(0,10);
+            state.users[uid].progress[id]={date:d.value||null,signed_by:s.value||null,done:!!c.checked};
+            saveState(); if(uid===state.currentUserId) renderCards();
+            log(`Admin oppdaterte progresjon for ${state.users[uid].name}.`);
+          }
+          d.onchange=commit; s.onchange=commit; c.onchange=commit;
+        });
+      }
+    }
+
+    function drawComments(uid){
+      const list=$('#commentList'); const arr=state.users[uid].comments||[];
+      list.innerHTML = arr.map(c=>`<li><span>${esc(c.text)}</span><span class="note">${ts(c.ts)}</span></li>`).join('') || '<li><span class="note">Ingen kommentarer.</span></li>';
+    }
+
+    function drawCatalogEditor(){
+      const role=$('#catRole').value; const wrap=$('#catWrap'); const secs=state.catalog[role]||[];
+      if(!secs.length){ wrap.innerHTML='<div class="note">Ingen inndelinger. Legg til med knappen over.</div>'; return; }
+      wrap.innerHTML = secs.map((s,si)=>`
+        <div class="box" style="margin-bottom:10px">
+          <div class="hd">
+            <div class="rowline">
+              <span class="n">${si+1}</span>
+              <input class="inp secTitle" data-si="${si}" value="${esc(s.title)}" style="min-width:220px">
+              <button class="btn small" data-act="secUp" data-si="${si}">↑</button>
+              <button class="btn small" data-act="secDown" data-si="${si}">↓</button>
+              <button class="btn small" data-act="secDel" data-si="${si}">Slett</button>
+              <span class="note" style="margin-left:auto">Innhold</span>
+              <input class="inp newItem" data-si="${si}" placeholder="Nytt punkt …" style="min-width:240px">
+              <button class="btn small primary" data-act="addItem" data-si="${si}">+ Legg til</button>
+            </div>
+          </div>
+          <div class="bd">
+            <ul class="ul">
+              ${s.items.map((it,ii)=>`
+                <li data-si="${si}" data-ii="${ii}">
+                  <div class="rowline">
+                    <span class="n">${si+1}.${ii+1}</span>
+                    <span class="muted">${esc(it.text)}</span>
+                  </div>
+                  <div class="rowline">
+                    <button class="btn small" data-act="itUp">↑</button>
+                    <button class="btn small" data-act="itDown">↓</button>
+                    <button class="btn small" data-act="itEdit">Rediger</button>
+                    <button class="btn small" data-act="itDel">Slett</button>
+                  </div>
+                </li>`).join('')}
+            </ul>
+          </div>
+        </div>
+      `).join('');
+
+      // handlers
+      // tittel
+      $$('#catWrap .secTitle').forEach(inp=>{
+        inp.onchange=()=>{ const si=+inp.dataset.si; state.catalog[role][si].title=inp.value.trim()||state.catalog[role][si].title; saveState(); log(`Admin endret tittel i ${role}.`); };
+      });
+      // knapper på seksjon
+      $$('#catWrap [data-act]').forEach(btn=>{
+        btn.onclick=()=>{
+          const act=btn.dataset.act; const si=+btn.dataset.si;
+          if(act==='secDel'){ if(!confirm('Slette inndeling?')) return;
+            // fjern progress for tilhørende items
+            const itemIds=new Set(state.catalog[role][si].items.map(x=>x.id));
+            for(const u of Object.values(state.users)){
+              for(const id of Object.keys(u.progress)) if(itemIds.has(id)) delete u.progress[id];
+            }
+            state.catalog[role].splice(si,1); saveState(); drawCatalogEditor(); renderCards(); log(`Admin slettet inndeling i ${role}.`); return;
+          }
+          if(act==='secUp' && si>0){ const tmp=state.catalog[role][si-1]; state.catalog[role][si-1]=state.catalog[role][si]; state.catalog[role][si]=tmp; saveState(); drawCatalogEditor(); log(`Admin flyttet inndeling opp i ${role}.`); return; }
+          if(act==='secDown' && si<state.catalog[role].length-1){ const tmp=state.catalog[role][si+1]; state.catalog[role][si+1]=state.catalog[role][si]; state.catalog[role][si]=tmp; saveState(); drawCatalogEditor(); log(`Admin flyttet inndeling ned i ${role}.`); return; }
+          if(act==='addItem'){ const inp=$(`#catWrap .newItem[data-si="${si}"]`); const txt=(inp.value||'').trim(); if(!txt) return;
+            state.catalog[role][si].items.push({id:String(Date.now()+Math.random()), text:txt}); inp.value=''; saveState(); drawCatalogEditor(); log(`Admin la til punkt i ${role}.`); return;
+          }
+        };
+      });
+      // knapper på item
+      $$('#catWrap li [data-act]').forEach(btn=>{
+        btn.onclick=()=>{
+          const li=btn.closest('li'); const si=+li.dataset.si; const ii=+li.dataset.ii;
+          const arr=state.catalog[role][si].items;
+          if(btn.dataset.act==='itUp' && ii>0){ [arr[ii-1],arr[ii]]=[arr[ii],arr[ii-1]]; saveState(); drawCatalogEditor(); log(`Admin flyttet punkt opp i ${role}.`); }
+          if(btn.dataset.act==='itDown' && ii<arr.length-1){ [arr[ii+1],arr[ii]]=[arr[ii],arr[ii+1]]; saveState(); drawCatalogEditor(); log(`Admin flyttet punkt ned i ${role}.`); }
+          if(btn.dataset.act==='itEdit'){ const nt=prompt('Rediger beskrivelse:', arr[ii].text); if(nt!=null){ arr[ii].text=nt.trim(); saveState(); drawCatalogEditor(); log(`Admin redigerte punkt i ${role}.`);} }
+          if(btn.dataset.act==='itDel'){
+            if(!confirm('Slette punkt?')) return;
+            const id=arr[ii].id;
+            for(const u of Object.values(state.users)) delete u.progress[id];
+            arr.splice(ii,1); saveState(); drawCatalogEditor(); renderCards(); log(`Admin slettet punkt i ${role}.`);
+          }
+        };
+      });
+    }
+
+    function drawLog(){
+      const el=$('#logWrap');
+      el.innerHTML = state.logs.slice(0,200).map(l=>`<div class="rowline" style="margin-bottom:6px"><span class="note">${ts(l.ts)}</span><span>${esc(l.text)}</span></div>`).join('')
+        || '<div class="note">Loggen er tom.</div>';
+    }
+
+    function countTotals(uid){
+      const its=Object.values(state.catalog).flatMap(secs=>secs.flatMap(s=>s.items));
+      const total=its.length; let done=0;
+      for(const it of its){ if(state.users[uid].progress[it.id]?.done) done++; }
+      return {total,done};
+    }
+  }
+
+  // start
+  renderStudent();
+})();
+</script>
+</body>
+</html>
