@@ -14,6 +14,7 @@
     .title{font-size:28px;font-weight:800;color:var(--accent);margin:0 0 6px}
     .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:8px 0 14px}
     .badge{padding:4px 8px;border-radius:999px;border:1px solid #ddd;background:#fff;font-size:12px}
+    .badge.warn{background:#ffe7d6;border-color:#ffc9a4;color:#7a3b00}
     .note{font-size:12px;color:#666}
     .btn{padding:8px 12px;border-radius:8px;border:1px solid #ddd;background:#fff;cursor:pointer}
     .btn.primary{background:#111;color:#fff;border-color:#111}
@@ -25,7 +26,7 @@
     .gray{background:#e5e5e5}.yellow{background:#ffe08a}.green{background:#9be29b}
     .tabs{display:flex;gap:8px;margin:12px 0;flex-wrap:wrap}
     .tab{padding:10px 12px;border-radius:10px;border:1px solid #ddd;background:#fff;cursor:pointer}
-    .tab.active{background:#111;color:#fff}
+    .tab.active{background:#111;color:#fff;border-color:#111}
     .tag{display:inline-block;font-size:12px;padding:4px 8px;border-radius:999px;background:#f1f1f1;margin:0 0 6px}
     .table{width:100%;border-collapse:collapse;background:#fff;border:1px solid #ddd;border-radius:12px;overflow:hidden}
     .table th,.table td{border-bottom:1px solid #eee;padding:10px 8px;text-align:left;vertical-align:top}
@@ -44,7 +45,6 @@
     .chip{font-size:12px;padding:3px 6px;border-radius:999px;background:#eee}
     .muted{opacity:.7}
     .rowline{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-
     /* overlay (login) */
     #ov{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.55);z-index:1000}
     #ov.open{display:flex}
@@ -54,7 +54,6 @@
     #dlg .ft{padding:12px 16px;border-top:1px solid #eee;display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
     .field{display:block;width:100%;padding:10px 12px;border:1px solid #ddd;border-radius:10px;margin:8px 0}
     .err{color:#b00020;font-size:12px;min-height:16px;margin-top:6px}
-
     /* toast */
     #toast{position:fixed;right:16px;bottom:16px;background:#111;color:#fff;padding:10px 12px;border-radius:10px;opacity:0;transform:translateY(8px);transition:.25s}
     #toast.show{opacity:1;transform:translateY(0)}
@@ -91,10 +90,10 @@
   const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
 
   const ROLES = ['Fartøysjef','NK','Matros','Aspirant','Rescuerunner'];
-  const FORCE_ADMIN_EMAIL = 'theodor.eide@rodekors.org'; // <- tvungen admin i UI
+  const FORCE_ADMIN_EMAIL = 'theodor.eide@rodekors.org'; // UI-admin for Theodor
 
   // ===== State =====
-  let me=null, isAdmin=false, catalog={}, myProg=new Map();
+  let me=null, isAdminDb=false, isAdmin=false, catalog={}, myProg=new Map();
   let rt=null;
 
   // ===== Helpers =====
@@ -129,13 +128,16 @@
     const { data:{ session } } = await sb.auth.getSession();
     if(!session){ openOverlay(); return false; }
     me = session.user;
+
+    // Sørg for profiles-rad
     await sb.from('profiles').upsert({ id: me.id, email: me.email, name: me.email }, { onConflict:'id' });
 
+    // Sjekk admin i DB
     const { data:adm } = await sb.from('profiles').select('is_admin').eq('id', me.id).maybeSingle();
-    isAdmin = !!adm?.is_admin;
+    isAdminDb = !!adm?.is_admin;
 
-    // Tving admin i UI for spesifikk e-post
-    if (me?.email && me.email.toLowerCase() === FORCE_ADMIN_EMAIL) isAdmin = true;
+    // Admin i UI = DB-admin eller tvungen e-post
+    isAdmin = isAdminDb || (me?.email && me.email.toLowerCase() === FORCE_ADMIN_EMAIL);
 
     return true;
   }
@@ -159,7 +161,8 @@
     myProg = new Map(); (data||[]).forEach(r=>myProg.set(r.item_id, r));
   }
   async function loadUsers(){
-    const { data } = await sb.from('profiles').select('id,email,name,is_admin').order('email',{ascending:true});
+    const { data, error } = await sb.from('profiles').select('id,email,name,is_admin').order('email',{ascending:true});
+    if(error){ alert('Kunne ikke laste brukere: ' + error.message); return []; }
     return data||[];
   }
   async function loadProgressFor(uid){
@@ -176,33 +179,81 @@
     return data||[];
   }
 
-  // ===== Saves =====
+  // ===== Saves (med feilhåndtering) =====
   async function upsertProgress(itemId, patch, uid=me.id){
     const row = { user_id: uid, item_id: itemId, done: !!patch.done, date: patch.date || null, signed_by: patch.signed_by || null };
     const { error } = await sb.from('progress').upsert(row, { onConflict:'user_id,item_id' });
-    if(!error){
-      if(uid===me.id){ myProg.set(itemId, { ...myProg.get(itemId), ...row }); }
-      await sb.from('logs').insert({ actor_id: me.id, message: `progress updated for user ${uid}` });
-    }
+    if(error){ alert('Kunne ikke lagre progresjon: ' + error.message); return; }
+    if(uid===me.id){ myProg.set(itemId, { ...myProg.get(itemId), ...row }); }
+    await sb.from('logs').insert({ actor_id: me.id, message: `progress updated for user ${uid}` });
   }
   async function addComment(uid, text){
-    await sb.from('comments').insert({ user_id: uid, author_id: me.id, text });
+    const { error } = await sb.from('comments').insert({ user_id: uid, author_id: me.id, text });
+    if(error){ alert('Kunne ikke legge til kommentar: ' + error.message); return; }
     await sb.from('logs').insert({ actor_id: me.id, message: `comment added for user ${uid}` });
   }
-  async function addSection(role){ await sb.from('sections').insert({ role, title:'Ny inndeling', position: Date.now() }); await sb.from('logs').insert({ actor_id: me.id, message: `section added in ${role}` }); }
-  async function updateSectionTitle(id, title){ await sb.from('sections').update({ title }).eq('id', id); await sb.from('logs').insert({ actor_id: me.id, message: `section title updated` }); }
-  async function deleteSection(id){ await sb.from('sections').delete().eq('id', id); await sb.from('logs').insert({ actor_id: me.id, message: `section deleted` }); }
-  async function moveSection(role, si, dir){ const secs=catalog[role]; const j=si+(dir==='up'?-1:+1); if(j<0||j>=secs.length) return; const a=secs[si], b=secs[j]; await sb.from('sections').update({ position:b.position }).eq('id', a.id); await sb.from('sections').update({ position:a.position }).eq('id', b.id); await sb.from('logs').insert({ actor_id: me.id, message: `section moved` }); }
-  async function addItem(section_id, text){ await sb.from('items').insert({ section_id, text, position: Date.now() }); await sb.from('logs').insert({ actor_id: me.id, message: `item added` }); }
-  async function editItem(id, text){ await sb.from('items').update({ text }).eq('id', id); await sb.from('logs').insert({ actor_id: me.id, message: `item edited` }); }
-  async function deleteItem(id){ await sb.from('items').delete().eq('id', id); await sb.from('logs').insert({ actor_id: me.id, message: `item deleted` }); }
-  async function moveItem(role, si, ii, dir){ const sec=catalog[role][si]; const arr=sec.items; const j=ii+(dir==='up'?-1:+1); if(j<0||j>=arr.length) return; const a=arr[ii], b=arr[j]; await sb.from('items').update({ position:b.position }).eq('id', a.id); await sb.from('items').update({ position:a.position }).eq('id', b.id); await sb.from('logs').insert({ actor_id: me.id, message: `item moved` }); }
+
+  async function addSection(role){
+    const { error } = await sb.from('sections').insert({ role, title:'Ny inndeling', position: Date.now() });
+    if(error){ alert('Kunne ikke legge til inndeling: ' + error.message + (isAdmin && !isAdminDb ? '\n(Hint: Du er bare UI-admin. Sett is_admin=true i DB.)' : '')); return; }
+    await sb.from('logs').insert({ actor_id: me.id, message: `section added in ${role}` });
+  }
+  async function updateSectionTitle(id, title){
+    const { error } = await sb.from('sections').update({ title }).eq('id', id);
+    if(error){ alert('Kunne ikke oppdatere tittel: ' + error.message); return; }
+    await sb.from('logs').insert({ actor_id: me.id, message: `section title updated` });
+  }
+  async function deleteSection(id){
+    const { error } = await sb.from('sections').delete().eq('id', id);
+    if(error){ alert('Kunne ikke slette inndeling: ' + error.message); return; }
+    await sb.from('logs').insert({ actor_id: me.id, message: `section deleted` });
+  }
+  async function moveSection(role, si, dir){
+    const secs = catalog[role]; const j = si + (dir==='up'?-1:+1);
+    if(j<0 || j>=secs.length) return;
+    const a=secs[si], b=secs[j];
+    let res = await sb.from('sections').update({ position:b.position }).eq('id', a.id);
+    if(res.error){ alert('Kunne ikke flytte inndeling (1): ' + res.error.message); return; }
+    res = await sb.from('sections').update({ position:a.position }).eq('id', b.id);
+    if(res.error){ alert('Kunne ikke flytte inndeling (2): ' + res.error.message); return; }
+    await sb.from('logs').insert({ actor_id: me.id, message: `section moved` });
+  }
+
+  async function addItem(section_id, text){
+    const { error } = await sb.from('items').insert({ section_id, text, position: Date.now() });
+    if(error){ alert('Kunne ikke legge til punkt: ' + error.message + (isAdmin && !isAdminDb ? '\n(Hint: Du er bare UI-admin. Sett is_admin=true i DB.)' : '')); return; }
+    await sb.from('logs').insert({ actor_id: me.id, message: `item added` });
+  }
+  async function editItem(id, text){
+    const { error } = await sb.from('items').update({ text }).eq('id', id);
+    if(error){ alert('Kunne ikke redigere punkt: ' + error.message); return; }
+    await sb.from('logs').insert({ actor_id: me.id, message: `item edited` });
+  }
+  async function deleteItem(id){
+    const { error } = await sb.from('items').delete().eq('id', id);
+    if(error){ alert('Kunne ikke slette punkt: ' + error.message); return; }
+    await sb.from('logs').insert({ actor_id: me.id, message: `item deleted` });
+  }
+  async function moveItem(role, si, ii, dir){
+    const sec=catalog[role][si]; const arr=sec.items; const j=ii+(dir==='up'?-1:+1);
+    if(j<0 || j>=arr.length) return;
+    const a=arr[ii], b=arr[j];
+    let res = await sb.from('items').update({ position:b.position }).eq('id', a.id);
+    if(res.error){ alert('Kunne ikke flytte punkt (1): ' + res.error.message); return; }
+    res = await sb.from('items').update({ position:a.position }).eq('id', b.id);
+    if(res.error){ alert('Kunne ikke flytte punkt (2): ' + res.error.message); return; }
+    await sb.from('logs').insert({ actor_id: me.id, message: `item moved` });
+  }
+
   async function setAdmin(uid, flag){
-    if(uid===me.id && !flag){ const ok=confirm('Du er i ferd med å fjerne din egen admin-tilgang. Fortsette?'); if(!ok) return; }
+    if(uid===me.id && !flag){
+      const ok = confirm('Du er i ferd med å fjerne din egen admin-tilgang. Fortsette?');
+      if(!ok) return;
+    }
     const { error } = await sb.from('profiles').update({ is_admin: !!flag }).eq('id', uid);
     if(error){ alert('Kunne ikke oppdatere admin-status: ' + error.message); return; }
     await sb.from('logs').insert({ actor_id: me.id, message: `is_admin ${flag?'ON':'OFF'} for ${uid}` });
-    if(uid===me.id){ isAdmin=!!flag; if(!isAdmin){ renderStudent(); return; } }
+    if(uid===me.id){ isAdminDb = !!flag; isAdmin = isAdminDb || (me.email?.toLowerCase()===FORCE_ADMIN_EMAIL); if(!isAdmin){ renderStudent(); return; } }
   }
 
   // ===== Student UI =====
@@ -214,6 +265,8 @@
         <span>Innlogget som <b>${esc(me.email||me.id)}</b></span>
         <span class="badge">Sky OK</span>
         <button id="btnAdmin" class="btn">Admin</button>
+        ${isAdmin && !isAdminDb ? '<span class="badge warn" title="Du er UI-admin (kun denne nettklienten). Skriv i databasen krever is_admin=true i profiles.">UI-admin</span>' : ''}
+        ${isAdminDb ? '<span class="badge">DB-admin</span>' : ''}
         <button id="logout" class="btn">Logg ut</button>
       </div>
       <div id="cards" class="grid"></div>
@@ -283,8 +336,7 @@
 
   // ===== Admin UI =====
   async function renderAdmin(){
-    if(!isAdmin){ alert('Du har ikke admin-tilgang.'); return; } // sikkerhetsnett i UI
-
+    if(!isAdmin){ alert('Du har ikke admin-tilgang.'); return; }
     const users = await loadUsers();
     const host=$('#app');
     host.innerHTML=`
@@ -292,6 +344,8 @@
       <div class="row">
         <button id="btnBack" class="btn">← Til elev-siden</button>
         <span class="badge">Admin</span>
+        ${isAdmin && !isAdminDb ? '<span class="badge warn" title="UI-admin: skriving kan feile hvis du ikke er DB-admin.">UI-admin</span>' : ''}
+        ${isAdminDb ? '<span class="badge">DB-admin</span>' : ''}
         <button id="logout" class="btn">Logg ut</button>
       </div>
 
@@ -370,7 +424,7 @@
 
       list.innerHTML = arr.map(u=>`
         <li data-id="${u.id}">
-          <span>${esc(u.name||u.email||u.id)}</span>
+          <span>${esc(u.name||u.email||u.id)} ${u.is_admin?'<span class="chip">admin</span>':''}</span>
           <span class="rowline">
             <label class="note" title="Gi/fjern admin-tilgang">
               <input type="checkbox" class="makeAdmin" data-id="${u.id}" ${u.is_admin?'checked':''}>
@@ -424,23 +478,28 @@
         </div>
       `).join('');
 
-      $$('#catWrap .secTitle').forEach(inp=>{ inp.onchange=async()=>{ const si=+inp.dataset.si; await updateSectionTitle(secs[si].id, inp.value.trim()||secs[si].title); await loadCatalog(); await drawCatalogEditor(); }; });
+      // handlers for seksjoner
+      $$('#catWrap .secTitle').forEach(inp=>{
+        inp.onchange=async()=>{ const si=+inp.dataset.si; await updateSectionTitle(secs[si].id, inp.value.trim()||secs[si].title); await loadCatalog(); await drawCatalogEditor(); };
+      });
       $$('#catWrap [data-act]').forEach(btn=>{
         btn.onclick=async()=>{
           const act=btn.dataset.act; const si=+btn.dataset.si;
           if(act==='secDel'){ if(!confirm('Slette inndeling?')) return; await deleteSection(secs[si].id); await loadCatalog(); await drawCatalogEditor(); return; }
-          if(act==='secUp'){ await moveSection(role, si, 'up'); await loadCatalog(); await drawCatalogEditor(); return; }
+          if(act==='secUp')  { await moveSection(role, si, 'up'); await loadCatalog(); await drawCatalogEditor(); return; }
           if(act==='secDown'){ await moveSection(role, si, 'down'); await loadCatalog(); await drawCatalogEditor(); return; }
           if(act==='addItem'){ const inp=$(`#catWrap .newItem[data-si="${si}"]`); const txt=(inp.value||'').trim(); if(!txt) return; await addItem(secs[si].id, txt); inp.value=''; await loadCatalog(); await drawCatalogEditor(); return; }
         };
       });
+
+      // handlers for items
       $$('#catWrap li [data-act]').forEach(btn=>{
         btn.onclick=async()=>{
           const li=btn.closest('li'); const si=+li.dataset.si; const ii=+li.dataset.ii; const role=$('#catRole').value;
-          if(btn.dataset.act==='itUp'){ await moveItem(role, si, ii, 'up'); await loadCatalog(); await drawCatalogEditor(); }
-          if(btn.dataset.act==='itDown'){ await moveItem(role, si, ii, 'down'); await loadCatalog(); await drawCatalogEditor(); }
+          if(btn.dataset.act==='itUp')   { await moveItem(role, si, ii, 'up');   await loadCatalog(); await drawCatalogEditor(); }
+          if(btn.dataset.act==='itDown') { await moveItem(role, si, ii, 'down'); await loadCatalog(); await drawCatalogEditor(); }
           if(btn.dataset.act==='itEdit'){ const cur=catalog[role][si].items[ii]; const nt=prompt('Rediger beskrivelse:', cur.text); if(nt!=null){ await editItem(cur.id, nt.trim()); await loadCatalog(); await drawCatalogEditor(); } }
-          if(btn.dataset.act==='itDel'){ if(!confirm('Slette punkt?')) return; const cur=catalog[role][si].items[ii]; await deleteItem(cur.id); await loadCatalog(); await drawCatalogEditor(); }
+          if(btn.dataset.act==='itDel') { if(!confirm('Slette punkt?')) return; const cur=catalog[role][si].items[ii]; await deleteItem(cur.id); await loadCatalog(); await drawCatalogEditor(); }
         };
       });
     }
@@ -542,11 +601,8 @@
     closeOverlay();
     await loadCatalog();
     await loadMyProgress();
-
-    // Åpne admin automatisk for tvungen admin/ekte admin
-    if (isAdmin) renderAdmin();
-    else renderStudent();
-
+    // Åpne admin automatisk for admin
+    if (isAdmin) renderAdmin(); else renderStudent();
     bindRealtime();
   }catch(e){
     $('#app').innerHTML = '<div class="wrap"><div class="title">Mannskapsbok</div><div class="note">Feil ved oppstart: '+esc(e.message||e)+'</div></div>';
@@ -556,80 +612,3 @@
 </script>
 </body>
 </html>
-<script>
-// ... behold alt annet uendret over ...
-
-async function addSection(role){
-  const { error } = await sb.from('sections').insert({ role, title:'Ny inndeling', position: Date.now() });
-  if(error){ alert('Kunne ikke legge til inndeling: ' + error.message); return; }
-  await sb.from('logs').insert({ actor_id: me.id, message: `section added in ${role}` });
-}
-
-async function updateSectionTitle(id, title){
-  const { error } = await sb.from('sections').update({ title }).eq('id', id);
-  if(error){ alert('Kunne ikke oppdatere tittel: ' + error.message); return; }
-  await sb.from('logs').insert({ actor_id: me.id, message: `section title updated` });
-}
-
-async function deleteSection(id){
-  const { error } = await sb.from('sections').delete().eq('id', id);
-  if(error){ alert('Kunne ikke slette inndeling: ' + error.message); return; }
-  await sb.from('logs').insert({ actor_id: me.id, message: `section deleted` });
-}
-
-async function moveSection(role, si, dir){
-  const secs = catalog[role]; const j = si + (dir==='up'?-1:+1);
-  if(j<0 || j>=secs.length) return;
-  const a=secs[si], b=secs[j];
-  let res = await sb.from('sections').update({ position:b.position }).eq('id', a.id);
-  if(res.error){ alert('Kunne ikke flytte inndeling (1): ' + res.error.message); return; }
-  res = await sb.from('sections').update({ position:a.position }).eq('id', b.id);
-  if(res.error){ alert('Kunne ikke flytte inndeling (2): ' + res.error.message); return; }
-  await sb.from('logs').insert({ actor_id: me.id, message: `section moved` });
-}
-
-async function addItem(section_id, text){
-  const { error } = await sb.from('items').insert({ section_id, text, position: Date.now() });
-  if(error){ alert('Kunne ikke legge til punkt: ' + error.message); return; }
-  await sb.from('logs').insert({ actor_id: me.id, message: `item added` });
-}
-
-async function editItem(id, text){
-  const { error } = await sb.from('items').update({ text }).eq('id', id);
-  if(error){ alert('Kunne ikke redigere punkt: ' + error.message); return; }
-  await sb.from('logs').insert({ actor_id: me.id, message: `item edited` });
-}
-
-async function deleteItem(id){
-  const { error } = await sb.from('items').delete().eq('id', id);
-  if(error){ alert('Kunne ikke slette punkt: ' + error.message); return; }
-  await sb.from('logs').insert({ actor_id: me.id, message: `item deleted` });
-}
-
-async function moveItem(role, si, ii, dir){
-  const sec=catalog[role][si]; const arr=sec.items; const j=ii+(dir==='up'?-1:+1);
-  if(j<0 || j>=arr.length) return;
-  const a=arr[ii], b=arr[j];
-  let res = await sb.from('items').update({ position:b.position }).eq('id', a.id);
-  if(res.error){ alert('Kunne ikke flytte punkt (1): ' + res.error.message); return; }
-  res = await sb.from('items').update({ position:a.position }).eq('id', b.id);
-  if(res.error){ alert('Kunne ikke flytte punkt (2): ' + res.error.message); return; }
-  await sb.from('logs').insert({ actor_id: me.id, message: `item moved` });
-}
-
-async function setAdmin(uid, flag){
-  if(uid === me.id && !flag){
-    const ok = confirm('Du er i ferd med å fjerne din egen admin-tilgang. Fortsette?');
-    if(!ok) return;
-  }
-  const { error } = await sb.from('profiles').update({ is_admin: !!flag }).eq('id', uid);
-  if(error){ alert('Kunne ikke oppdatere admin-status: ' + error.message); return; }
-  await sb.from('logs').insert({ actor_id: me.id, message: `is_admin ${flag?'ON':'OFF'} for ${uid}` });
-  if(uid === me.id){
-    isAdmin = !!flag;
-    if(!isAdmin){ renderStudent(); return; }
-  }
-}
-
-// ... behold alt annet uendret under ...
-</script>
