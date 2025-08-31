@@ -608,3 +608,50 @@
 </script>
 </body>
 </html>
+async function setAdmin(uid, flag){
+  // hvis du forsøker å fjerne din egen admin-tilgang, spør først
+  if(uid === me.id && !flag){
+    const ok = confirm('Du er i ferd med å fjerne din egen admin-tilgang. Fortsette?');
+    if(!ok) return;
+  }
+  const { error } = await sb.from('profiles').update({ is_admin: !!flag }).eq('id', uid);
+  if(error){ alert('Kunne ikke oppdatere admin-status: ' + error.message); return; }
+  await sb.from('logs').insert({ actor_id: me.id, message: `is_admin ${flag?'ON':'OFF'} for ${uid}` });
+
+  // oppdater lokalt UI
+  if(uid === me.id){
+    isAdmin = !!flag;
+    if(!isAdmin){
+      // mister admin der og da → tilbake til elev-siden
+      renderStudent();
+      return;
+    }
+  }
+}
+list.innerHTML = arr.map(u=>`
+  <li data-id="${u.id}">
+    <span>${esc(u.name||u.email||u.id)}</span>
+    <span class="rowline">
+      <label class="note" title="Gi/fjern admin-tilgang">
+        <input type="checkbox" class="makeAdmin" data-id="${u.id}" ${u.is_admin?'checked':''}>
+        Admin
+      </label>
+      <span class="chip" id="sum-${u.id}">…</span>
+    </span>
+  </li>
+`).join('');
+// klikk på rad = velg bruker
+$$('#userList li').forEach(li => li.onclick = (e)=>{
+  // ignorér klikk på selve checkboxen (den har egen handler)
+  if(e.target && e.target.classList.contains('makeAdmin')) return;
+  selectUser(li.getAttribute('data-id'));
+});
+
+// toggle admin
+$$('#userList .makeAdmin').forEach(ch=>{
+  ch.onchange = async ()=>{
+    const uid = ch.dataset.id;
+    const flag = ch.checked;
+    await setAdmin(uid, flag);
+  };
+});
