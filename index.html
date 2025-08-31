@@ -556,3 +556,80 @@
 </script>
 </body>
 </html>
+<script>
+// ... behold alt annet uendret over ...
+
+async function addSection(role){
+  const { error } = await sb.from('sections').insert({ role, title:'Ny inndeling', position: Date.now() });
+  if(error){ alert('Kunne ikke legge til inndeling: ' + error.message); return; }
+  await sb.from('logs').insert({ actor_id: me.id, message: `section added in ${role}` });
+}
+
+async function updateSectionTitle(id, title){
+  const { error } = await sb.from('sections').update({ title }).eq('id', id);
+  if(error){ alert('Kunne ikke oppdatere tittel: ' + error.message); return; }
+  await sb.from('logs').insert({ actor_id: me.id, message: `section title updated` });
+}
+
+async function deleteSection(id){
+  const { error } = await sb.from('sections').delete().eq('id', id);
+  if(error){ alert('Kunne ikke slette inndeling: ' + error.message); return; }
+  await sb.from('logs').insert({ actor_id: me.id, message: `section deleted` });
+}
+
+async function moveSection(role, si, dir){
+  const secs = catalog[role]; const j = si + (dir==='up'?-1:+1);
+  if(j<0 || j>=secs.length) return;
+  const a=secs[si], b=secs[j];
+  let res = await sb.from('sections').update({ position:b.position }).eq('id', a.id);
+  if(res.error){ alert('Kunne ikke flytte inndeling (1): ' + res.error.message); return; }
+  res = await sb.from('sections').update({ position:a.position }).eq('id', b.id);
+  if(res.error){ alert('Kunne ikke flytte inndeling (2): ' + res.error.message); return; }
+  await sb.from('logs').insert({ actor_id: me.id, message: `section moved` });
+}
+
+async function addItem(section_id, text){
+  const { error } = await sb.from('items').insert({ section_id, text, position: Date.now() });
+  if(error){ alert('Kunne ikke legge til punkt: ' + error.message); return; }
+  await sb.from('logs').insert({ actor_id: me.id, message: `item added` });
+}
+
+async function editItem(id, text){
+  const { error } = await sb.from('items').update({ text }).eq('id', id);
+  if(error){ alert('Kunne ikke redigere punkt: ' + error.message); return; }
+  await sb.from('logs').insert({ actor_id: me.id, message: `item edited` });
+}
+
+async function deleteItem(id){
+  const { error } = await sb.from('items').delete().eq('id', id);
+  if(error){ alert('Kunne ikke slette punkt: ' + error.message); return; }
+  await sb.from('logs').insert({ actor_id: me.id, message: `item deleted` });
+}
+
+async function moveItem(role, si, ii, dir){
+  const sec=catalog[role][si]; const arr=sec.items; const j=ii+(dir==='up'?-1:+1);
+  if(j<0 || j>=arr.length) return;
+  const a=arr[ii], b=arr[j];
+  let res = await sb.from('items').update({ position:b.position }).eq('id', a.id);
+  if(res.error){ alert('Kunne ikke flytte punkt (1): ' + res.error.message); return; }
+  res = await sb.from('items').update({ position:a.position }).eq('id', b.id);
+  if(res.error){ alert('Kunne ikke flytte punkt (2): ' + res.error.message); return; }
+  await sb.from('logs').insert({ actor_id: me.id, message: `item moved` });
+}
+
+async function setAdmin(uid, flag){
+  if(uid === me.id && !flag){
+    const ok = confirm('Du er i ferd med å fjerne din egen admin-tilgang. Fortsette?');
+    if(!ok) return;
+  }
+  const { error } = await sb.from('profiles').update({ is_admin: !!flag }).eq('id', uid);
+  if(error){ alert('Kunne ikke oppdatere admin-status: ' + error.message); return; }
+  await sb.from('logs').insert({ actor_id: me.id, message: `is_admin ${flag?'ON':'OFF'} for ${uid}` });
+  if(uid === me.id){
+    isAdmin = !!flag;
+    if(!isAdmin){ renderStudent(); return; }
+  }
+}
+
+// ... behold alt annet uendret under ...
+</script>
