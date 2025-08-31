@@ -42,8 +42,6 @@
     .list li{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border-bottom:1px solid #f6f6f6;cursor:pointer}
     .list li:hover{background:#f9f9f9}
     .chip{font-size:12px;padding:3px 6px;border-radius:999px;background:#eee}
-    .chip.red{background:#ffd2d2}
-    .chip.green{background:#c9f7c9}
     .muted{opacity:.7}
     .rowline{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 
@@ -65,40 +63,20 @@
 <body>
   <div class="wrap" id="app"></div>
 
-  <!-- Login overlay -->
+  <!-- Login overlay (kun e-post/OTP) -->
   <div id="ov">
     <div id="dlg">
       <div class="hd">Logg inn</div>
       <div class="bd">
-        <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">
-          <button id="tabStudent" class="btn primary">Elev (magisk lenke)</button>
-          <button id="tabAdmin" class="btn">Admin (passord)</button>
-        </div>
-
-        <!-- Elev -->
-        <div id="paneStudent">
-          <input id="email" class="field" type="email" placeholder="din@epost.no">
-          <div class="note">Vi sender en magisk lenke. Du kan også lime inn 6-sifret kode.</div>
-          <input id="otp" class="field" type="text" maxlength="6" placeholder="6-sifret kode (valgfritt)">
-          <div id="sMsg" class="err"></div>
-        </div>
-
-        <!-- Admin -->
-        <div id="paneAdmin" style="display:none">
-          <input id="adminEmail" class="field" type="email" placeholder="post@rcbjorgvin.no" value="post@rcbjorgvin.no">
-          <input id="adminPass" class="field" type="password" placeholder="fergehallen">
-          <div id="aMsg" class="err"></div>
-        </div>
+        <input id="email" class="field" type="email" placeholder="din@epost.no">
+        <div class="note">Vi sender en magisk lenke. Du kan også lime inn 6-sifret kode.</div>
+        <input id="otp" class="field" type="text" maxlength="6" placeholder="6-sifret kode (valgfritt)">
+        <div id="sMsg" class="err"></div>
       </div>
       <div class="ft">
-        <div id="studentBtns">
-          <button id="send" class="btn primary">Send lenke</button>
-          <button id="check" class="btn">Jeg har åpnet lenken</button>
-          <button id="verify" class="btn">Verifiser kode</button>
-        </div>
-        <div id="adminBtns" style="display:none">
-          <button id="adminLogin" class="btn primary">Logg inn som admin</button>
-        </div>
+        <button id="send" class="btn primary">Send lenke</button>
+        <button id="check" class="btn">Sjekk innlogging</button>
+        <button id="verify" class="btn">Verifiser kode</button>
       </div>
     </div>
   </div>
@@ -128,29 +106,12 @@
   function openOverlay(){ $('#ov').classList.add('open'); }
   function closeOverlay(){ $('#ov').classList.remove('open'); }
 
-  // ===== Håndter magisk lenke (#access_token i URL) =====
-  async function handleHashLogin(){
-    const hash = location.hash ? location.hash.replace(/^#/, '') : '';
-    if(!hash) return;
-    const p = new URLSearchParams(hash);
-    const at = p.get('access_token');
-    const rt = p.get('refresh_token');
-    if(at && rt){
-      await sb.auth.setSession({ access_token: at, refresh_token: rt });
-      history.replaceState({}, document.title, location.pathname + location.search); // fjern tokens fra URL
-    }
-  }
-
-  // ===== Login overlay tabs =====
-  $('#tabStudent').onclick=()=>{ $('#paneStudent').style.display='block'; $('#paneAdmin').style.display='none'; $('#studentBtns').style.display=''; $('#adminBtns').style.display='none'; $('#tabStudent').classList.add('primary'); $('#tabAdmin').classList.remove('primary'); };
-  $('#tabAdmin').onclick=()=>{ $('#paneStudent').style.display='none'; $('#paneAdmin').style.display='block'; $('#studentBtns').style.display='none'; $('#adminBtns').style.display=''; $('#tabAdmin').classList.add('primary'); $('#tabStudent').classList.remove('primary'); };
-
-  // ===== Auth actions =====
+  // ===== Auth (kun e-post) =====
   $('#send').onclick=async()=>{
     const email=$('#email').value.trim(); if(!email){ $('#sMsg').textContent='Skriv inn e-post.'; return; }
     $('#sMsg').textContent='Sender …';
-    const { error } = await sb.auth.signInWithOtp({ email, options:{ emailRedirectTo: location.origin + location.pathname } });
-    $('#sMsg').textContent = error? error.message : 'Lenke sendt! Åpne e-posten, og kom tilbake hit.';
+    const { error } = await sb.auth.signInWithOtp({ email, options:{ emailRedirectTo: location.href } });
+    $('#sMsg').textContent = error? error.message : 'Lenke sendt! Åpne e-posten, eller bruk 6-sifret kode her.';
   };
   $('#verify').onclick=async()=>{
     const email=$('#email').value.trim(); const otp=$('#otp').value.trim();
@@ -162,21 +123,8 @@
   };
   $('#check').onclick=()=>location.reload();
 
-  $('#adminLogin').onclick=async()=>{
-    const email=$('#adminEmail').value.trim(); const password=$('#adminPass').value;
-    if(!email || !password){ $('#aMsg').textContent='Skriv e-post og passord.'; return; }
-    $('#aMsg').textContent='Logger inn …';
-    const { data, error } = await sb.auth.signInWithPassword({ email, password });
-    if(error){ $('#aMsg').textContent=error.message; return; }
-    await sb.from('profiles').upsert({ id:data.user.id, email:data.user.email, name:data.user.email }, { onConflict:'id' });
-    const { data:prof } = await sb.from('profiles').select('is_admin').eq('id',data.user.id).maybeSingle();
-    if(!prof?.is_admin){ $('#aMsg').textContent='Innlogget, men ikke admin. Kontakt ansvarlig.'; return; }
-    location.reload();
-  };
-
   // ===== Gate =====
   async function gate(){
-    await handleHashLogin(); // <-- viktig: plukk opp tokens før vi sjekker sesjon
     const { data:{ session } } = await sb.auth.getSession();
     if(!session){ openOverlay(); return false; }
     me = session.user;
@@ -206,7 +154,7 @@
     const { data } = await sb.from('progress').select('item_id,done,date,signed_by').eq('user_id', me.id);
     myProg = new Map(); (data||[]).forEach(r=>myProg.set(r.item_id, r));
   }
-  async function loadUsers(){
+  async function loadUsers(){ // admin
     const { data } = await sb.from('profiles').select('id,email,name,is_admin').order('email',{ascending:true});
     return data||[];
   }
@@ -612,6 +560,7 @@
       </div>`).join('') || '<div class="note">Loggen er tom.</div>';
     }
 
+    // bind
     $('#userSearch').oninput=drawUsers;
     $('#addSec').onclick=async()=>{ await addSection($('#catRole').value); await loadCatalog(); await drawCatalogEditor(); };
     $('#catRole').onchange=drawCatalogEditor;
