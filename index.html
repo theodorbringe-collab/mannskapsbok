@@ -1,16 +1,8 @@
 diff --git a/index.html b/index.html
-index 71b235f857513b700382a58d6b64d66d518ed9e9..d8634b221c0d33e0f02b53053bba126241d52fa5 100644
+index 71b235f857513b700382a58d6b64d66d518ed9e9..eac1ee48a4d06ec2cd5804ac43d9e582a0bb6180 100644
 --- a/index.html
 +++ b/index.html
-@@ -70,50 +70,51 @@
-         <div class="note">Vi sender en magisk lenke. Du kan også lime inn 6-sifret kode.</div>
-         <input id="otp" class="field" type="text" maxlength="6" placeholder="6-sifret kode (valgfritt)">
-         <div id="sMsg" class="err"></div>
-       </div>
-       <div class="ft">
-         <button id="send" class="btn primary">Send lenke</button>
-         <button id="check" class="btn">Sjekk innlogging</button>
-         <button id="verify" class="btn">Verifiser kode</button>
+@@ -78,51 +78,58 @@
        </div>
      </div>
    </div>
@@ -28,7 +20,6 @@ index 71b235f857513b700382a58d6b64d66d518ed9e9..d8634b221c0d33e0f02b53053bba1262
  
    // ===== State =====
    let me=null, catalog={}, myProg=new Map();
-+  let editMode=false;
    let rt=null;
  
    // ===== Helpers =====
@@ -37,7 +28,15 @@ index 71b235f857513b700382a58d6b64d66d518ed9e9..d8634b221c0d33e0f02b53053bba1262
    const esc=s=>(s||'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[m]));
    const fmt=v=>v??'';
    const clsFor=(done,total)=> total===0||done===0?'gray':(done<total?'yellow':'green');
-   const toast=msg=>{ const t=$('#toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),1200); };
+-  const toast=msg=>{ const t=$('#toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),1200); };
++  let toastTimer;
++  const toast=msg=>{
++    const t=$('#toast');
++    t.textContent=msg;
++    t.classList.add('show');
++    clearTimeout(toastTimer);
++    toastTimer=setTimeout(()=>t.classList.remove('show'),1200);
++  };
    const openOverlay=()=>$('#ov').classList.add('open');
    const closeOverlay=()=>$('#ov').classList.remove('open');
  
@@ -54,119 +53,12 @@ index 71b235f857513b700382a58d6b64d66d518ed9e9..d8634b221c0d33e0f02b53053bba1262
      $('#sMsg').textContent='Verifiserer …';
      const { error } = await sb.auth.verifyOtp({ type:'email', email, token: otp });
      if(error){ $('#sMsg').textContent=error.message; return; }
-@@ -224,109 +225,112 @@
-   async function deleteItem(id){
-     const { error } = await sb.from('items').delete().eq('id', id);
-     if(error){ alert('Kunne ikke slette punkt: ' + error.message); return; }
-     await sb.from('logs').insert({ actor_id: me.id, message: `item deleted` });
-   }
-   async function moveItem(role, si, ii, dir){
-     const sec=catalog[role][si]; const arr=sec.items; const j=ii+(dir==='up'?-1:+1);
-     if(j<0 || j>=arr.length) return;
-     const a=arr[ii], b=arr[j];
-     let res = await sb.from('items').update({ position:b.position }).eq('id', a.id);
-     if(res.error){ alert('Kunne ikke flytte punkt (1): ' + res.error.message); return; }
-     res = await sb.from('items').update({ position:a.position }).eq('id', b.id);
-     if(res.error){ alert('Kunne ikke flytte punkt (2): ' + res.error.message); return; }
-     await sb.from('logs').insert({ actor_id: me.id, message: `item moved` });
-   }
+     location.reload();
+   };
+   $('#check').onclick=()=>location.reload();
  
-   // ===== Student UI =====
-   function renderStudent(){
-     const host=$('#app');
-     host.innerHTML=`
-       <div class="title">Mannskapsbok</div>
-       <div class="row">
-         <span>Innlogget som <b>${esc(me.email||me.id)}</b></span>
-         <span class="badge">Sky OK</span>
-         <button id="btnAdmin" class="btn">Admin</button>
-+        <button id="toggleEdit" class="btn">Rediger</button>
-         <button id="logout" class="btn">Logg ut</button>
-       </div>
-       <div id="cards" class="grid"></div>
-       <div id="tabs" class="tabs"></div>
-       <div id="panel"></div>
-     `;
-     $('#logout').onclick=async()=>{ await sb.auth.signOut(); location.reload(); };
-     $('#btnAdmin').onclick=renderAdmin; // alltid tillatt i dev-mode
-+    $('#toggleEdit').onclick=()=>{ editMode=!editMode; $('#toggleEdit').textContent=editMode?'Lås':'Rediger'; const active=$('#tabs .tab.active')?.textContent; if(active) renderRole(active); };
-     renderCards(); renderTabs(ROLES[0]); renderRole(ROLES[0]);
-   }
-   function renderCards(){
-     const grid=$('#cards'); grid.innerHTML='';
-     ROLES.forEach(role=>{
-       const its=(catalog[role]||[]).flatMap(s=>s.items);
-       const total=its.length;
-       const done=its.filter(it=>myProg.get(it.id)?.done).length;
-       const card=document.createElement('div'); card.className='card';
-       const btn=document.createElement('button'); btn.className=clsFor(done,total);
-       btn.innerHTML=`${role}<span class="sub">${done}/${total} fullført</span>`;
-       btn.onclick=()=>{ renderTabs(role); renderRole(role); };
-       card.appendChild(btn); grid.appendChild(card);
-     });
-   }
-   function renderTabs(active){
-     const tabs=$('#tabs'); tabs.innerHTML='';
-     ROLES.forEach(r=>{
-       const b=document.createElement('button'); b.className='tab'+(r===active?' active':''); b.textContent=r;
-       b.onclick=()=>{ renderTabs(r); renderRole(r); };
-       tabs.appendChild(b);
-     });
-   }
-   function renderRole(role){
-     const panel=$('#panel'); const secs=catalog[role]||[];
-     if(!secs.length){ panel.innerHTML='<div class="empty">Ingen punkter.</div>'; return; }
-     panel.innerHTML = secs.map((s,si)=>`
-       <div style="margin:10px 0 14px">
-         <div class="tag">${esc(s.title)}</div>
-         <table class="table">
-           <thead><tr><th style="width:66px">#</th><th>Beskrivelse</th><th style="width:140px">Dato</th><th style="width:180px">Signert</th><th style="width:80px">Ferdig</th></tr></thead>
-           <tbody>
-             ${s.items.map((it,pi)=>{
-               const pr=myProg.get(it.id)||{};
-               return `<tr data-id="${it.id}">
-                 <td>${si+1}.${pi+1}</td>
-                 <td>${esc(it.text)}</td>
--                <td><input type="date" value="${fmt(pr.date)}"></td>
--                <td><input type="text" value="${esc(pr.signed_by||'')}" placeholder="Signert av"></td>
--                <td><input type="checkbox" ${pr.done?'checked':''}></td>
-+                <td><input ${editMode?'':'disabled'} type="date" value="${fmt(pr.date)}"></td>
-+                <td><input ${editMode?'':'disabled'} type="text" value="${esc(pr.signed_by||'')}" placeholder="Signert av"></td>
-+                <td><input ${editMode?'':'disabled'} type="checkbox" ${pr.done?'checked':''}></td>
-               </tr>`;
-             }).join('')}
-           </tbody>
-         </table>
-       </div>`).join('');
-     $$('#panel tbody tr').forEach(tr=>{
-       const id=tr.getAttribute('data-id');
-       const d=tr.querySelector('input[type="date"]');
-       const s=tr.querySelector('input[type="text"]');
-       const c=tr.querySelector('input[type="checkbox"]');
-       async function commit(){
-+        if(!editMode) return;
-         if(c.checked && !d.value) d.value=new Date().toISOString().slice(0,10);
-         await upsertProgress(id,{date:d.value||null,signed_by:s.value||null,done:!!c.checked}, me.id);
-         renderCards();
-       }
-       d.onchange=commit; s.onchange=commit; c.onchange=commit;
-     });
-   }
- 
-   // ===== Admin UI =====
-   async function renderAdmin(){
-     const users = await loadUsers();
-     const host=$('#app');
-     host.innerHTML=`
-       <div class="title">Admin</div>
-       <div class="row">
-         <button id="btnBack" class="btn">← Til elev-siden</button>
-         <span class="badge">Dev-mode</span>
-         <button id="logout" class="btn">Logg ut</button>
-       </div>
- 
-       <div class="split">
-         <div>
-           <div class="box">
-             <div class="hd">Brukere</div>
-             <div class="bd">
+   // ===== Gate =====
+   async function gate(){
+     const { data:{ session } } = await sb.auth.getSession();
+     if(!session){ openOverlay(); return false; }
+     me = session.user;
