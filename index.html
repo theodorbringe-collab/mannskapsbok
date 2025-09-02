@@ -1,64 +1,589 @@
-diff --git a/index.html b/index.html
-index 71b235f857513b700382a58d6b64d66d518ed9e9..eac1ee48a4d06ec2cd5804ac43d9e582a0bb6180 100644
---- a/index.html
-+++ b/index.html
-@@ -78,51 +78,58 @@
-       </div>
-     </div>
-   </div>
- 
-   <div id="toast">Lagret ✅</div>
- 
- <script>
- (async()=>{
-   // ===== Supabase =====
-   const SUPABASE_URL  = "https://pmrkhwpshbnnbjfkslyw.supabase.co";
-   const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBtcmtod3BzaGJubmJqZmtzbHl3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYwNDEyODAsImV4cCI6MjA3MTYxNzI4MH0.NKaeyjbEoSsJ1mHRUMyclkbdWx5ClylaILNjr1l3Tas";
-   const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
- 
-   const ROLES = ['Fartøysjef','NK','Matros','Aspirant','Rescuerunner'];
- 
-   // ===== State =====
-   let me=null, catalog={}, myProg=new Map();
-   let rt=null;
- 
-   // ===== Helpers =====
-   const $=(s,r=document)=>r.querySelector(s);
-   const $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
-   const esc=s=>(s||'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[m]));
-   const fmt=v=>v??'';
-   const clsFor=(done,total)=> total===0||done===0?'gray':(done<total?'yellow':'green');
--  const toast=msg=>{ const t=$('#toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),1200); };
-+  let toastTimer;
-+  const toast=msg=>{
-+    const t=$('#toast');
-+    t.textContent=msg;
-+    t.classList.add('show');
-+    clearTimeout(toastTimer);
-+    toastTimer=setTimeout(()=>t.classList.remove('show'),1200);
-+  };
-   const openOverlay=()=>$('#ov').classList.add('open');
-   const closeOverlay=()=>$('#ov').classList.remove('open');
- 
-   // ===== Auth (email) =====
-   $('#send').onclick=async()=>{
-     const email=$('#email').value.trim(); if(!email){ $('#sMsg').textContent='Skriv inn e-post.'; return; }
-     $('#sMsg').textContent='Sender …';
-     const { error } = await sb.auth.signInWithOtp({ email, options:{ emailRedirectTo: location.href } });
-     $('#sMsg').textContent = error? error.message : 'Lenke sendt! Åpne e-posten, eller bruk 6-sifret kode her.';
-   };
-   $('#verify').onclick=async()=>{
-     const email=$('#email').value.trim(); const otp=$('#otp').value.trim();
-     if(!email || !otp){ $('#sMsg').textContent='Skriv e-post + kode.'; return; }
-     $('#sMsg').textContent='Verifiserer …';
-     const { error } = await sb.auth.verifyOtp({ type:'email', email, token: otp });
-     if(error){ $('#sMsg').textContent=error.message; return; }
-     location.reload();
-   };
-   $('#check').onclick=()=>location.reload();
- 
-   // ===== Gate =====
-   async function gate(){
-     const { data:{ session } } = await sb.auth.getSession();
-     if(!session){ openOverlay(); return false; }
-     me = session.user;
+<!DOCTYPE html>
+<html lang="no">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Mannskapsbok</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    :root{--accent:#2b4dcb}
+    *{box-sizing:border-box}
+    body{margin:0;background:#fafafa;font:14px/1.4 Arial, sans-serif;color:#111}
+    a{color:inherit}
+    .wrap{max-width:1100px;margin:40px auto;padding:0 16px}
+    .title{font-size:28px;font-weight:800;color:var(--accent);margin:0 0 6px}
+    .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:8px 0 14px}
+    .badge{padding:4px 8px;border-radius:999px;border:1px solid #ddd;background:#fff;font-size:12px}
+    .note{font-size:12px;color:#666}
+    .btn{padding:8px 12px;border-radius:8px;border:1px solid #ddd;background:#fff;cursor:pointer}
+    .btn.primary{background:#111;color:#fff;border-color:#111}
+    .btn.small{padding:6px 8px;font-size:12px}
+    .grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));margin:16px 0 8px}
+    .card{border:1px solid #eee;border-radius:14px;background:#f7f7f7}
+    .card button{width:100%;padding:16px 14px;border:0;border-radius:12px;font-weight:700;cursor:pointer;box-shadow:0 2px 5px rgba(0,0,0,.08)}
+    .card .sub{display:block;font-weight:400;font-size:12px;opacity:.85;margin-top:2px}
+    .gray{background:#e5e5e5}.yellow{background:#ffe08a}.green{background:#9be29b}
+    .tabs{display:flex;gap:8px;margin:12px 0;flex-wrap:wrap}
+    .tab{padding:10px 12px;border-radius:10px;border:1px solid #ddd;background:#fff;cursor:pointer}
+    .tab.active{background:#111;color:#fff;border-color:#111}
+    .tag{display:inline-block;font-size:12px;padding:4px 8px;border-radius:999px;background:#f1f1f1;margin:0 0 6px}
+    .table{width:100%;border-collapse:collapse;background:#fff;border:1px solid #ddd;border-radius:12px;overflow:hidden}
+    .table th,.table td{border-bottom:1px solid #eee;padding:10px 8px;text-align:left;vertical-align:top}
+    .table th{background:#fafafa;font-weight:700}
+    .table tr:last-child td{border-bottom:0}
+    .table input[type="text"],.table input[type="date"]{width:100%;padding:6px 8px;border:1px solid #ddd;border-radius:8px}
+    .empty{padding:16px;color:#666}
+    .split{display:grid;grid-template-columns:300px 1fr;gap:12px}
+    @media (max-width:900px){ .split{grid-template-columns:1fr} }
+    .box{border:1px solid #eee;border-radius:12px;background:#fff;overflow:hidden}
+    .box .hd{padding:10px 12px;border-bottom:1px solid #eee;background:#fafafa;font-weight:700}
+    .box .bd{padding:10px 12px}
+    .list{list-style:none;margin:0;padding:0;max-height:420px;overflow:auto}
+    .list li{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border-bottom:1px solid #f6f6f6;cursor:pointer}
+    .list li:hover{background:#f9f9f9}
+    .chip{font-size:12px;padding:3px 6px;border-radius:999px;background:#eee}
+    .muted{opacity:.7}
+    .rowline{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+    /* overlay (login) */
+    #ov{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.55);z-index:1000}
+    #ov.open{display:flex}
+    #dlg{width:min(560px,94%);background:#fff;border-radius:14px;box-shadow:0 16px 40px rgba(0,0,0,.35)}
+    #dlg .hd{padding:14px 16px;border-bottom:1px solid #eee;font-weight:700}
+    #dlg .bd{padding:16px}
+    #dlg .ft{padding:12px 16px;border-top:1px solid #eee;display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+    .field{display:block;width:100%;padding:10px 12px;border:1px solid #ddd;border-radius:10px;margin:8px 0}
+    .err{color:#b00020;font-size:12px;min-height:16px;margin-top:6px}
+    /* toast */
+    #toast{position:fixed;right:16px;bottom:16px;background:#111;color:#fff;padding:10px 12px;border-radius:10px;opacity:0;transform:translateY(8px);transition:.25s}
+    #toast.show{opacity:1;transform:translateY(0)}
+  </style>
+</head>
+<body>
+  <div class="wrap" id="app"></div>
+
+  <!-- Login overlay -->
+  <div id="ov">
+    <div id="dlg">
+      <div class="hd">Logg inn</div>
+      <div class="bd">
+        <input id="email" class="field" type="email" placeholder="din@epost.no">
+        <div class="note">Vi sender en magisk lenke. Du kan også lime inn 6-sifret kode.</div>
+        <input id="otp" class="field" type="text" maxlength="6" placeholder="6-sifret kode (valgfritt)">
+        <div id="sMsg" class="err"></div>
+      </div>
+      <div class="ft">
+        <button id="send" class="btn primary">Send lenke</button>
+        <button id="check" class="btn">Sjekk innlogging</button>
+        <button id="verify" class="btn">Verifiser kode</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast">Lagret ✅</div>
+
+<script>
+(async()=>{
+  // ===== Supabase =====
+  const SUPABASE_URL  = "https://pmrkhwpshbnnbjfkslyw.supabase.co";
+  const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBtcmtod3BzaGJubmJqZmtzbHl3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYwNDEyODAsImV4cCI6MjA3MTYxNzI4MH0.NKaeyjbEoSsJ1mHRUMyclkbdWx5ClylaILNjr1l3Tas";
+  const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+
+  const ROLES = ['Fartøysjef','NK','Matros','Aspirant','Rescuerunner'];
+
+  // ===== State =====
+  let me=null, catalog={}, myProg=new Map();
+  let rt=null;
+
+  // ===== Helpers =====
+  const $=(s,r=document)=>r.querySelector(s);
+  const $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
+  const esc=s=>(s||'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[m]));
+  const fmt=v=>v??'';
+  const clsFor=(done,total)=> total===0||done===0?'gray':(done<total?'yellow':'green');
+  const toast=msg=>{ const t=$('#toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),1200); };
+  const openOverlay=()=>$('#ov').classList.add('open');
+  const closeOverlay=()=>$('#ov').classList.remove('open');
+
+  // ===== Auth (email) =====
+  $('#send').onclick=async()=>{
+    const email=$('#email').value.trim(); if(!email){ $('#sMsg').textContent='Skriv inn e-post.'; return; }
+    $('#sMsg').textContent='Sender …';
+    const { error } = await sb.auth.signInWithOtp({ email, options:{ emailRedirectTo: location.href } });
+    $('#sMsg').textContent = error? error.message : 'Lenke sendt! Åpne e-posten, eller bruk 6-sifret kode her.';
+  };
+  $('#verify').onclick=async()=>{
+    const email=$('#email').value.trim(); const otp=$('#otp').value.trim();
+    if(!email || !otp){ $('#sMsg').textContent='Skriv e-post + kode.'; return; }
+    $('#sMsg').textContent='Verifiserer …';
+    const { error } = await sb.auth.verifyOtp({ type:'email', email, token: otp });
+    if(error){ $('#sMsg').textContent=error.message; return; }
+    location.reload();
+  };
+  $('#check').onclick=()=>location.reload();
+
+  // ===== Gate =====
+  async function gate(){
+    const { data:{ session } } = await sb.auth.getSession();
+    if(!session){ openOverlay(); return false; }
+    me = session.user;
+
+    // sørg for profiles-rad
+    await sb.from('profiles').upsert({ id: me.id, email: me.email, name: me.email }, { onConflict:'id' });
+
+    return true;
+  }
+
+  // ===== Loaders =====
+  async function loadCatalog(){
+    catalog={};
+    for(const role of ROLES){
+      const { data:secs, error:e1 } = await sb.from('sections').select('id,title,position').eq('role',role).order('position',{ascending:true});
+      if(e1){ console.warn(e1); catalog[role]=[]; continue; }
+      const list=[]; 
+      if(secs?.length){
+        const ids=secs.map(s=>s.id);
+        const { data:items } = await sb.from('items').select('id,section_id,text,position').in('section_id',ids).order('position',{ascending:true});
+        for(const s of secs){
+          list.push({ id:s.id, title:s.title, position:s.position, items:(items||[]).filter(i=>i.section_id===s.id) });
+        }
+      }
+      catalog[role]=list;
+    }
+  }
+  async function loadMyProgress(){
+    const { data } = await sb.from('progress').select('item_id,done,date,signed_by').eq('user_id', me.id);
+    myProg = new Map(); (data||[]).forEach(r=>myProg.set(r.item_id, r));
+  }
+  async function loadUsers(){
+    const { data, error } = await sb.from('profiles').select('id,email,name,is_admin').order('email',{ascending:true});
+    if(error){ alert('Kunne ikke laste brukere: ' + error.message); return []; }
+    return data||[];
+  }
+  async function loadProgressFor(uid){
+    const { data } = await sb.from('progress').select('item_id,done,date,signed_by').eq('user_id', uid);
+    const map=new Map(); (data||[]).forEach(r=>map.set(r.item_id, r));
+    return map;
+  }
+  async function loadComments(uid){
+    const { data } = await sb.from('comments').select('id,author_id,text,created_at').eq('user_id',uid).order('created_at',{ascending:false});
+    return data||[];
+  }
+  async function loadLogs(){
+    const { data } = await sb.from('logs').select('actor_id,message,created_at').order('created_at',{ascending:false}).limit(200);
+    return data||[];
+  }
+
+  // ===== Saves (med feilhåndtering) =====
+  async function upsertProgress(itemId, patch, uid=me.id){
+    const row = { user_id: uid, item_id: itemId, done: !!patch.done, date: patch.date || null, signed_by: patch.signed_by || null };
+    const { error } = await sb.from('progress').upsert(row, { onConflict:'user_id,item_id' });
+    if(error){ alert('Kunne ikke lagre progresjon: ' + error.message); return; }
+    if(uid===me.id){ myProg.set(itemId, { ...myProg.get(itemId), ...row }); }
+    await sb.from('logs').insert({ actor_id: me.id, message: `progress updated for user ${uid}` });
+  }
+  async function addComment(uid, text){
+    const { error } = await sb.from('comments').insert({ user_id: uid, author_id: me.id, text });
+    if(error){ alert('Kunne ikke legge til kommentar: ' + error.message); return; }
+    await sb.from('logs').insert({ actor_id: me.id, message: `comment added for user ${uid}` });
+  }
+  async function addSection(role){
+    const { error } = await sb.from('sections').insert({ role, title:'Ny inndeling', position: Date.now() });
+    if(error){ alert('Kunne ikke legge til inndeling: ' + error.message); return; }
+    await sb.from('logs').insert({ actor_id: me.id, message: `section added in ${role}` });
+  }
+  async function updateSectionTitle(id, title){
+    const { error } = await sb.from('sections').update({ title }).eq('id', id);
+    if(error){ alert('Kunne ikke oppdatere tittel: ' + error.message); return; }
+    await sb.from('logs').insert({ actor_id: me.id, message: `section title updated` });
+  }
+  async function deleteSection(id){
+    const { error } = await sb.from('sections').delete().eq('id', id);
+    if(error){ alert('Kunne ikke slette inndeling: ' + error.message); return; }
+    await sb.from('logs').insert({ actor_id: me.id, message: `section deleted` });
+  }
+  async function moveSection(role, si, dir){
+    const secs = catalog[role]; const j = si + (dir==='up'?-1:+1);
+    if(j<0 || j>=secs.length) return;
+    const a=secs[si], b=secs[j];
+    let res = await sb.from('sections').update({ position:b.position }).eq('id', a.id);
+    if(res.error){ alert('Kunne ikke flytte inndeling (1): ' + res.error.message); return; }
+    res = await sb.from('sections').update({ position:a.position }).eq('id', b.id);
+    if(res.error){ alert('Kunne ikke flytte inndeling (2): ' + res.error.message); return; }
+    await sb.from('logs').insert({ actor_id: me.id, message: `section moved` });
+  }
+  async function addItem(section_id, text){
+    const { error } = await sb.from('items').insert({ section_id, text, position: Date.now() });
+    if(error){ alert('Kunne ikke legge til punkt: ' + error.message); return; }
+    await sb.from('logs').insert({ actor_id: me.id, message: `item added` });
+  }
+  async function editItem(id, text){
+    const { error } = await sb.from('items').update({ text }).eq('id', id);
+    if(error){ alert('Kunne ikke redigere punkt: ' + error.message); return; }
+    await sb.from('logs').insert({ actor_id: me.id, message: `item edited` });
+  }
+  async function deleteItem(id){
+    const { error } = await sb.from('items').delete().eq('id', id);
+    if(error){ alert('Kunne ikke slette punkt: ' + error.message); return; }
+    await sb.from('logs').insert({ actor_id: me.id, message: `item deleted` });
+  }
+  async function moveItem(role, si, ii, dir){
+    const sec=catalog[role][si]; const arr=sec.items; const j=ii+(dir==='up'?-1:+1);
+    if(j<0 || j>=arr.length) return;
+    const a=arr[ii], b=arr[j];
+    let res = await sb.from('items').update({ position:b.position }).eq('id', a.id);
+    if(res.error){ alert('Kunne ikke flytte punkt (1): ' + res.error.message); return; }
+    res = await sb.from('items').update({ position:a.position }).eq('id', b.id);
+    if(res.error){ alert('Kunne ikke flytte punkt (2): ' + res.error.message); return; }
+    await sb.from('logs').insert({ actor_id: me.id, message: `item moved` });
+  }
+
+  // ===== Student UI =====
+  function renderStudent(){
+    const host=$('#app');
+    host.innerHTML=`
+      <div class="title">Mannskapsbok</div>
+      <div class="row">
+        <span>Innlogget som <b>${esc(me.email||me.id)}</b></span>
+        <span class="badge">Sky OK</span>
+        <button id="btnAdmin" class="btn">Admin</button>
+        <button id="logout" class="btn">Logg ut</button>
+      </div>
+      <div id="cards" class="grid"></div>
+      <div id="tabs" class="tabs"></div>
+      <div id="panel"></div>
+    `;
+    $('#logout').onclick=async()=>{ await sb.auth.signOut(); location.reload(); };
+    $('#btnAdmin').onclick=renderAdmin; // alltid tillatt i dev-mode
+    renderCards(); renderTabs(ROLES[0]); renderRole(ROLES[0]);
+  }
+  function renderCards(){
+    const grid=$('#cards'); grid.innerHTML='';
+    ROLES.forEach(role=>{
+      const its=(catalog[role]||[]).flatMap(s=>s.items);
+      const total=its.length;
+      const done=its.filter(it=>myProg.get(it.id)?.done).length;
+      const card=document.createElement('div'); card.className='card';
+      const btn=document.createElement('button'); btn.className=clsFor(done,total);
+      btn.innerHTML=`${role}<span class="sub">${done}/${total} fullført</span>`;
+      btn.onclick=()=>{ renderTabs(role); renderRole(role); };
+      card.appendChild(btn); grid.appendChild(card);
+    });
+  }
+  function renderTabs(active){
+    const tabs=$('#tabs'); tabs.innerHTML='';
+    ROLES.forEach(r=>{
+      const b=document.createElement('button'); b.className='tab'+(r===active?' active':''); b.textContent=r;
+      b.onclick=()=>{ renderTabs(r); renderRole(r); };
+      tabs.appendChild(b);
+    });
+  }
+  function renderRole(role){
+    const panel=$('#panel'); const secs=catalog[role]||[];
+    if(!secs.length){ panel.innerHTML='<div class="empty">Ingen punkter.</div>'; return; }
+    panel.innerHTML = secs.map((s,si)=>`
+      <div style="margin:10px 0 14px">
+        <div class="tag">${esc(s.title)}</div>
+        <table class="table">
+          <thead><tr><th style="width:66px">#</th><th>Beskrivelse</th><th style="width:140px">Dato</th><th style="width:180px">Signert</th><th style="width:80px">Ferdig</th></tr></thead>
+          <tbody>
+            ${s.items.map((it,pi)=>{
+              const pr=myProg.get(it.id)||{};
+              return `<tr data-id="${it.id}">
+                <td>${si+1}.${pi+1}</td>
+                <td>${esc(it.text)}</td>
+                <td><input type="date" value="${fmt(pr.date)}"></td>
+                <td><input type="text" value="${esc(pr.signed_by||'')}" placeholder="Signert av"></td>
+                <td><input type="checkbox" ${pr.done?'checked':''}></td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>`).join('');
+    $$('#panel tbody tr').forEach(tr=>{
+      const id=tr.getAttribute('data-id');
+      const d=tr.querySelector('input[type="date"]');
+      const s=tr.querySelector('input[type="text"]');
+      const c=tr.querySelector('input[type="checkbox"]');
+      async function commit(){
+        if(c.checked && !d.value) d.value=new Date().toISOString().slice(0,10);
+        await upsertProgress(id,{date:d.value||null,signed_by:s.value||null,done:!!c.checked}, me.id);
+        renderCards();
+      }
+      d.onchange=commit; s.onchange=commit; c.onchange=commit;
+    });
+  }
+
+  // ===== Admin UI =====
+  async function renderAdmin(){
+    const users = await loadUsers();
+    const host=$('#app');
+    host.innerHTML=`
+      <div class="title">Admin</div>
+      <div class="row">
+        <button id="btnBack" class="btn">← Til elev-siden</button>
+        <span class="badge">Dev-mode</span>
+        <button id="logout" class="btn">Logg ut</button>
+      </div>
+
+      <div class="split">
+        <div>
+          <div class="box">
+            <div class="hd">Brukere</div>
+            <div class="bd">
+              <input id="userSearch" class="field" placeholder="Søk navn/epost …" style="margin-bottom:8px">
+              <ul id="userList" class="list"></ul>
+            </div>
+          </div>
+
+          <div class="box" style="margin-top:12px">
+            <div class="hd">Katalog (punkter)</div>
+            <div class="bd">
+              <div class="rowline">
+                <label>Rolle:
+                  <select id="catRole" class="field" style="max-width:220px">
+                    ${ROLES.map(r=>`<option value="${r}">${r}</option>`).join('')}
+                  </select>
+                </label>
+                <button id="addSec" class="btn small primary">+ Inndeling</button>
+              </div>
+              <div id="catWrap" style="margin-top:8px"></div>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <div class="box">
+            <div class="hd">
+              <span id="selName">Velg en bruker</span>
+              <span id="selSum" class="note"></span>
+              <span style="float:right">
+                <label class="note"><input type="checkbox" id="editToggle"> Rediger som admin</label>
+              </span>
+            </div>
+            <div class="bd" id="userBook"><div class="note">Ingen valgt.</div></div>
+          </div>
+
+          <div class="box" style="margin-top:12px">
+            <div class="hd">Kommentarer</div>
+            <div class="bd">
+              <div class="rowline">
+                <input id="commentTxt" class="field" placeholder="Skriv kommentar til elev" style="flex:1">
+                <button id="addComment" class="btn small">Legg til</button>
+              </div>
+              <ul id="commentList" class="list" style="margin-top:8px"></ul>
+            </div>
+          </div>
+
+          <div class="box" style="margin-top:12px">
+            <div class="hd">Logg</div>
+            <div class="bd" id="logWrap" style="max-height:260px;overflow:auto"><div class="note">Laster …</div></div>
+          </div>
+        </div>
+      </div>
+    `;
+    $('#btnBack').onclick=renderStudent;
+    $('#logout').onclick=async()=>{ await sb.auth.signOut(); location.reload(); };
+
+    function totalsFor(uid){
+      const its=Object.values(catalog).flatMap(secs=>secs.flatMap(s=>s.items));
+      return loadProgressFor(uid).then(map=>{
+        let done=0; for(const it of its) if(map.get(it.id)?.done) done++;
+        return { done, total: its.length, map };
+      });
+    }
+
+    async function drawUsers(){
+      const q=($('#userSearch').value||'').toLowerCase();
+      const list=$('#userList');
+      const arr=users.filter(u=>(u.name||'').toLowerCase().includes(q)||(u.email||'').toLowerCase().includes(q));
+      if(!arr.length){ list.innerHTML='<li><span class="note">Ingen brukere</span></li>'; return; }
+
+      list.innerHTML = arr.map(u=>`
+        <li data-id="${u.id}">
+          <span>${esc(u.name||u.email||u.id)} ${u.is_admin?'<span class="chip">admin</span>':''}</span>
+          <span class="rowline">
+            <span class="chip" id="sum-${u.id}">…</span>
+          </span>
+        </li>
+      `).join('');
+
+      $$('#userList li').forEach(li => li.onclick = ()=> selectUser(li.getAttribute('data-id')));
+
+      for(const u of arr){
+        totalsFor(u.id).then(t=>{ const el=$(`#sum-${u.id}`); if(el) el.textContent=`${t.done}/${t.total}`; });
+      }
+    }
+
+    async function drawCatalogEditor(){
+      const role=$('#catRole').value; const wrap=$('#catWrap'); const secs=catalog[role]||[];
+      if(!secs.length){ wrap.innerHTML='<div class="note">Ingen inndelinger. Legg til med knappen over.</div>'; return; }
+      wrap.innerHTML = secs.map((s,si)=>`
+        <div class="box" style="margin-bottom:10px">
+          <div class="hd">
+            <div class="rowline">
+              <span class="note">${si+1}</span>
+              <input class="field secTitle" data-si="${si}" value="${esc(s.title)}" style="min-width:220px">
+              <button class="btn small" data-act="secUp" data-si="${si}">↑</button>
+              <button class="btn small" data-act="secDown" data-si="${si}">↓</button>
+              <button class="btn small" data-act="secDel" data-si="${si}">Slett</button>
+              <span class="note" style="margin-left:auto">Nytt punkt</span>
+              <input class="field newItem" data-si="${si}" placeholder="Beskrivelse …" style="min-width:240px">
+              <button class="btn small primary" data-act="addItem" data-si="${si}">+ Legg til</button>
+            </div>
+          </div>
+          <div class="bd">
+            <ul class="list">
+              ${s.items.map((it,ii)=>`
+                <li data-si="${si}" data-ii="${ii}">
+                  <div class="rowline">
+                    <span class="note">${si+1}.${ii+1}</span>
+                    <span class="muted">${esc(it.text)}</span>
+                  </div>
+                  <div class="rowline">
+                    <button class="btn small" data-act="itUp">↑</button>
+                    <button class="btn small" data-act="itDown">↓</button>
+                    <button class="btn small" data-act="itEdit">Rediger</button>
+                    <button class="btn small" data-act="itDel">Slett</button>
+                  </div>
+                </li>`).join('')}
+            </ul>
+          </div>
+        </div>
+      `).join('');
+
+      // seksjoner
+      $$('#catWrap .secTitle').forEach(inp=>{
+        inp.onchange=async()=>{ const si=+inp.dataset.si; await updateSectionTitle(secs[si].id, inp.value.trim()||secs[si].title); await loadCatalog(); await drawCatalogEditor(); };
+      });
+      $$('#catWrap [data-act]').forEach(btn=>{
+        btn.onclick=async()=>{
+          const act=btn.dataset.act; const si=+btn.dataset.si;
+          if(act==='secDel'){ if(!confirm('Slette inndeling?')) return; await deleteSection(secs[si].id); await loadCatalog(); await drawCatalogEditor(); return; }
+          if(act==='secUp')  { await moveSection(role, si, 'up'); await loadCatalog(); await drawCatalogEditor(); return; }
+          if(act==='secDown'){ await moveSection(role, si, 'down'); await loadCatalog(); await drawCatalogEditor(); return; }
+          if(act==='addItem'){ const inp=$(`#catWrap .newItem[data-si="${si}"]`); const txt=(inp.value||'').trim(); if(!txt) return; await addItem(secs[si].id, txt); inp.value=''; await loadCatalog(); await drawCatalogEditor(); return; }
+        };
+      });
+
+      // items
+      $$('#catWrap li [data-act]').forEach(btn=>{
+        btn.onclick=async()=>{
+          const li=btn.closest('li'); const si=+li.dataset.si; const ii=+li.dataset.ii; const role=$('#catRole').value;
+          if(btn.dataset.act==='itUp')   { await moveItem(role, si, ii, 'up');   await loadCatalog(); await drawCatalogEditor(); }
+          if(btn.dataset.act==='itDown') { await moveItem(role, si, ii, 'down'); await loadCatalog(); await drawCatalogEditor(); }
+          if(btn.dataset.act==='itEdit'){ const cur=catalog[role][si].items[ii]; const nt=prompt('Rediger beskrivelse:', cur.text); if(nt!=null){ await editItem(cur.id, nt.trim()); await loadCatalog(); await drawCatalogEditor(); } }
+          if(btn.dataset.act==='itDel') { if(!confirm('Slette punkt?')) return; const cur=catalog[role][si].items[ii]; await deleteItem(cur.id); await loadCatalog(); await drawCatalogEditor(); }
+        };
+      });
+    }
+
+    async function selectUser(uid){
+      const u = users.find(x=>x.id===uid); if(!u) return;
+      const totals = await totalsFor(uid);
+      $('#selName').textContent = (u.name||u.email||u.id);
+      $('#selSum').textContent = `— ${totals.done}/${totals.total} fullført, ${totals.total - totals.done} mangler`;
+      await renderUserBook(uid, $('#editToggle').checked, totals.map);
+      await drawComments(uid);
+      $('#editToggle').onchange=()=> renderUserBook(uid, $('#editToggle').checked, totals.map);
+      $('#addComment').onclick=async()=>{ const t=$('#commentTxt').value.trim(); if(!t) return; await addComment(uid, t); $('#commentTxt').value=''; await drawComments(uid); };
+    }
+
+    async function renderUserBook(uid, editable, progMap){
+      const el=$('#userBook');
+      el.innerHTML = ROLES.map(role=>{
+        const secs=catalog[role]||[];
+        return secs.map((s,si)=>`
+          <div style="margin-bottom:12px">
+            <div class="tag">${role} / ${esc(s.title)}</div>
+            <table class="table"><thead><tr><th style="width:66px">#</th><th>Beskrivelse</th><th style="width:140px">Dato</th><th style="width:180px">Signert</th><th style="width:80px">Ferdig</th></tr></thead>
+              <tbody>
+                ${s.items.map((it,pi)=>{
+                  const pr=progMap.get(it.id)||{};
+                  const dis=editable?'':'disabled';
+                  return `<tr data-id="${it.id}">
+                    <td>${si+1}.${pi+1}</td>
+                    <td>${esc(it.text)}</td>
+                    <td><input ${dis} type="date" value="${fmt(pr.date)}"></td>
+                    <td><input ${dis} type="text" value="${esc(pr.signed_by||'')}" placeholder="Signert av"></td>
+                    <td><input ${dis} type="checkbox" ${pr.done?'checked':''}></td>
+                  </tr>`;
+                }).join('')}
+              </tbody>
+            </table>
+          </div>`).join('');
+      }).join('') || '<div class="empty">Ingen punkter.</div>';
+
+      if(editable){
+        $$('#userBook tbody tr').forEach(tr=>{
+          const id=tr.getAttribute('data-id');
+          const d=tr.querySelector('input[type="date"]');
+          const s=tr.querySelector('input[type="text"]');
+          const c=tr.querySelector('input[type="checkbox"]');
+          async function commit(){
+            if(c.checked && !d.value) d.value=new Date().toISOString().slice(0,10);
+            await upsertProgress(id,{date:d.value||null,signed_by:s.value||null,done:!!c.checked}, uid);
+          }
+          d.onchange=commit; s.onchange=commit; c.onchange=commit;
+        });
+      }
+    }
+
+    async function drawComments(uid){
+      const list=$('#commentList'); const arr=await loadComments(uid);
+      list.innerHTML = arr.map(c=>`<li><span>${esc(c.text)}</span><span class="note">${new Date(c.created_at).toLocaleString('no-NO')}</span></li>`).join('') || '<li><span class="note">Ingen kommentarer.</span></li>';
+    }
+
+    async function drawLog(){
+      const entries = await loadLogs();
+      $('#logWrap').innerHTML = entries.map(l=>`<div class="rowline" style="margin-bottom:6px">
+        <span class="note">${new Date(l.created_at).toLocaleString('no-NO')}</span>
+        <span>${esc(l.message)}</span>
+      </div>`).join('') || '<div class="note">Loggen er tom.</div>';
+    }
+
+    $('#userSearch').oninput=drawUsers;
+    $('#addSec').onclick=async()=>{ await addSection($('#catRole').value); await loadCatalog(); await drawCatalogEditor(); };
+    $('#catRole').onchange=drawCatalogEditor;
+
+    await drawCatalogEditor();
+    await drawUsers();
+    await drawLog();
+
+    const first = users[0]; if(first){ selectUser(first.id); }
+  }
+
+  // ===== Realtime =====
+  function bindRealtime(){
+    if(rt){ sb.removeChannel(rt); rt=null; }
+    rt = sb.channel('live')
+      .on('postgres_changes',{ event:'*', schema:'public', table:'progress', filter:`user_id=eq.${me.id}` },
+        async()=>{ await loadMyProgress(); renderCards(); const active=$('#tabs .tab.active')?.textContent; if(active) renderRole(active); })
+      .on('postgres_changes',{ event:'*', schema:'public', table:'sections' },
+        async()=>{ await loadCatalog(); renderCards(); const active=$('#tabs .tab.active')?.textContent; if(active) renderRole(active); })
+      .on('postgres_changes',{ event:'*', schema:'public', table:'items' },
+        async()=>{ await loadCatalog(); renderCards(); const active=$('#tabs .tab.active')?.textContent; if(active) renderRole(active); })
+      .on('postgres_changes',{ event:'INSERT', schema:'public', table:'comments', filter:`user_id=eq.${me.id}` },
+        ()=> toast('Ny kommentar'))
+      .subscribe();
+  }
+
+  // ===== Start =====
+  try{
+    const ok = await gate();
+    if(!ok) return;
+    closeOverlay();
+    await loadCatalog();
+    await loadMyProgress();
+
+    // I dev-mode: åpne Admin rett etter innlogging
+    renderAdmin();
+
+    bindRealtime();
+  }catch(e){
+    $('#app').innerHTML = '<div class="wrap"><div class="title">Mannskapsbok</div><div class="note">Feil ved oppstart: '+esc(e.message||e)+'</div></div>';
+    console.error(e);
+  }
+})();
+</script>
+</body>
+</html>
