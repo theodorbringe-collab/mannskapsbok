@@ -100,7 +100,14 @@
   const esc=s=>(s||'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[m]));
   const fmt=v=>v??'';
   const clsFor=(done,total)=> total===0||done===0?'gray':(done<total?'yellow':'green');
-  const toast=msg=>{ const t=$('#toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),1200); };
+  let toastTimer;
+  const toast=msg=>{
+    const t=$('#toast');
+    t.textContent=msg;
+    t.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer=setTimeout(()=>t.classList.remove('show'),1200);
+  };
   const openOverlay=()=>$('#ov').classList.add('open');
   const closeOverlay=()=>$('#ov').classList.remove('open');
 
