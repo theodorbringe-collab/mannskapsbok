@@ -1,1 +1,144 @@
+<!doctype html>
+<html lang="no">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Mannskapsbok – Ny</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    body{margin:0;font:14px/1.45 system-ui,Segoe UI,Arial;color:#111;background:#fafafa}
+    .wrap{max-width:980px;margin:32px auto;padding:0 16px}
+    h1{margin:0 0 8px;color:#2b4dcb}
+    .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+    .btn{padding:8px 12px;border:1px solid #ddd;border-radius:8px;background:#fff;cursor:pointer}
+    .btn.primary{background:#111;color:#fff;border-color:#111}
+    .box{background:#fff;border:1px solid #eee;border-radius:12px;overflow:hidden;margin-top:12px}
+    .hd{padding:10px 12px;background:#f7f7f7;border-bottom:1px solid #eee;font-weight:700}
+    .bd{padding:12px}
+    .field{padding:8px 10px;border:1px solid #ddd;border-radius:8px}
+    table{width:100%;border-collapse:collapse}
+    th,td{border-bottom:1px solid #eee;padding:8px;text-align:left}
+    th{background:#fafafa}
+    .note{color:#666}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Mannskapsbok (åpen)</h1>
+  <div class="row">
+    <span class="note">Koblet til Supabase</span>
+    <button id="reload" class="btn">Last på nytt</button>
+  </div>
+
+  <div class="box">
+    <div class="hd">Profiler</div>
+    <div class="bd">
+      <table id="tblProfiles"><thead><tr><th>ID</th><th>E-post</th><th>Navn</th></tr></thead><tbody></tbody></table>
+      <div id="profilesEmpty" class="note" style="display:none">Ingen profiler.</div>
+    </div>
+  </div>
+
+  <div class="box">
+    <div class="hd">Katalog</div>
+    <div class="bd">
+      <div class="row" style="margin-bottom:8px">
+        <input id="role" class="field" placeholder="Rolle" value="Fartøysjef">
+        <input id="secTitle" class="field" placeholder="Ny inndeling">
+        <button id="addSec" class="btn primary">+ Inndeling</button>
+      </div>
+      <div class="row" style="margin-bottom:8px">
+        <input id="secId" class="field" placeholder="Section ID">
+        <input id="itemText" class="field" placeholder="Nytt punkt">
+        <button id="addItem" class="btn">+ Punkt</button>
+      </div>
+      <table id="tblSections"><thead><tr><th>ID</th><th>Rolle</th><th>Tittel</th></tr></thead><tbody></tbody></table>
+      <div id="sectionsEmpty" class="note" style="display:none">Ingen inndelinger.</div>
+      <div style="height:8px"></div>
+      <table id="tblItems"><thead><tr><th>ID</th><th>Section</th><th>Tekst</th></tr></thead><tbody></tbody></table>
+      <div id="itemsEmpty" class="note" style="display:none">Ingen punkter.</div>
+    </div>
+  </div>
+</div>
+
+<script>
+(async()=>{
+  // === Bruk ditt nye prosjekt ===
+  const SUPABASE_URL  = "https://vogqypnvsifswjmvuptn.supabase.co";
+  const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZvZ3F5cG52c2lmc3dqbXZ1cHRuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTcwNzIwMDIsImV4cCI6MjA3MjY0ODAwMn0.CbB58BW4f4O-VzU88DI3hae5PxaptK8Fl6BIsch9Tto";
+  const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+
+  const $ = (s,r=document)=>r.querySelector(s);
+  const tbody = (id)=>$(id).querySelector('tbody');
+
+  async function loadProfiles(){
+    const { data, error } = await sb.from('profiles').select('id,email,name').order('email');
+    const tb = tbody('#tblProfiles'); tb.innerHTML='';
+    if(error){ tb.innerHTML=`<tr><td colspan="3">Feil: ${error.message}</td></tr>`; return; }
+    if(!data?.length){ $('#profilesEmpty').style.display='block'; return; }
+    $('#profilesEmpty').style.display='none';
+    for(const r of data){
+      const tr=document.createElement('tr');
+      tr.innerHTML=`<td>${r.id}</td><td>${r.email||''}</td><td>${r.name||''}</td>`;
+      tb.appendChild(tr);
+    }
+  }
+
+  async function loadCatalog(){
+    // sections
+    {
+      const { data, error } = await sb.from('sections').select('id,role,title').order('position',{ascending:true});
+      const tb = tbody('#tblSections'); tb.innerHTML='';
+      if(error){ tb.innerHTML=`<tr><td colspan="3">Feil: ${error.message}</td></tr>`; }
+      else if(!data?.length){ $('#sectionsEmpty').style.display='block'; }
+      else {
+        $('#sectionsEmpty').style.display='none';
+        for(const s of data){
+          const tr=document.createElement('tr');
+          tr.innerHTML=`<td>${s.id}</td><td>${s.role}</td><td>${s.title}</td>`;
+          tb.appendChild(tr);
+        }
+      }
+    }
+    // items
+    {
+      const { data, error } = await sb.from('items').select('id,section_id,text').order('position',{ascending:true});
+      const tb = tbody('#tblItems'); tb.innerHTML='';
+      if(error){ tb.innerHTML=`<tr><td colspan="3">Feil: ${error.message}</td></tr>`; }
+      else if(!data?.length){ $('#itemsEmpty').style.display='block'; }
+      else {
+        $('#itemsEmpty').style.display='none';
+        for(const it of data){
+          const tr=document.createElement('tr');
+          tr.innerHTML=`<td>${it.id}</td><td>${it.section_id}</td><td>${it.text}</td>`;
+          tb.appendChild(tr);
+        }
+      }
+    }
+  }
+
+  // actions
+  $('#reload').onclick = ()=>{ loadProfiles(); loadCatalog(); };
+  $('#addSec').onclick = async ()=>{
+    const role = $('#role').value.trim() || 'Fartøysjef';
+    const title = $('#secTitle').value.trim() || 'Ny inndeling';
+    const { error } = await sb.from('sections').insert({ role, title });
+    if(error) alert('Feil ved oppretting av inndeling: ' + error.message);
+    await loadCatalog();
+  };
+  $('#addItem').onclick = async ()=>{
+    const section_id = +$('#secId').value;
+    const text = $('#itemText').value.trim() || 'Nytt punkt';
+    if(!section_id){ alert('Oppgi Section ID'); return; }
+    const { error } = await sb.from('items').insert({ section_id, text });
+    if(error) alert('Feil ved oppretting av punkt: ' + error.message);
+    await loadCatalog();
+  };
+
+  // initial load
+  await loadProfiles();
+  await loadCatalog();
+})();
+</script>
+</body>
+</html>
 
