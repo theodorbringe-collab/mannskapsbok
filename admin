@@ -5,13 +5,40 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Mannskapsbok – Admin</title>
   <link rel="stylesheet" href="./assets/styles.css">
+  <style>
+    #err{display:none;margin:12px 0;padding:10px 12px;border:1px solid #ffbcbc;background:#ffe7e7;border-radius:10px;color:#7a1010;white-space:pre-wrap}
+    #err.show{display:block}
+  </style>
 </head>
 <body>
-<div class="wrap" id="app">Laster …</div>
+<div class="wrap">
+  <div class="row" style="justify-content:space-between">
+    <h1>Admin</h1>
+    <div class="row">
+      <a class="btn" href="./elev.html">← Til elev-siden</a>
+    </div>
+  </div>
+  <div id="err"></div>
+  <div id="app">Laster …</div>
+</div>
+
+<script>
+  // Fang ALLE runtime-feil og vis i #err
+  (function(){
+    const box = document.getElementById('err');
+    function show(msg){ box.textContent = msg; box.classList.add('show'); }
+    window.addEventListener('error', e => show('Feil: ' + (e.error?.message || e.message || e)));
+    window.addEventListener('unhandledrejection', e => show('Ubehandlet feil: ' + (e.reason?.message || e.reason || e)));
+    // liten sanity: sjekk at GitHub Pages faktisk serverer assets/
+    fetch('./assets/common.js', { method:'HEAD' })
+      .then(r => { if(!r.ok) throw new Error('Fant ikke assets/common.js ('+r.status+')'); })
+      .catch(err => show('Lasting av assets/common.js feilet: ' + err.message + '\n\nSjekk at mappa/filnavn stemmer og ble commitet.'));
+  })();
+</script>
 
 <script type="module">
 import {
-  sb, ROLES, ensureLocalUser,
+  ROLES, ensureLocalUser,
   listUsers, loadCatalog, loadProgressFor, loadComments, loadLogs,
   addSection, updateSectionTitle, deleteSection, moveSection,
   addItem, editItem, deleteItem, moveItem,
@@ -24,6 +51,12 @@ const esc=s=>(s||"").replace(/[&<>"']/g,m=>({ "&":"&amp;","<":"&lt;",">":"&gt;",
 const fmt=v=>v??"";
 
 let me=null, catalog={}, users=[];
+
+function showErr(e){
+  const box = document.getElementById('err');
+  box.textContent = (e?.message || e);
+  box.classList.add('show');
+}
 
 function totalsFor(uid){
   const its = Object.values(catalog).flatMap(secs => secs.flatMap(s => s.items));
@@ -86,15 +119,20 @@ async function drawCatalogEditor(){
 
   // seksjoner
   $$("#catWrap .secTitle").forEach(inp=>{
-    inp.onchange=async()=>{ const si=+inp.dataset.si; await updateSectionTitle(secs[si].id, inp.value.trim()||secs[si].title); catalog=await loadCatalog(); await drawCatalogEditor(); };
+    inp.onchange=async()=>{ try{
+      const si=+inp.dataset.si; await updateSectionTitle(secs[si].id, inp.value.trim()||secs[si].title);
+      catalog=await loadCatalog(); await drawCatalogEditor();
+    }catch(e){ showErr(e); } };
   });
   $$("#catWrap [data-act]").forEach(btn=>{
     btn.onclick=async()=>{
       const act=btn.dataset.act; const si=+btn.dataset.si;
-      if(act==="secDel"){ if(!confirm("Slette inndeling?")) return; await deleteSection(secs[si].id); catalog=await loadCatalog(); await drawCatalogEditor(); return; }
-      if(act==="secUp")  { if(si>0){ await moveSection(secs[si].id, secs[si].position, secs[si-1].id, secs[si-1].position); catalog=await loadCatalog(); await drawCatalogEditor(); } return; }
-      if(act==="secDown"){ if(si<secs.length-1){ await moveSection(secs[si].id, secs[si].position, secs[si+1].id, secs[si+1].position); catalog=await loadCatalog(); await drawCatalogEditor(); } return; }
-      if(act==="addItem"){ const inp=$("#catWrap .newItem[data-si='"+si+"']"); const txt=(inp.value||"").trim(); if(!txt) return; await addItem(secs[si].id, txt); inp.value=""; catalog=await loadCatalog(); await drawCatalogEditor(); return; }
+      try{
+        if(act==="secDel"){ if(!confirm("Slette inndeling?")) return; await deleteSection(secs[si].id); catalog=await loadCatalog(); await drawCatalogEditor(); return; }
+        if(act==="secUp")  { if(si>0){ await moveSection(secs[si].id, secs[si].position, secs[si-1].id, secs[si-1].position); catalog=await loadCatalog(); await drawCatalogEditor(); } return; }
+        if(act==="secDown"){ if(si<secs.length-1){ await moveSection(secs[si].id, secs[si].position, secs[si+1].id, secs[si+1].position); catalog=await loadCatalog(); await drawCatalogEditor(); } return; }
+        if(act==="addItem"){ const inp=$("#catWrap .newItem[data-si='"+si+"']"); const txt=(inp.value||"").trim(); if(!txt) return; await addItem(secs[si].id, txt); inp.value=""; catalog=await loadCatalog(); await drawCatalogEditor(); return; }
+      }catch(e){ showErr(e); }
     };
   });
 
@@ -103,23 +141,27 @@ async function drawCatalogEditor(){
     btn.onclick=async()=>{
       const li=btn.closest("li"); const si=+li.dataset.si; const ii=+li.dataset.ii;
       const role=$("#catRole").value; const secs=catalog[role]||[];
-      if(btn.dataset.act==="itUp")   { if(ii>0){ const a=secs[si].items[ii], b=secs[si].items[ii-1]; await moveItem(a.id,a.position,b.id,b.position); catalog=await loadCatalog(); await drawCatalogEditor(); } }
-      if(btn.dataset.act==="itDown") { if(ii<secs[si].items.length-1){ const a=secs[si].items[ii], b=secs[si].items[ii+1]; await moveItem(a.id,a.position,b.id,b.position); catalog=await loadCatalog(); await drawCatalogEditor(); } }
-      if(btn.dataset.act==="itEdit"){ const cur=secs[si].items[ii]; const nt=prompt("Rediger beskrivelse:", cur.text); if(nt!=null){ await editItem(cur.id, nt.trim()); catalog=await loadCatalog(); await drawCatalogEditor(); } }
-      if(btn.dataset.act==="itDel") { if(!confirm("Slette punkt?")) return; const cur=secs[si].items[ii]; await deleteItem(cur.id); catalog=await loadCatalog(); await drawCatalogEditor(); }
+      try{
+        if(btn.dataset.act==="itUp")   { if(ii>0){ const a=secs[si].items[ii], b=secs[si].items[ii-1]; await moveItem(a.id,a.position,b.id,b.position); catalog=await loadCatalog(); await drawCatalogEditor(); } }
+        if(btn.dataset.act==="itDown") { if(ii<secs[si].items.length-1){ const a=secs[si].items[ii], b=secs[si].items[ii+1]; await moveItem(a.id,a.position,b.id,b.position); catalog=await loadCatalog(); await drawCatalogEditor(); } }
+        if(btn.dataset.act==="itEdit"){ const cur=secs[si].items[ii]; const nt=prompt("Rediger beskrivelse:", cur.text); if(nt!=null){ await editItem(cur.id, nt.trim()); catalog=await loadCatalog(); await drawCatalogEditor(); } }
+        if(btn.dataset.act==="itDel") { if(!confirm("Slette punkt?")) return; const cur=secs[si].items[ii]; await deleteItem(cur.id); catalog=await loadCatalog(); await drawCatalogEditor(); }
+      }catch(e){ showErr(e); }
     };
   });
 }
 
 async function selectUser(uid){
-  const u = users.find(x=>x.id===uid); if(!u) return;
-  const totals = await totalsFor(uid);
-  $("#selName").textContent = (u.name||u.email||u.id);
-  $("#selSum").textContent  = `— ${totals.done}/${totals.total} fullført`;
-  await renderUserBook(uid, $("#editToggle").checked, totals.map);
-  await drawComments(uid);
-  $("#editToggle").onchange=()=> renderUserBook(uid, $("#editToggle").checked, totals.map);
-  $("#addComment").onclick=async()=>{ const t=$("#commentTxt").value.trim(); if(!t) return; await addComment(uid, t, me.id); $("#commentTxt").value=""; await drawComments(uid); };
+  try{
+    const u = users.find(x=>x.id===uid); if(!u) return;
+    const totals = await totalsFor(uid);
+    $("#selName").textContent = (u.name||u.email||u.id);
+    $("#selSum").textContent  = `— ${totals.done}/${totals.total} fullført`;
+    await renderUserBook(uid, $("#editToggle").checked, totals.map);
+    await drawComments(uid);
+    $("#editToggle").onchange=()=> renderUserBook(uid, $("#editToggle").checked, totals.map);
+    $("#addComment").onclick=async()=>{ const t=$("#commentTxt").value.trim(); if(!t) return; try{ await addComment(uid, t, me.id); $("#commentTxt").value=""; await drawComments(uid); }catch(e){ showErr(e); } };
+  }catch(e){ showErr(e); }
 }
 
 async function renderUserBook(uid, editable, progMap){
@@ -155,7 +197,7 @@ async function renderUserBook(uid, editable, progMap){
       async function commit(){
         if(c.checked && !d.value) d.value=new Date().toISOString().slice(0,10);
         try{ await upsertProgress(id,{date:d.value||null,signed_by:s.value||null,done:!!c.checked}, uid); }
-        catch(e){ alert("Kunne ikke lagre: " + (e.message||e)); }
+        catch(e){ showErr(e); }
       }
       d.onchange=commit; s.onchange=commit; c.onchange=commit;
     });
@@ -169,14 +211,6 @@ async function drawComments(uid){
 
 function renderShell(){
   $("#app").innerHTML = `
-    <div class="row" style="justify-content:space-between">
-      <h1>Admin</h1>
-      <div class="row">
-        <a class="btn" href="./elev.html">← Til elev-siden</a>
-        <span class="badge">Som: <b>${esc(me.email||me.id)}</b></span>
-      </div>
-    </div>
-
     <div class="split">
       <div>
         <div class="box">
@@ -196,6 +230,8 @@ function renderShell(){
                   ${ROLES.map(r=>`<option value="${r}">${r}</option>`).join("")}
                 </select>
               </label>
+            </div>
+            <div class="row" style="margin-bottom:6px">
               <button id="addSec" class="btn primary">+ Inndeling</button>
             </div>
             <div id="catWrap"></div>
@@ -234,25 +270,28 @@ function renderShell(){
 }
 
 (async function start(){
-  me = await ensureLocalUser();
-  catalog = await loadCatalog();
-  users   = await listUsers();
+  try{
+    me = await ensureLocalUser();
+    catalog = await loadCatalog();
+    users   = await listUsers();
 
-  renderShell();
-  $("#userSearch").oninput=drawUsers;
-  $("#addSec").onclick=async()=>{ await addSection($("#catRole").value); catalog=await loadCatalog(); await drawCatalogEditor(); };
-  $("#catRole").onchange=drawCatalogEditor;
+    renderShell();
+    $("#userSearch").oninput=drawUsers;
+    $("#addSec").onclick=async()=>{ try{ await addSection($("#catRole").value); catalog=await loadCatalog(); await drawCatalogEditor(); }catch(e){ showErr(e); } };
+    $("#catRole").onchange=drawCatalogEditor;
 
-  await drawCatalogEditor();
-  await drawUsers();
+    await drawCatalogEditor();
+    await drawUsers();
 
-  const entries = await loadLogs();
-  $("#logWrap").innerHTML = entries.map(l=>`<div class="row" style="margin-bottom:6px">
-    <span class="note">${new Date(l.created_at).toLocaleString('no-NO')}</span>
-    <span>${esc(l.message)}</span>
-  </div>`).join("") || '<div class="note">Loggen er tom.</div>';
+    const entries = await loadLogs();
+    $("#logWrap").innerHTML = entries.map(l=>`<div class="row" style="margin-bottom:6px">
+      <span class="note">${new Date(l.created_at).toLocaleString('no-NO')}</span>
+      <span>${esc(l.message)}</span>
+    </div>`).join("") || '<div class="note">Loggen er tom.</div>';
+  }catch(e){
+    showErr(e);
+  }
 })();
 </script>
 </body>
 </html>
-
