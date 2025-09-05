@@ -3,142 +3,505 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Mannskapsbok – Ny</title>
+  <title>Mannskapsbok – Elev & Admin</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
-    body{margin:0;font:14px/1.45 system-ui,Segoe UI,Arial;color:#111;background:#fafafa}
-    .wrap{max-width:980px;margin:32px auto;padding:0 16px}
-    h1{margin:0 0 8px;color:#2b4dcb}
+    :root{--accent:#2b4dcb}
+    *{box-sizing:border-box}
+    body{margin:0;background:#fafafa;font:14px/1.45 system-ui,-apple-system,Segoe UI,Arial;color:#111}
+    .wrap{max-width:1100px;margin:32px auto;padding:0 16px}
+    h1{margin:0 0 8px;color:var(--accent)}
     .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
     .btn{padding:8px 12px;border:1px solid #ddd;border-radius:8px;background:#fff;cursor:pointer}
     .btn.primary{background:#111;color:#fff;border-color:#111}
+    .badge{padding:4px 8px;border-radius:999px;border:1px solid #ddd;background:#fff;font-size:12px}
     .box{background:#fff;border:1px solid #eee;border-radius:12px;overflow:hidden;margin-top:12px}
     .hd{padding:10px 12px;background:#f7f7f7;border-bottom:1px solid #eee;font-weight:700}
     .bd{padding:12px}
     .field{padding:8px 10px;border:1px solid #ddd;border-radius:8px}
+    .tabs{display:flex;gap:8px;margin:12px 0;flex-wrap:wrap}
+    .tab{padding:8px 12px;border:1px solid #ddd;border-radius:999px;background:#fff;cursor:pointer}
+    .tab.active{background:#111;color:#fff;border-color:#111}
+    .grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));margin:16px 0 8px}
+    .card{border:1px solid #eee;border-radius:14px;background:#f7f7f7}
+    .card button{width:100%;padding:16px 14px;border:0;border-radius:12px;font-weight:700;cursor:pointer;box-shadow:0 2px 5px rgba(0,0,0,.08)}
+    .card .sub{display:block;font-weight:400;font-size:12px;opacity:.85;margin-top:2px}
+    .gray{background:#e5e5e5}.yellow{background:#ffe08a}.green{background:#9be29b}
     table{width:100%;border-collapse:collapse}
-    th,td{border-bottom:1px solid #eee;padding:8px;text-align:left}
+    th,td{border-bottom:1px solid #eee;padding:8px;text-align:left;vertical-align:top}
     th{background:#fafafa}
+    .tag{display:inline-block;font-size:12px;padding:4px 8px;border-radius:999px;background:#f1f1f1;margin:6px 0}
+    .split{display:grid;grid-template-columns:320px 1fr;gap:12px}
+    @media (max-width:900px){ .split{grid-template-columns:1fr} }
+    .list{list-style:none;margin:0;padding:0;max-height:420px;overflow:auto}
+    .list li{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border-bottom:1px solid #f6f6f6;cursor:pointer}
+    .list li:hover{background:#fafafa}
     .note{color:#666}
+    #toast{position:fixed;right:16px;bottom:16px;background:#111;color:#fff;padding:10px 12px;border-radius:10px;opacity:0;transform:translateY(8px);transition:.25s}
+    #toast.show{opacity:1;transform:translateY(0)}
   </style>
 </head>
 <body>
-<div class="wrap">
-  <h1>Mannskapsbok (åpen)</h1>
-  <div class="row">
-    <span class="note">Koblet til Supabase</span>
-    <button id="reload" class="btn">Last på nytt</button>
-  </div>
-
-  <div class="box">
-    <div class="hd">Profiler</div>
-    <div class="bd">
-      <table id="tblProfiles"><thead><tr><th>ID</th><th>E-post</th><th>Navn</th></tr></thead><tbody></tbody></table>
-      <div id="profilesEmpty" class="note" style="display:none">Ingen profiler.</div>
-    </div>
-  </div>
-
-  <div class="box">
-    <div class="hd">Katalog</div>
-    <div class="bd">
-      <div class="row" style="margin-bottom:8px">
-        <input id="role" class="field" placeholder="Rolle" value="Fartøysjef">
-        <input id="secTitle" class="field" placeholder="Ny inndeling">
-        <button id="addSec" class="btn primary">+ Inndeling</button>
-      </div>
-      <div class="row" style="margin-bottom:8px">
-        <input id="secId" class="field" placeholder="Section ID">
-        <input id="itemText" class="field" placeholder="Nytt punkt">
-        <button id="addItem" class="btn">+ Punkt</button>
-      </div>
-      <table id="tblSections"><thead><tr><th>ID</th><th>Rolle</th><th>Tittel</th></tr></thead><tbody></tbody></table>
-      <div id="sectionsEmpty" class="note" style="display:none">Ingen inndelinger.</div>
-      <div style="height:8px"></div>
-      <table id="tblItems"><thead><tr><th>ID</th><th>Section</th><th>Tekst</th></tr></thead><tbody></tbody></table>
-      <div id="itemsEmpty" class="note" style="display:none">Ingen punkter.</div>
-    </div>
-  </div>
-</div>
+<div class="wrap" id="app">Laster …</div>
+<div id="toast">Lagret ✅</div>
 
 <script>
 (async()=>{
-  // === Bruk ditt nye prosjekt ===
+  // === Prosjekt (ditt nye) ===
   const SUPABASE_URL  = "https://vogqypnvsifswjmvuptn.supabase.co";
   const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZvZ3F5cG52c2lmc3dqbXZ1cHRuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTcwNzIwMDIsImV4cCI6MjA3MjY0ODAwMn0.CbB58BW4f4O-VzU88DI3hae5PxaptK8Fl6BIsch9Tto";
   const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
 
-  const $ = (s,r=document)=>r.querySelector(s);
-  const tbody = (id)=>$(id).querySelector('tbody');
+  // === Konstanter/State ===
+  const ROLES = ['Fartøysjef','NK','Matros','Aspirant','Rescuerunner'];
+  const $=(s,r=document)=>r.querySelector(s);
+  const $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
+  const esc=s=>(s||'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[m]));
+  const fmt=v=>v??'';
+  const toast=msg=>{ const t=$('#toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),1200); };
+  const clsFor=(done,total)=> total===0||done===0?'gray':(done<total?'yellow':'green');
 
-  async function loadProfiles(){
-    const { data, error } = await sb.from('profiles').select('id,email,name').order('email');
-    const tb = tbody('#tblProfiles'); tb.innerHTML='';
-    if(error){ tb.innerHTML=`<tr><td colspan="3">Feil: ${error.message}</td></tr>`; return; }
-    if(!data?.length){ $('#profilesEmpty').style.display='block'; return; }
-    $('#profilesEmpty').style.display='none';
-    for(const r of data){
-      const tr=document.createElement('tr');
-      tr.innerHTML=`<td>${r.id}</td><td>${r.email||''}</td><td>${r.name||''}</td>`;
-      tb.appendChild(tr);
+  let me=null;          // { id, email, name }
+  let catalog={};       // role -> [{id,title,items:[...]}]
+  let myProg=new Map(); // item_id -> {done,date,signed_by}
+
+  // === 1) Lokal “elev”-bruker (ingen auth nødvendig)
+  async function ensureLocalUser(){
+    let id = localStorage.getItem('mb_uid');
+    if(!id){
+      id = (crypto.randomUUID ? crypto.randomUUID() :
+        'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{
+          const r=Math.random()*16|0, v=c==='x'?r:(r&0x3|0x8); return v.toString(16);
+        }));
+      localStorage.setItem('mb_uid', id);
+      localStorage.setItem('mb_email', `elev-${id.slice(0,8)}@local`);
+      localStorage.setItem('mb_name',  `Elev ${id.slice(0,4)}`);
     }
+    const email = localStorage.getItem('mb_email') || `elev-${id.slice(0,8)}@local`;
+    const name  = localStorage.getItem('mb_name')  || email;
+    // sikrer rad i profiles
+    await sb.from('profiles').upsert({ id, email, name }, { onConflict:'id' });
+    return { id, email, name };
   }
 
+  // === 2) Laster data
   async function loadCatalog(){
-    // sections
-    {
-      const { data, error } = await sb.from('sections').select('id,role,title').order('position',{ascending:true});
-      const tb = tbody('#tblSections'); tb.innerHTML='';
-      if(error){ tb.innerHTML=`<tr><td colspan="3">Feil: ${error.message}</td></tr>`; }
-      else if(!data?.length){ $('#sectionsEmpty').style.display='block'; }
-      else {
-        $('#sectionsEmpty').style.display='none';
-        for(const s of data){
-          const tr=document.createElement('tr');
-          tr.innerHTML=`<td>${s.id}</td><td>${s.role}</td><td>${s.title}</td>`;
-          tb.appendChild(tr);
+    catalog={};
+    for(const role of ROLES){
+      const { data:secs } = await sb.from('sections').select('id,title,position').eq('role',role).order('position',{ascending:true});
+      const list=[]; 
+      if(secs?.length){
+        const ids=secs.map(s=>s.id);
+        const { data:items } = await sb.from('items').select('id,section_id,text,position').in('section_id',ids).order('position',{ascending:true});
+        for(const s of secs){
+          list.push({ id:s.id, title:s.title, position:s.position, items:(items||[]).filter(i=>i.section_id===s.id) });
         }
       }
+      catalog[role]=list;
     }
-    // items
-    {
-      const { data, error } = await sb.from('items').select('id,section_id,text').order('position',{ascending:true});
-      const tb = tbody('#tblItems'); tb.innerHTML='';
-      if(error){ tb.innerHTML=`<tr><td colspan="3">Feil: ${error.message}</td></tr>`; }
-      else if(!data?.length){ $('#itemsEmpty').style.display='block'; }
-      else {
-        $('#itemsEmpty').style.display='none';
-        for(const it of data){
-          const tr=document.createElement('tr');
-          tr.innerHTML=`<td>${it.id}</td><td>${it.section_id}</td><td>${it.text}</td>`;
-          tb.appendChild(tr);
+  }
+  async function loadMyProgress(){
+    const { data } = await sb.from('progress').select('item_id,done,date,signed_by').eq('user_id', me.id);
+    myProg = new Map(); (data||[]).forEach(r=>myProg.set(r.item_id, r));
+  }
+  async function loadUsers(){
+    const { data, error } = await sb.from('profiles').select('id,email,name').order('email',{ascending:true});
+    if(error) return [];
+    return data||[];
+  }
+  async function loadProgressFor(uid){
+    const { data } = await sb.from('progress').select('item_id,done,date,signed_by').eq('user_id', uid);
+    const map=new Map(); (data||[]).forEach(r=>map.set(r.item_id, r));
+    return map;
+  }
+  async function loadComments(uid){
+    const { data } = await sb.from('comments').select('id,author_id,text,created_at').eq('user_id',uid).order('created_at',{ascending:false});
+    return data||[];
+  }
+  async function loadLogs(){
+    const { data } = await sb.from('logs').select('actor_id,message,created_at').order('created_at',{ascending:false}).limit(200);
+    return data||[];
+  }
+
+  // === 3) Lagre / endre
+  async function upsertProgress(itemId, patch, uid=me.id){
+    const row = { user_id: uid, item_id: itemId, done: !!patch.done, date: patch.date || null, signed_by: patch.signed_by || null };
+    const { error } = await sb.from('progress').upsert(row, { onConflict:'user_id,item_id' });
+    if(error){ alert('Kunne ikke lagre progresjon: ' + error.message); return; }
+    if(uid===me.id){ myProg.set(itemId, { ...myProg.get(itemId), ...row }); }
+    await sb.from('logs').insert({ actor_id: me.id, message: `progress updated for user ${uid}` });
+    toast('Lagret ✅');
+  }
+  async function addComment(uid, text){
+    const { error } = await sb.from('comments').insert({ user_id: uid, author_id: me.id, text });
+    if(error){ alert('Kunne ikke legge til kommentar: ' + error.message); return; }
+    await sb.from('logs').insert({ actor_id: me.id, message: `comment added for user ${uid}` });
+  }
+  async function addSection(role){
+    const { error } = await sb.from('sections').insert({ role, title:'Ny inndeling', position: Date.now() });
+    if(error){ alert('Kunne ikke legge til inndeling: ' + error.message); return; }
+    await sb.from('logs').insert({ actor_id: me.id, message: `section added in ${role}` });
+  }
+  async function updateSectionTitle(id, title){
+    const { error } = await sb.from('sections').update({ title }).eq('id', id);
+    if(error){ alert('Kunne ikke oppdatere tittel: ' + error.message); return; }
+    await sb.from('logs').insert({ actor_id: me.id, message: `section title updated` });
+  }
+  async function deleteSection(id){
+    const { error } = await sb.from('sections').delete().eq('id', id);
+    if(error){ alert('Kunne ikke slette inndeling: ' + error.message); return; }
+    await sb.from('logs').insert({ actor_id: me.id, message: `section deleted` });
+  }
+  async function moveSection(role, si, dir){
+    const secs = catalog[role]; const j = si + (dir==='up'?-1:+1);
+    if(j<0 || j>=secs.length) return;
+    const a=secs[si], b=secs[j];
+    let res = await sb.from('sections').update({ position:b.position }).eq('id', a.id);
+    if(res.error){ alert('Kunne ikke flytte inndeling (1): ' + res.error.message); return; }
+    res = await sb.from('sections').update({ position:a.position }).eq('id', b.id);
+    if(res.error){ alert('Kunne ikke flytte inndeling (2): ' + res.error.message); return; }
+    await sb.from('logs').insert({ actor_id: me.id, message: `section moved` });
+  }
+  async function addItem(section_id, text){
+    const { error } = await sb.from('items').insert({ section_id, text, position: Date.now() });
+    if(error){ alert('Kunne ikke legge til punkt: ' + error.message); return; }
+    await sb.from('logs').insert({ actor_id: me.id, message: `item added` });
+  }
+  async function editItem(id, text){
+    const { error } = await sb.from('items').update({ text }).eq('id', id);
+    if(error){ alert('Kunne ikke redigere punkt: ' + error.message); return; }
+    await sb.from('logs').insert({ actor_id: me.id, message: `item edited` });
+  }
+  async function deleteItem(id){
+    const { error } = await sb.from('items').delete().eq('id', id);
+    if(error){ alert('Kunne ikke slette punkt: ' + error.message); return; }
+    await sb.from('logs').insert({ actor_id: me.id, message: `item deleted` });
+  }
+  async function moveItem(role, si, ii, dir){
+    const sec=catalog[role][si]; const arr=sec.items; const j=ii+(dir==='up'?-1:+1);
+    if(j<0 || j>=arr.length) return;
+    const a=arr[ii], b=arr[j];
+    let res = await sb.from('items').update({ position:b.position }).eq('id', a.id);
+    if(res.error){ alert('Kunne ikke flytte punkt (1): ' + res.error.message); return; }
+    res = await sb.from('items').update({ position:a.position }).eq('id', b.id);
+    if(res.error){ alert('Kunne ikke flytte punkt (2): ' + res.error.message); return; }
+    await sb.from('logs').insert({ actor_id: me.id, message: `item moved` });
+  }
+
+  // === 4) Elev-visning
+  function renderStudent(){
+    const host=$('#app');
+    host.innerHTML=`
+      <div class="row" style="justify-content:space-between">
+        <h1>Mannskapsbok – Elev</h1>
+        <div class="row">
+          <span class="badge">Innlogget som: <b>${esc(me.email||me.id)}</b></span>
+          <button id="btnAdmin" class="btn">Admin</button>
+        </div>
+      </div>
+      <div id="cards" class="grid"></div>
+      <div id="tabs" class="tabs"></div>
+      <div id="panel"></div>
+    `;
+    $('#btnAdmin').onclick=renderAdmin;
+
+    renderCards(); renderTabs(ROLES[0]); renderRole(ROLES[0]);
+
+    function renderCards(){
+      const grid=$('#cards'); grid.innerHTML='';
+      ROLES.forEach(role=>{
+        const its=(catalog[role]||[]).flatMap(s=>s.items);
+        const total=its.length;
+        const done=its.filter(it=>myProg.get(it.id)?.done).length;
+        const card=document.createElement('div'); card.className='card';
+        const btn=document.createElement('button'); btn.className=clsFor(done,total);
+        btn.innerHTML=`${role}<span class="sub">${done}/${total} fullført</span>`;
+        btn.onclick=()=>{ renderTabs(role); renderRole(role); };
+        card.appendChild(btn); grid.appendChild(card);
+      });
+    }
+    function renderTabs(active){
+      const tabs=$('#tabs'); tabs.innerHTML='';
+      ROLES.forEach(r=>{
+        const b=document.createElement('button'); b.className='tab'+(r===active?' active':''); b.textContent=r;
+        b.onclick=()=>{ renderTabs(r); renderRole(r); };
+        tabs.appendChild(b);
+      });
+    }
+    function renderRole(role){
+      const panel=$('#panel'); const secs=catalog[role]||[];
+      if(!secs.length){ panel.innerHTML='<div class="note">Ingen punkter.</div>'; return; }
+      panel.innerHTML = secs.map((s,si)=>`
+        <div style="margin:10px 0 14px">
+          <div class="tag">${esc(s.title)}</div>
+          <table><thead><tr><th style="width:66px">#</th><th>Beskrivelse</th><th style="width:140px">Dato</th><th style="width:180px">Signert</th><th style="width:80px">Ferdig</th></tr></thead>
+          <tbody>
+            ${s.items.map((it,pi)=>{
+              const pr=myProg.get(it.id)||{};
+              return `<tr data-id="${it.id}">
+                <td>${si+1}.${pi+1}</td>
+                <td>${esc(it.text)}</td>
+                <td><input type="date" value="${fmt(pr.date)}"></td>
+                <td><input type="text" value="${esc(pr.signed_by||'')}" placeholder="Signert av"></td>
+                <td><input type="checkbox" ${pr.done?'checked':''}></td>
+              </tr>`;
+            }).join('')}
+          </tbody></table>
+        </div>`).join('');
+
+      $$('#panel tbody tr').forEach(tr=>{
+        const id=tr.getAttribute('data-id');
+        const d=tr.querySelector('input[type="date"]');
+        const s=tr.querySelector('input[type="text"]');
+        const c=tr.querySelector('input[type="checkbox"]');
+        async function commit(){
+          if(c.checked && !d.value) d.value=new Date().toISOString().slice(0,10);
+          await upsertProgress(id,{date:d.value||null,signed_by:s.value||null,done:!!c.checked}, me.id);
+          renderCards();
         }
-      }
+        d.onchange=commit; s.onchange=commit; c.onchange=commit;
+      });
     }
   }
 
-  // actions
-  $('#reload').onclick = ()=>{ loadProfiles(); loadCatalog(); };
-  $('#addSec').onclick = async ()=>{
-    const role = $('#role').value.trim() || 'Fartøysjef';
-    const title = $('#secTitle').value.trim() || 'Ny inndeling';
-    const { error } = await sb.from('sections').insert({ role, title });
-    if(error) alert('Feil ved oppretting av inndeling: ' + error.message);
-    await loadCatalog();
-  };
-  $('#addItem').onclick = async ()=>{
-    const section_id = +$('#secId').value;
-    const text = $('#itemText').value.trim() || 'Nytt punkt';
-    if(!section_id){ alert('Oppgi Section ID'); return; }
-    const { error } = await sb.from('items').insert({ section_id, text });
-    if(error) alert('Feil ved oppretting av punkt: ' + error.message);
-    await loadCatalog();
-  };
+  // === 5) Admin-visning
+  async function renderAdmin(){
+    const users = await loadUsers();
+    const host=$('#app');
+    host.innerHTML=`
+      <div class="row" style="justify-content:space-between">
+        <h1>Admin</h1>
+        <div class="row">
+          <button id="btnBack" class="btn">← Til elev-siden</button>
+          <span class="badge">Som: <b>${esc(me.email||me.id)}</b></span>
+        </div>
+      </div>
 
-  // initial load
-  await loadProfiles();
+      <div class="split">
+        <div>
+          <div class="box">
+            <div class="hd">Brukere</div>
+            <div class="bd">
+              <input id="userSearch" class="field" placeholder="Søk navn/epost …" style="margin-bottom:8px">
+              <ul id="userList" class="list"></ul>
+            </div>
+          </div>
+
+          <div class="box" style="margin-top:12px">
+            <div class="hd">Katalog (punkter)</div>
+            <div class="bd">
+              <div class="row" style="margin-bottom:6px">
+                <label>Rolle:
+                  <select id="catRole" class="field" style="max-width:220px">
+                    ${ROLES.map(r=>`<option value="${r}">${r}</option>`).join('')}
+                  </select>
+                </label>
+                <button id="addSec" class="btn primary">+ Inndeling</button>
+              </div>
+              <div id="catWrap"></div>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <div class="box">
+            <div class="hd">
+              <span id="selName">Velg en bruker</span>
+              <span id="selSum" class="note"></span>
+              <span style="float:right" class="note"><input type="checkbox" id="editToggle" checked> Rediger</span>
+            </div>
+            <div class="bd" id="userBook"><div class="note">Ingen valgt.</div></div>
+          </div>
+
+          <div class="box" style="margin-top:12px">
+            <div class="hd">Kommentarer</div>
+            <div class="bd">
+              <div class="row" style="margin-bottom:6px">
+                <input id="commentTxt" class="field" placeholder="Skriv kommentar til elev" style="flex:1">
+                <button id="addComment" class="btn">Legg til</button>
+              </div>
+              <ul id="commentList" class="list"></ul>
+            </div>
+          </div>
+
+          <div class="box" style="margin-top:12px">
+            <div class="hd">Logg</div>
+            <div class="bd" id="logWrap" style="max-height:220px;overflow:auto"><div class="note">Laster …</div></div>
+          </div>
+        </div>
+      </div>
+    `;
+    $('#btnBack').onclick=renderStudent;
+
+    async function totalsFor(uid){
+      const its=Object.values(catalog).flatMap(secs=>secs.flatMap(s=>s.items));
+      const map=await loadProgressFor(uid);
+      let done=0; for(const it of its) if(map.get(it.id)?.done) done++;
+      return { done, total: its.length, map };
+    }
+
+    async function drawUsers(){
+      const list=$('#userList');
+      const q=($('#userSearch').value||'').toLowerCase();
+      const arr=(users||[]).filter(u=>(u.name||'').toLowerCase().includes(q)||(u.email||'').toLowerCase().includes(q));
+      if(!arr.length){ list.innerHTML='<li><span class="note">Ingen brukere</span></li>'; return; }
+      list.innerHTML = arr.map(u=>`
+        <li data-id="${u.id}">
+          <span>${esc(u.name||u.email||u.id)}</span>
+          <span class="badge" id="sum-${u.id}">…</span>
+        </li>
+      `).join('');
+      $$('#userList li').forEach(li => li.onclick = ()=> selectUser(li.getAttribute('data-id')));
+      for(const u of arr){
+        totalsFor(u.id).then(t=>{ const el=$(`#sum-${u.id}`); if(el) el.textContent=`${t.done}/${t.total}`; });
+      }
+    }
+
+    async function drawCatalogEditor(){
+      const role=$('#catRole').value; const wrap=$('#catWrap'); const secs=catalog[role]||[];
+      if(!secs.length){ wrap.innerHTML='<div class="note">Ingen inndelinger. Legg til med knappen over.</div>'; return; }
+      wrap.innerHTML = secs.map((s,si)=>`
+        <div class="box" style="margin-bottom:10px">
+          <div class="hd">
+            <div class="row">
+              <span class="note">${si+1}</span>
+              <input class="field secTitle" data-si="${si}" value="${esc(s.title)}" style="min-width:220px">
+              <button class="btn" data-act="secUp" data-si="${si}">↑</button>
+              <button class="btn" data-act="secDown" data-si="${si}">↓</button>
+              <button class="btn" data-act="secDel" data-si="${si}">Slett</button>
+              <span class="note" style="margin-left:auto">Nytt punkt</span>
+              <input class="field newItem" data-si="${si}" placeholder="Beskrivelse …" style="min-width:240px">
+              <button class="btn primary" data-act="addItem" data-si="${si}">+ Legg til</button>
+            </div>
+          </div>
+          <div class="bd">
+            <ul class="list">
+              ${s.items.map((it,ii)=>`
+                <li data-si="${si}" data-ii="${ii}">
+                  <div><span class="note">${si+1}.${ii+1}</span> ${esc(it.text)}</div>
+                  <div class="row">
+                    <button class="btn" data-act="itUp">↑</button>
+                    <button class="btn" data-act="itDown">↓</button>
+                    <button class="btn" data-act="itEdit">Rediger</button>
+                    <button class="btn" data-act="itDel">Slett</button>
+                  </div>
+                </li>`).join('')}
+            </ul>
+          </div>
+        </div>
+      `).join('');
+
+      // seksjoner
+      $$('#catWrap .secTitle').forEach(inp=>{
+        inp.onchange=async()=>{ const si=+inp.dataset.si; await updateSectionTitle(secs[si].id, inp.value.trim()||secs[si].title); await loadCatalog(); await drawCatalogEditor(); };
+      });
+      $$('#catWrap [data-act]').forEach(btn=>{
+        btn.onclick=async()=>{
+          const act=btn.dataset.act; const si=+btn.dataset.si;
+          if(act==='secDel'){ if(!confirm('Slette inndeling?')) return; await deleteSection(secs[si].id); await loadCatalog(); await drawCatalogEditor(); return; }
+          if(act==='secUp')  { await moveSection(role, si, 'up'); await loadCatalog(); await drawCatalogEditor(); return; }
+          if(act==='secDown'){ await moveSection(role, si, 'down'); await loadCatalog(); await drawCatalogEditor(); return; }
+          if(act==='addItem'){ const inp=$(`#catWrap .newItem[data-si="${si}"]`); const txt=(inp.value||'').trim(); if(!txt) return; await addItem(secs[si].id, txt); inp.value=''; await loadCatalog(); await drawCatalogEditor(); return; }
+        };
+      });
+
+      // items
+      $$('#catWrap li [data-act]').forEach(btn=>{
+        btn.onclick=async()=>{
+          const li=btn.closest('li'); const si=+li.dataset.si; const ii=+li.dataset.ii;
+          if(btn.dataset.act==='itUp')   { await moveItem(role, si, ii, 'up');   await loadCatalog(); await drawCatalogEditor(); }
+          if(btn.dataset.act==='itDown') { await moveItem(role, si, ii, 'down'); await loadCatalog(); await drawCatalogEditor(); }
+          if(btn.dataset.act==='itEdit'){ const cur=catalog[role][si].items[ii]; const nt=prompt('Rediger beskrivelse:', cur.text); if(nt!=null){ await editItem(cur.id, nt.trim()); await loadCatalog(); await drawCatalogEditor(); } }
+          if(btn.dataset.act==='itDel') { if(!confirm('Slette punkt?')) return; const cur=catalog[role][si].items[ii]; await deleteItem(cur.id); await loadCatalog(); await drawCatalogEditor(); }
+        };
+      });
+    }
+
+    async function selectUser(uid){
+      const all = await loadUsers();
+      const u = (all||[]).find(x=>x.id===uid); if(!u) return;
+      const totals = await totalsFor(uid);
+      $('#selName').textContent = (u.name||u.email||u.id);
+      $('#selSum').textContent = `— ${totals.done}/${totals.total} fullført`;
+      await renderUserBook(uid, $('#editToggle').checked, totals.map);
+      await drawComments(uid);
+      $('#editToggle').onchange=()=> renderUserBook(uid, $('#editToggle').checked, totals.map);
+      $('#addComment').onclick=async()=>{ const t=$('#commentTxt').value.trim(); if(!t) return; await addComment(uid, t); $('#commentTxt').value=''; await drawComments(uid); };
+    }
+    async function renderUserBook(uid, editable, progMap){
+      const el=$('#userBook');
+      el.innerHTML = ROLES.map(role=>{
+        const secs=catalog[role]||[];
+        return secs.map((s,si)=>`
+          <div style="margin-bottom:12px">
+            <div class="tag">${role} / ${esc(s.title)}</div>
+            <table><thead><tr><th style="width:66px">#</th><th>Beskrivelse</th><th style="width:140px">Dato</th><th style="width:180px">Signert</th><th style="width:80px">Ferdig</th></tr></thead>
+              <tbody>
+                ${s.items.map((it,pi)=>{
+                  const pr=progMap.get(it.id)||{}; const dis=editable?'':'disabled';
+                  return `<tr data-id="${it.id}">
+                    <td>${si+1}.${pi+1}</td>
+                    <td>${esc(it.text)}</td>
+                    <td><input ${dis} type="date" value="${fmt(pr.date)}"></td>
+                    <td><input ${dis} type="text" value="${esc(pr.signed_by||'')}" placeholder="Signert av"></td>
+                    <td><input ${dis} type="checkbox" ${pr.done?'checked':''}></td>
+                  </tr>`;
+                }).join('')}
+              </tbody>
+            </table>
+          </div>`).join('');
+      }).join('') || '<div class="note">Ingen punkter.</div>';
+
+      if(editable){
+        $$('#userBook tbody tr').forEach(tr=>{
+          const id=tr.getAttribute('data-id');
+          const d=tr.querySelector('input[type="date"]');
+          const s=tr.querySelector('input[type="text"]');
+          const c=tr.querySelector('input[type="checkbox"]');
+          async function commit(){
+            if(c.checked && !d.value) d.value=new Date().toISOString().slice(0,10);
+            await upsertProgress(id,{date:d.value||null,signed_by:s.value||null,done:!!c.checked}, uid);
+          }
+          d.onchange=commit; s.onchange=commit; c.onchange=commit;
+        });
+      }
+    }
+    async function drawComments(uid){
+      const list=$('#commentList'); const arr=await loadComments(uid);
+      list.innerHTML = arr.map(c=>`<li><span>${esc(c.text)}</span><span class="note">${new Date(c.created_at).toLocaleString('no-NO')}</span></li>`).join('') || '<li><span class="note">Ingen kommentarer.</span></li>';
+    }
+
+    $('#userSearch').oninput=drawUsers;
+    $('#addSec').onclick=async()=>{ await addSection($('#catRole').value); await loadCatalog(); await drawCatalogEditor(); };
+    $('#catRole').onchange=drawCatalogEditor;
+
+    await drawCatalogEditor();
+    await drawUsers();
+    const entries = await loadLogs();
+    $('#logWrap').innerHTML = entries.map(l=>`<div class="row" style="margin-bottom:6px">
+      <span class="note">${new Date(l.created_at).toLocaleString('no-NO')}</span>
+      <span>${esc(l.message)}</span>
+    </div>`).join('') || '<div class="note">Loggen er tom.</div>';
+  }
+
+  // === 6) Start
+  me = await ensureLocalUser();
   await loadCatalog();
+  await loadMyProgress();
+  renderStudent();
+
+  // (Valgfritt) Realtime – oppdater elev-panelet live
+  try{
+    const rt = sb.channel('live')
+      .on('postgres_changes',{ event:'*', schema:'public', table:'progress', filter:`user_id=eq.${me.id}` },
+        async()=>{ await loadMyProgress(); const active=$('#tabs .tab.active')?.textContent; if(active){ const grid=$('#cards'); if(grid) { /* will refresh on change */ } } })
+      .on('postgres_changes',{ event:'*', schema:'public', table:'sections' },
+        async()=>{ await loadCatalog(); })
+      .on('postgres_changes',{ event:'*', schema:'public', table:'items' },
+        async()=>{ await loadCatalog(); })
+      .subscribe();
+  }catch(_){}
 })();
 </script>
 </body>
 </html>
-
