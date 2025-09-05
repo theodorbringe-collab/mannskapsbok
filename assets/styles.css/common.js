@@ -1,127 +1,141 @@
-// Felles datalag for elev + admin (ESM)
-// Importerer Supabase som ESM direkte fra jsDelivr (ingen bundler nødvendig)
-import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
+<!doctype html>
+<html lang="no">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Mannskapsbok – Elev</title>
+  <link rel="stylesheet" href="./assets/styles.css">
+</head>
+<body>
+<div class="wrap" id="app">Laster …</div>
 
-// --- KONFIG: sett prosjektet ditt her (du har ny URL og anon key) ---
-export const SUPABASE_URL  = "https://vogqypnvsifswjmvuptn.supabase.co";
-export const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZvZ3F5cG52c2lmc3dqbXZ1cHRuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTcwNzIwMDIsImV4cCI6MjA3MjY0ODAwMn0.CbB58BW4f4O-VzU88DI3hae5PxaptK8Fl6BIsch9Tto";
-// -------------------------------------------------------------------
+<script type="module">
+import {
+  ROLES, ensureLocalUser, setLocalIdentity,
+  loadCatalog, loadMyProgress, upsertProgress, getLocalIdentity
+} from "./assets/common.js";
 
-export const sb = createClient(SUPABASE_URL, SUPABASE_ANON);
-export const ROLES = ["Fartøysjef","NK","Matros","Aspirant","Rescuerunner"];
+const $=(s,r=document)=>r.querySelector(s);
+const $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
+const esc=s=>(s||"").replace(/[&<>"']/g,m=>({ "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;" }[m]));
+const fmt=v=>v??"";
+const clsFor=(done,total)=> total===0||done===0?"gray":(done<total?"yellow":"green");
 
-/** Lokal "elev" uten auth – oppretter profilrad basert på localStorage */
-export async function ensureLocalUser() {
-  let id = localStorage.getItem("mb_uid");
-  if (!id) {
-    id = (crypto.randomUUID?.() ||
-      "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, c => {
-        const r = Math.random()*16|0, v = c === "x" ? r : (r & 0x3 | 0x8); return v.toString(16);
-      }));
-    localStorage.setItem("mb_uid", id);
-    localStorage.setItem("mb_email", `elev-${id.slice(0,8)}@local`);
-    localStorage.setItem("mb_name",  `Elev ${id.slice(0,4)}`);
-  }
-  const email = localStorage.getItem("mb_email") || `elev-${id.slice(0,8)}@local`;
-  const name  = localStorage.getItem("mb_name")  || email;
-  await sb.from("profiles").upsert({ id, email, name }, { onConflict: "id" });
-  return { id, email, name };
-}
+let me=null, catalog={}, myProg=new Map();
 
-// ---------- Lesing ----------
-export async function listUsers() {
-  const { data, error } = await sb.from("profiles").select("id,email,name").order("email", { ascending: true });
-  if (error) throw error;
-  return data || [];
-}
+function render(){
+  const host=$("#app");
+  host.innerHTML = `
+    <div class="row" style="justify-content:space-between">
+      <h1>Mannskapsbok – Elev</h1>
+      <div class="row">
+        <a class="btn" href="./admin.html">Admin</a>
+      </div>
+    </div>
 
-export async function loadCatalog() {
-  const out = {};
-  for (const role of ROLES) {
-    const { data: secs } = await sb.from("sections").select("id,title,position").eq("role", role).order("position", { ascending: true });
-    const list = [];
-    if (secs?.length) {
-      const ids = secs.map(s => s.id);
-      const { data: items } = await sb.from("items")
-        .select("id,section_id,text,position")
-        .in("section_id", ids)
-        .order("position", { ascending: true });
-      for (const s of secs) list.push({ id: s.id, title: s.title, position: s.position, items: (items||[]).filter(i => i.section_id === s.id) });
+    <!-- Oppretter / identitet -->
+    <div class="box" style="margin-top:10px">
+      <div class="hd">Oppretter av mannskapsboka</div>
+      <div class="bd">
+        <div class="row" style="gap:10px; flex-wrap:wrap">
+          <input id="inpName"  class="field" style="min-width:260px" placeholder="Navn på oppretter">
+          <input id="inpEmail" class="field" style="min-width:260px" placeholder="E-post (valgfritt)">
+          <button id="saveIdent" class="btn">Lagre</button>
+          <span id="saveMsg" class="note"></span>
+        </div>
+      </div>
+    </div>
+
+    <div id="cards" class="grid"></div>
+    <div id="tabs" class="tabs"></div>
+    <div id="panel"></div>
+  `;
+
+  // prefyll feltene fra localStorage
+  const loc = getLocalIdentity();
+  $("#inpName").value  = loc.name  || me?.name  || "";
+  $("#inpEmail").value = loc.email || me?.email || "";
+
+  $("#saveIdent").onclick = async ()=>{
+    const name  = $("#inpName").value.trim();
+    const email = $("#inpEmail").value.trim();
+    try{
+      const u = await setLocalIdentity({ name, email });
+      me = { ...me, ...u };
+      $("#saveMsg").textContent = "Lagret!";
+      setTimeout(()=>$("#saveMsg").textContent="", 1200);
+    }catch(e){
+      $("#saveMsg").textContent = "Feil: " + (e.message||e);
     }
-    out[role] = list;
-  }
-  return out;
+  };
+
+  renderCards(); renderTabs(ROLES[0]); renderRole(ROLES[0]);
 }
 
-export async function loadMyProgress(uid) {
-  const { data, error } = await sb.from("progress").select("item_id,done,date,signed_by").eq("user_id", uid);
-  if (error) throw error;
-  const map = new Map(); (data||[]).forEach(r => map.set(r.item_id, r));
-  return map;
+function renderCards(){
+  const grid=$("#cards"); grid.innerHTML="";
+  ROLES.forEach(role=>{
+    const its=(catalog[role]||[]).flatMap(s=>s.items);
+    const total=its.length;
+    const done=its.filter(it=>myProg.get(it.id)?.done).length;
+    const card=document.createElement("div"); card.className="card";
+    const btn=document.createElement("button"); btn.className=clsFor(done,total);
+    btn.innerHTML=`${role}<span class="sub">${done}/${total} fullført</span>`;
+    btn.onclick=()=>{ renderTabs(role); renderRole(role); };
+    card.appendChild(btn); grid.appendChild(card);
+  });
 }
-export async function loadProgressFor(uid) {
-  const { data } = await sb.from("progress").select("item_id,done,date,signed_by").eq("user_id", uid);
-  const map = new Map(); (data||[]).forEach(r => map.set(r.item_id, r));
-  return map;
+function renderTabs(active){
+  const tabs=$("#tabs"); tabs.innerHTML="";
+  ROLES.forEach(r=>{
+    const b=document.createElement("button"); b.className="tab"+(r===active?" active":""); b.textContent=r;
+    b.onclick=()=>{ renderTabs(r); renderRole(r); };
+    tabs.appendChild(b);
+  });
 }
-export async function loadComments(uid) {
-  const { data } = await sb.from("comments").select("id,author_id,text,created_at").eq("user_id", uid).order("created_at", { ascending: false });
-  return data || [];
-}
-export async function loadLogs(limit=200) {
-  const { data } = await sb.from("logs").select("actor_id,message,created_at").order("created_at", { ascending: false }).limit(limit);
-  return data || [];
+function renderRole(role){
+  const panel=$("#panel"); const secs=catalog[role]||[];
+  if(!secs.length){ panel.innerHTML='<div class="note">Ingen punkter.</div>'; return; }
+  panel.innerHTML = secs.map((s,si)=>`
+    <div style="margin:10px 0 14px">
+      <div class="tag">${esc(s.title)}</div>
+      <table><thead><tr><th style="width:66px">#</th><th>Beskrivelse</th><th style="width:140px">Dato</th><th style="width:180px">Signert</th><th style="width:80px">Ferdig</th></tr></thead>
+      <tbody>
+        ${s.items.map((it,pi)=>{
+          const pr=myProg.get(it.id)||{};
+          return `<tr data-id="${it.id}">
+            <td>${si+1}.${pi+1}</td>
+            <td>${esc(it.text)}</td>
+            <td><input type="date" value="${fmt(pr.date)}"></td>
+            <td><input type="text" value="${esc(pr.signed_by||"")}" placeholder="Signert av"></td>
+            <td><input type="checkbox" ${pr.done?"checked":""}></td>
+          </tr>`;
+        }).join("")}
+      </tbody></table>
+    </div>`).join("");
+
+  $$("#panel tbody tr").forEach(tr=>{
+    const id=tr.getAttribute("data-id");
+    const d=tr.querySelector('input[type="date"]');
+    const s=tr.querySelector('input[type="text"]');
+    const c=tr.querySelector('input[type="checkbox"]');
+    async function commit(){
+      if(c.checked && !d.value) d.value=new Date().toISOString().slice(0,10);
+      try{
+        await upsertProgress(id,{date:d.value||null,signed_by:s.value||null,done:!!c.checked}, me.id);
+        renderCards();
+      }catch(e){ alert("Kunne ikke lagre: " + (e.message||e)); }
+    }
+    d.onchange=commit; s.onchange=commit; c.onchange=commit;
+  });
 }
 
-// ---------- Skriv / endre ----------
-export async function upsertProgress(itemId, patch, uid) {
-  const row = { user_id: uid, item_id: itemId, done: !!patch.done, date: patch.date || null, signed_by: patch.signed_by || null };
-  const { error } = await sb.from("progress").upsert(row, { onConflict: "user_id,item_id" });
-  if (error) throw error;
-  await sb.from("logs").insert({ actor_id: uid, message: `progress updated for user ${uid}` });
-}
-
-export async function addComment(uid, text, authorId) {
-  const { error } = await sb.from("comments").insert({ user_id: uid, author_id: authorId, text });
-  if (error) throw error;
-  await sb.from("logs").insert({ actor_id: authorId, message: `comment added for user ${uid}` });
-}
-
-export async function addSection(role) {
-  const { error } = await sb.from("sections").insert({ role, title: "Ny inndeling", position: Date.now() });
-  if (error) throw error;
-}
-export async function updateSectionTitle(id, title) {
-  const { error } = await sb.from("sections").update({ title }).eq("id", id);
-  if (error) throw error;
-}
-export async function deleteSection(id) {
-  const { error } = await sb.from("sections").delete().eq("id", id);
-  if (error) throw error;
-}
-export async function moveSection(aId, aPos, bId, bPos) {
-  let r = await sb.from("sections").update({ position: bPos }).eq("id", aId);
-  if (r.error) throw r.error;
-  r = await sb.from("sections").update({ position: aPos }).eq("id", bId);
-  if (r.error) throw r.error;
-}
-
-export async function addItem(section_id, text) {
-  const { error } = await sb.from("items").insert({ section_id, text, position: Date.now() });
-  if (error) throw error;
-}
-export async function editItem(id, text) {
-  const { error } = await sb.from("items").update({ text }).eq("id", id);
-  if (error) throw error;
-}
-export async function deleteItem(id) {
-  const { error } = await sb.from("items").delete().eq("id", id);
-  if (error) throw error;
-}
-export async function moveItem(aId, aPos, bId, bPos) {
-  let r = await sb.from("items").update({ position: bPos }).eq("id", aId);
-  if (r.error) throw r.error;
-  r = await sb.from("items").update({ position: aPos }).eq("id", bId);
-  if (r.error) throw r.error;
-}
-
+(async function start(){
+  me = await ensureLocalUser();
+  catalog = await loadCatalog();
+  myProg  = await loadMyProgress(me.id);
+  render();
+})();
+</script>
+</body>
+</html>
