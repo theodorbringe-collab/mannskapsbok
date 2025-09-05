@@ -23,16 +23,15 @@
 </div>
 
 <script>
-  // Fang ALLE runtime-feil og vis i #err
+  // Vis alle runtime-feil pent øverst
   (function(){
     const box = document.getElementById('err');
     function show(msg){ box.textContent = msg; box.classList.add('show'); }
     window.addEventListener('error', e => show('Feil: ' + (e.error?.message || e.message || e)));
     window.addEventListener('unhandledrejection', e => show('Ubehandlet feil: ' + (e.reason?.message || e.reason || e)));
-    // liten sanity: sjekk at GitHub Pages faktisk serverer assets/
     fetch('./assets/common.js', { method:'HEAD' })
       .then(r => { if(!r.ok) throw new Error('Fant ikke assets/common.js ('+r.status+')'); })
-      .catch(err => show('Lasting av assets/common.js feilet: ' + err.message + '\n\nSjekk at mappa/filnavn stemmer og ble commitet.'));
+      .catch(err => show('Lasting av assets/common.js feilet: ' + err.message));
   })();
 </script>
 
@@ -156,11 +155,7 @@ async function selectUser(uid){
     const u = users.find(x=>x.id===uid); if(!u) return;
     const totals = await totalsFor(uid);
     $("#selName").textContent = (u.name||u.email||u.id);
-    $("#selSum").textContent  = `— ${totals.done}/${totals.total} fullført`;
-    await renderUserBook(uid, $("#editToggle").checked, totals.map);
-    await drawComments(uid);
-    $("#editToggle").onchange=()=> renderUserBook(uid, $("#editToggle").checked, totals.map);
-    $("#addComment").onclick=async()=>{ const t=$("#commentTxt").value.trim(); if(!t) return; try{ await addComment(uid, t, me.id); $("#commentTxt").value=""; await drawComments(uid); }catch(e){ showErr(e); } };
+    $("#selSum").textContent  = `— ${titals.done}/${totals.total} fullført`;
   }catch(e){ showErr(e); }
 }
 
