@@ -1,1 +1,109 @@
-qq
+<!doctype html>
+<html lang="no">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Mannskapsbok – Elev</title>
+  <link rel="stylesheet" href="./assets/styles.css">
+</head>
+<body>
+<div class="wrap" id="app">Laster …</div>
+
+<script type="module">
+import {
+  sb, ROLES, ensureLocalUser,
+  loadCatalog, loadMyProgress, upsertProgress
+} from "./assets/common.js";
+
+const $=(s,r=document)=>r.querySelector(s);
+const $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
+const esc=s=>(s||"").replace(/[&<>"']/g,m=>({ "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;" }[m]));
+const fmt=v=>v??"";
+const clsFor=(done,total)=> total===0||done===0?"gray":(done<total?"yellow":"green");
+
+let me=null, catalog={}, myProg=new Map();
+
+function render(){
+  const host=$("#app");
+  host.innerHTML = `
+    <div class="row" style="justify-content:space-between">
+      <h1>Mannskapsbok – Elev</h1>
+      <div class="row">
+        <span class="badge">Som: <b>${esc(me.email||me.id)}</b></span>
+        <a class="btn" href="./admin.html">Admin</a>
+      </div>
+    </div>
+    <div id="cards" class="grid"></div>
+    <div id="tabs" class="tabs"></div>
+    <div id="panel"></div>
+  `;
+  renderCards(); renderTabs(ROLES[0]); renderRole(ROLES[0]);
+}
+
+function renderCards(){
+  const grid=$("#cards"); grid.innerHTML="";
+  ROLES.forEach(role=>{
+    const its=(catalog[role]||[]).flatMap(s=>s.items);
+    const total=its.length;
+    const done=its.filter(it=>myProg.get(it.id)?.done).length;
+    const card=document.createElement("div"); card.className="card";
+    const btn=document.createElement("button"); btn.className=clsFor(done,total);
+    btn.innerHTML=`${role}<span class="sub">${done}/${total} fullført</span>`;
+    btn.onclick=()=>{ renderTabs(role); renderRole(role); };
+    card.appendChild(btn); grid.appendChild(card);
+  });
+}
+function renderTabs(active){
+  const tabs=$("#tabs"); tabs.innerHTML="";
+  ROLES.forEach(r=>{
+    const b=document.createElement("button"); b.className="tab"+(r===active?" active":""); b.textContent=r;
+    b.onclick=()=>{ renderTabs(r); renderRole(r); };
+    tabs.appendChild(b);
+  });
+}
+function renderRole(role){
+  const panel=$("#panel"); const secs=catalog[role]||[];
+  if(!secs.length){ panel.innerHTML='<div class="note">Ingen punkter.</div>'; return; }
+  panel.innerHTML = secs.map((s,si)=>`
+    <div style="margin:10px 0 14px">
+      <div class="tag">${esc(s.title)}</div>
+      <table><thead><tr><th style="width:66px">#</th><th>Beskrivelse</th><th style="width:140px">Dato</th><th style="width:180px">Signert</th><th style="width:80px">Ferdig</th></tr></thead>
+      <tbody>
+        ${s.items.map((it,pi)=>{
+          const pr=myProg.get(it.id)||{};
+          return `<tr data-id="${it.id}">
+            <td>${si+1}.${pi+1}</td>
+            <td>${esc(it.text)}</td>
+            <td><input type="date" value="${fmt(pr.date)}"></td>
+            <td><input type="text" value="${esc(pr.signed_by||"")}" placeholder="Signert av"></td>
+            <td><input type="checkbox" ${pr.done?"checked":""}></td>
+          </tr>`;
+        }).join("")}
+      </tbody></table>
+    </div>`).join("");
+
+  $$("#panel tbody tr").forEach(tr=>{
+    const id=tr.getAttribute("data-id");
+    const d=tr.querySelector('input[type="date"]');
+    const s=tr.querySelector('input[type="text"]');
+    const c=tr.querySelector('input[type="checkbox"]');
+    async function commit(){
+      if(c.checked && !d.value) d.value=new Date().toISOString().slice(0,10);
+      try{
+        await upsertProgress(id,{date:d.value||null,signed_by:s.value||null,done:!!c.checked}, me.id);
+        renderCards();
+      }catch(e){ alert("Kunne ikke lagre: " + (e.message||e)); }
+    }
+    d.onchange=commit; s.onchange=commit; c.onchange=commit;
+  });
+}
+
+(async function start(){
+  me = await ensureLocalUser();
+  catalog = await loadCatalog();
+  myProg  = await loadMyProgress(me.id);
+  render();
+})();
+</script>
+</body>
+</html>
