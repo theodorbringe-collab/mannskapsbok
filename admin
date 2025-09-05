@@ -1,1 +1,258 @@
+<!doctype html>
+<html lang="no">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Mannskapsbok – Admin</title>
+  <link rel="stylesheet" href="./assets/styles.css">
+</head>
+<body>
+<div class="wrap" id="app">Laster …</div>
+
+<script type="module">
+import {
+  sb, ROLES, ensureLocalUser,
+  listUsers, loadCatalog, loadProgressFor, loadComments, loadLogs,
+  addSection, updateSectionTitle, deleteSection, moveSection,
+  addItem, editItem, deleteItem, moveItem,
+  upsertProgress, addComment
+} from "./assets/common.js";
+
+const $=(s,r=document)=>r.querySelector(s);
+const $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
+const esc=s=>(s||"").replace(/[&<>"']/g,m=>({ "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;" }[m]));
+const fmt=v=>v??"";
+
+let me=null, catalog={}, users=[];
+
+function totalsFor(uid){
+  const its = Object.values(catalog).flatMap(secs => secs.flatMap(s => s.items));
+  return loadProgressFor(uid).then(map=>{
+    let done=0; for(const it of its) if(map.get(it.id)?.done) done++;
+    return { done, total: its.length, map };
+  });
+}
+
+async function drawUsers(){
+  const list=$("#userList");
+  const q=($("#userSearch").value||"").toLowerCase();
+  const arr=users.filter(u=>(u.name||"").toLowerCase().includes(q)||(u.email||"").toLowerCase().includes(q));
+  if(!arr.length){ list.innerHTML='<li><span class="note">Ingen brukere</span></li>'; return; }
+  list.innerHTML = arr.map(u=>`
+    <li data-id="${u.id}">
+      <span>${esc(u.name||u.email||u.id)}</span>
+      <span class="badge" id="sum-${u.id}">…</span>
+    </li>
+  `).join("");
+  $$("#userList li").forEach(li => li.onclick = ()=> selectUser(li.getAttribute("data-id")));
+  for(const u of arr){
+    totalsFor(u.id).then(t=>{ const el=$(`#sum-${u.id}`); if(el) el.textContent=`${t.done}/${t.total}`; });
+  }
+}
+
+async function drawCatalogEditor(){
+  const role=$("#catRole").value; const wrap=$("#catWrap"); const secs=catalog[role]||[];
+  if(!secs.length){ wrap.innerHTML='<div class="note">Ingen inndelinger. Legg til med knappen over.</div>'; return; }
+  wrap.innerHTML = secs.map((s,si)=>`
+    <div class="box" style="margin-bottom:10px">
+      <div class="hd">
+        <div class="row">
+          <span class="note">${si+1}</span>
+          <input class="field secTitle" data-si="${si}" value="${esc(s.title)}" style="min-width:220px">
+          <button class="btn" data-act="secUp" data-si="${si}">↑</button>
+          <button class="btn" data-act="secDown" data-si="${si}">↓</button>
+          <button class="btn" data-act="secDel" data-si="${si}">Slett</button>
+          <span class="note" style="margin-left:auto">Nytt punkt</span>
+          <input class="field newItem" data-si="${si}" placeholder="Beskrivelse …" style="min-width:240px">
+          <button class="btn primary" data-act="addItem" data-si="${si}">+ Legg til</button>
+        </div>
+      </div>
+      <div class="bd">
+        <ul class="list">
+          ${s.items.map((it,ii)=>`
+            <li data-si="${si}" data-ii="${ii}">
+              <div><span class="note">${si+1}.${ii+1}</span> ${esc(it.text)}</div>
+              <div class="row">
+                <button class="btn" data-act="itUp">↑</button>
+                <button class="btn" data-act="itDown">↓</button>
+                <button class="btn" data-act="itEdit">Rediger</button>
+                <button class="btn" data-act="itDel">Slett</button>
+              </div>
+            </li>`).join("")}
+        </ul>
+      </div>
+    </div>
+  `).join("");
+
+  // seksjoner
+  $$("#catWrap .secTitle").forEach(inp=>{
+    inp.onchange=async()=>{ const si=+inp.dataset.si; await updateSectionTitle(secs[si].id, inp.value.trim()||secs[si].title); catalog=await loadCatalog(); await drawCatalogEditor(); };
+  });
+  $$("#catWrap [data-act]").forEach(btn=>{
+    btn.onclick=async()=>{
+      const act=btn.dataset.act; const si=+btn.dataset.si;
+      if(act==="secDel"){ if(!confirm("Slette inndeling?")) return; await deleteSection(secs[si].id); catalog=await loadCatalog(); await drawCatalogEditor(); return; }
+      if(act==="secUp")  { if(si>0){ await moveSection(secs[si].id, secs[si].position, secs[si-1].id, secs[si-1].position); catalog=await loadCatalog(); await drawCatalogEditor(); } return; }
+      if(act==="secDown"){ if(si<secs.length-1){ await moveSection(secs[si].id, secs[si].position, secs[si+1].id, secs[si+1].position); catalog=await loadCatalog(); await drawCatalogEditor(); } return; }
+      if(act==="addItem"){ const inp=$("#catWrap .newItem[data-si='"+si+"']"); const txt=(inp.value||"").trim(); if(!txt) return; await addItem(secs[si].id, txt); inp.value=""; catalog=await loadCatalog(); await drawCatalogEditor(); return; }
+    };
+  });
+
+  // items
+  $$("#catWrap li [data-act]").forEach(btn=>{
+    btn.onclick=async()=>{
+      const li=btn.closest("li"); const si=+li.dataset.si; const ii=+li.dataset.ii;
+      const role=$("#catRole").value; const secs=catalog[role]||[];
+      if(btn.dataset.act==="itUp")   { if(ii>0){ const a=secs[si].items[ii], b=secs[si].items[ii-1]; await moveItem(a.id,a.position,b.id,b.position); catalog=await loadCatalog(); await drawCatalogEditor(); } }
+      if(btn.dataset.act==="itDown") { if(ii<secs[si].items.length-1){ const a=secs[si].items[ii], b=secs[si].items[ii+1]; await moveItem(a.id,a.position,b.id,b.position); catalog=await loadCatalog(); await drawCatalogEditor(); } }
+      if(btn.dataset.act==="itEdit"){ const cur=secs[si].items[ii]; const nt=prompt("Rediger beskrivelse:", cur.text); if(nt!=null){ await editItem(cur.id, nt.trim()); catalog=await loadCatalog(); await drawCatalogEditor(); } }
+      if(btn.dataset.act==="itDel") { if(!confirm("Slette punkt?")) return; const cur=secs[si].items[ii]; await deleteItem(cur.id); catalog=await loadCatalog(); await drawCatalogEditor(); }
+    };
+  });
+}
+
+async function selectUser(uid){
+  const u = users.find(x=>x.id===uid); if(!u) return;
+  const totals = await totalsFor(uid);
+  $("#selName").textContent = (u.name||u.email||u.id);
+  $("#selSum").textContent  = `— ${totals.done}/${totals.total} fullført`;
+  await renderUserBook(uid, $("#editToggle").checked, totals.map);
+  await drawComments(uid);
+  $("#editToggle").onchange=()=> renderUserBook(uid, $("#editToggle").checked, totals.map);
+  $("#addComment").onclick=async()=>{ const t=$("#commentTxt").value.trim(); if(!t) return; await addComment(uid, t, me.id); $("#commentTxt").value=""; await drawComments(uid); };
+}
+
+async function renderUserBook(uid, editable, progMap){
+  const el=$("#userBook");
+  el.innerHTML = ROLES.map(role=>{
+    const secs=catalog[role]||[];
+    return secs.map((s,si)=>`
+      <div style="margin-bottom:12px">
+        <div class="tag">${role} / ${esc(s.title)}</div>
+        <table><thead><tr><th style="width:66px">#</th><th>Beskrivelse</th><th style="width:140px">Dato</th><th style="width:180px">Signert</th><th style="width:80px">Ferdig</th></tr></thead>
+          <tbody>
+            ${s.items.map((it,pi)=>{
+              const pr=progMap.get(it.id)||{}; const dis=editable?"":"disabled";
+              return `<tr data-id="${it.id}">
+                <td>${si+1}.${pi+1}</td>
+                <td>${esc(it.text)}</td>
+                <td><input ${dis} type="date" value="${fmt(pr.date)}"></td>
+                <td><input ${dis} type="text" value="${esc(pr.signed_by||"")}" placeholder="Signert av"></td>
+                <td><input ${dis} type="checkbox" ${pr.done?"checked":""}></td>
+              </tr>`;
+            }).join("")}
+          </tbody>
+        </table>
+      </div>`).join("");
+  }).join("") || '<div class="note">Ingen punkter.</div>';
+
+  if(editable){
+    $$("#userBook tbody tr").forEach(tr=>{
+      const id=tr.getAttribute("data-id");
+      const d=tr.querySelector('input[type="date"]');
+      const s=tr.querySelector('input[type="text"]');
+      const c=tr.querySelector('input[type="checkbox"]');
+      async function commit(){
+        if(c.checked && !d.value) d.value=new Date().toISOString().slice(0,10);
+        try{ await upsertProgress(id,{date:d.value||null,signed_by:s.value||null,done:!!c.checked}, uid); }
+        catch(e){ alert("Kunne ikke lagre: " + (e.message||e)); }
+      }
+      d.onchange=commit; s.onchange=commit; c.onchange=commit;
+    });
+  }
+}
+
+async function drawComments(uid){
+  const list=$("#commentList"); const arr=await loadComments(uid);
+  list.innerHTML = arr.map(c=>`<li><span>${esc(c.text)}</span><span class="note">${new Date(c.created_at).toLocaleString('no-NO')}</span></li>`).join("") || '<li><span class="note">Ingen kommentarer.</span></li>';
+}
+
+function renderShell(){
+  $("#app").innerHTML = `
+    <div class="row" style="justify-content:space-between">
+      <h1>Admin</h1>
+      <div class="row">
+        <a class="btn" href="./elev.html">← Til elev-siden</a>
+        <span class="badge">Som: <b>${esc(me.email||me.id)}</b></span>
+      </div>
+    </div>
+
+    <div class="split">
+      <div>
+        <div class="box">
+          <div class="hd">Brukere</div>
+          <div class="bd">
+            <input id="userSearch" class="field" placeholder="Søk navn/epost …" style="margin-bottom:8px">
+            <ul id="userList" class="list"></ul>
+          </div>
+        </div>
+
+        <div class="box" style="margin-top:12px">
+          <div class="hd">Katalog (punkter)</div>
+          <div class="bd">
+            <div class="row" style="margin-bottom:6px">
+              <label>Rolle:
+                <select id="catRole" class="field" style="max-width:220px">
+                  ${ROLES.map(r=>`<option value="${r}">${r}</option>`).join("")}
+                </select>
+              </label>
+              <button id="addSec" class="btn primary">+ Inndeling</button>
+            </div>
+            <div id="catWrap"></div>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <div class="box">
+          <div class="hd">
+            <span id="selName">Velg en bruker</span>
+            <span id="selSum" class="note"></span>
+            <span style="float:right" class="note"><input type="checkbox" id="editToggle" checked> Rediger</span>
+          </div>
+          <div class="bd" id="userBook"><div class="note">Ingen valgt.</div></div>
+        </div>
+
+        <div class="box" style="margin-top:12px">
+          <div class="hd">Kommentarer</div>
+          <div class="bd">
+            <div class="row" style="margin-bottom:6px">
+              <input id="commentTxt" class="field" placeholder="Skriv kommentar til elev" style="flex:1">
+              <button id="addComment" class="btn">Legg til</button>
+            </div>
+            <ul id="commentList" class="list"></ul>
+          </div>
+        </div>
+
+        <div class="box" style="margin-top:12px">
+          <div class="hd">Logg</div>
+          <div class="bd" id="logWrap" style="max-height:220px;overflow:auto"><div class="note">Laster …</div></div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+(async function start(){
+  me = await ensureLocalUser();
+  catalog = await loadCatalog();
+  users   = await listUsers();
+
+  renderShell();
+  $("#userSearch").oninput=drawUsers;
+  $("#addSec").onclick=async()=>{ await addSection($("#catRole").value); catalog=await loadCatalog(); await drawCatalogEditor(); };
+  $("#catRole").onchange=drawCatalogEditor;
+
+  await drawCatalogEditor();
+  await drawUsers();
+
+  const entries = await loadLogs();
+  $("#logWrap").innerHTML = entries.map(l=>`<div class="row" style="margin-bottom:6px">
+    <span class="note">${new Date(l.created_at).toLocaleString('no-NO')}</span>
+    <span>${esc(l.message)}</span>
+  </div>`).join("") || '<div class="note">Loggen er tom.</div>';
+})();
+</script>
+</body>
+</html>
 
