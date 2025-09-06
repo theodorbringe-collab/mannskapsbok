@@ -2,7 +2,7 @@
 <html lang="no">
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Admin – test</title>
+  <title>Mannskapsbok – Admin</title>
   <link rel="stylesheet" href="./assets/styles.css">
 </head>
 <body>
@@ -15,15 +15,32 @@ import { ensureLocalUser, listUsers } from "./assets/common.js";
   const app = document.getElementById("app");
   try {
     const me = await ensureLocalUser();
-    const users = await listUsers();
+    let users = [];
+    let lastErr = null;
+    try{
+      users = await listUsers();
+    }catch(e){
+      lastErr = e;
+    }
     app.innerHTML = `
-      <h1>Admin OK</h1>
-      <p>Innlogget (lokalt): <b>${me.email}</b></p>
-      <p>Profiler i databasen: <b>${users.length}</b></p>
-      <p><a class="btn" href="./elev.html">← Til elev</a></p>
+      <h1>Admin</h1>
+      <div class="row">
+        <a class="btn" href="./elev.html">← Til elev</a>
+        <span class="badge">Innlogget (lokalt): ${me.email}</span>
+        ${lastErr ? `<span class="badge" style="background:#ffe7e7;border-color:#ffbcbc;color:#7a1010">Feil ved lesing av profiler: ${lastErr.message||lastErr}</span>` : ""}
+      </div>
+      <div class="box" style="margin-top:12px">
+        <div class="hd">Brukere (${users.length})</div>
+        <div class="bd">
+          ${users.length ? `
+            <ul class="list">
+              ${users.map(u=>`<li><span>${u.name||u.email||u.id}</span><span class="note">${u.email||''}</span></li>`).join('')}
+            </ul>` : `<div class="note">Ingen profiler – eller manglende tilgang.</div>`}
+        </div>
+      </div>
     `;
   } catch (e) {
-    app.innerHTML = `<div style="color:#b00020">Feil (admin): ${e.message||e}</div>`;
+    document.getElementById("app").innerHTML = `<div class="box"><div class="hd">Feil</div><div class="bd" style="color:#b00020">${e.message||e}</div></div>`;
     console.error(e);
   }
 })();
