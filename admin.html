@@ -236,3 +236,50 @@ import {
 </script>
 </body>
 </html>
+// Slett bruker (public-data). Merk: auth.users kan ikke slettes med anon-key.
+export async function deleteUserCascade(uid){
+  await sb.from('progress').delete().eq('user_id', uid);
+  await sb.from('comments').delete().or(`user_id.eq.${uid},author_id.eq.${uid}`);
+  await sb.from('logs').delete().eq('actor_id', uid);
+  await sb.from('profiles').delete().eq('id', uid);
+}
+async function drawUsers(){
+  const list=$('#userList');
+  const q=($('#userSearch').value||'').toLowerCase();
+  const arr=users.filter(u=>(u.name||'').toLowerCase().includes(q)||(u.email||'').toLowerCase().includes(q));
+  if(!arr.length){ list.innerHTML='<li><span class="note">Ingen brukere</span></li>'; return; }
+
+  list.innerHTML = arr.map(u=>`
+    <li data-id="${u.id}">
+      <span>${esc(u.name||u.email||u.id)}</span>
+      <span class="row" style="gap:8px">
+        <span class="tag" id="sum-${u.id}">…</span>
+        <button class="btn small" data-act="open">Åpne</button>
+        <button class="btn small" data-act="del">Slett</button>
+      </span>
+    </li>
+  `).join('');
+
+  // velg / slett
+  $$('#userList li').forEach(li=>{
+    const uid=li.dataset.id;
+    li.querySelector('[data-act="open"]').onclick = ()=> selectUser(uid);
+    li.querySelector('[data-act="del"]').onclick  = async (e)=>{
+      e.stopPropagation();
+      const u = users.find(x=>x.id===uid);
+      if(!confirm(`Slette bruker "${u?.name||u?.email||uid}"? Dette fjerner all progresjon/kommentarer/logg i databasen.`)) return;
+      try{
+        await deleteUserCascade(uid);
+        users = users.filter(x=>x.id!==uid);
+        drawUsers();
+        $('#userBook').innerHTML = '<div class="note">Ingen valgt.</div>';
+      }catch(err){ alert('Kunne ikke slette: '+(err.message||err)); }
+    };
+  });
+
+  // vis totaler
+  for(const u of arr){
+    totalsFor(u.id).then(t=>{ const el=$(`#sum-${u.id}`); if(el) el.textContent=`${t.done}/${t.total}`; });
+  }
+}
+
