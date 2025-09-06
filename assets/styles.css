@@ -109,3 +109,22 @@ tbody tr:hover{background:#fbfdff}
 /* Toast */
 .toast{position:fixed;right:16px;bottom:16px;background:#111;color:#fff;padding:10px 12px;border-radius:10px;opacity:0;transform:translateY(6px);transition:.2s}
 .toast.show{opacity:1;transform:translateY(0)}
+/* ==== Røde Kors-header + rød toppmeny ==== */
+.rk-header{background:#fff;border-bottom:1px solid #e5e7eb}
+.rk-head-inner{display:flex;align-items:center;gap:12px;padding:10px 0}
+.rk-logo{
+  width:30px;height:30px;background:#ff1a1a;position:relative;border-radius:4px;flex:0 0 30px;
+}
+.rk-logo::before,.rk-logo::after{content:"";position:absolute;background:#fff;border-radius:2px}
+.rk-logo::before{left:50%;top:5px;bottom:5px;width:6px;transform:translateX(-50%)}
+.rk-logo::after{top:50%;left:5px;right:5px;height:6px;transform:translateY(-50%)}
+
+.rk-title{font-weight:800;font-size:26px;letter-spacing:.2px}
+.rk-title .rk-sub{font-weight:700;margin-left:4px}
+
+.rk-nav{background:#ff1a1a;color:#fff}
+.rk-nav .wrap{display:flex;gap:14px;align-items:center;padding:8px 0}
+.rk-nav a{color:#fff;font-weight:700;text-decoration:none}
+.rk-nav a:hover{text-decoration:underline}
+.rk-nav .sep{opacity:.6}
+
