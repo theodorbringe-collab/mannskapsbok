@@ -10,19 +10,22 @@
 
 <script type="module">
 import { ensureLocalUser } from "./assets/common.js";
-const app = document.getElementById("app");
 
-try{
-  const me = await ensureLocalUser();
-  app.innerHTML = `
-    <h1>Elev OK</h1>
-    <p>Du er registrert lokalt som <b>${me.name}</b> (${me.email})</p>
-    <p class="note">Dette er en enkel testside. Når denne virker kan vi bytte til full elev-UI.</p>
-    <p><a class="btn" href="./admin.html">Gå til Admin</a></p>
-  `;
-}catch(e){
-  app.innerHTML = `<div style="color:#b00020">Feil: ${e.message||e}</div>`;
-}
+(async () => {
+  const app = document.getElementById("app");
+  try {
+    const me = await ensureLocalUser();
+    app.innerHTML = `
+      <h1>Elev OK</h1>
+      <p>Du er registrert lokalt som <b>${me.name}</b> (${me.email})</p>
+      <p class="note">Dette er en enkel testside. Når denne virker kan vi bytte til full elev-UI.</p>
+      <p><a class="btn" href="./admin.html">Gå til Admin</a></p>
+    `;
+  } catch (e) {
+    app.innerHTML = `<div style="color:#b00020">Feil (elev): ${e.message||e}</div>`;
+    console.error(e);
+  }
+})();
 </script>
 </body>
 </html>
