@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="no">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Admin – test</title>
+  <link rel="stylesheet" href="./assets/styles.css">
+</head>
+<body>
+<div class="wrap" id="app">Laster …</div>
+
+<script type="module">
+import { ensureLocalUser, listUsers } from "./assets/common.js";
+
+(async () => {
+  const app = document.getElementById("app");
+  try {
+    const me = await ensureLocalUser();
+    const users = await listUsers();
+    app.innerHTML = `
+      <h1>Admin OK</h1>
+      <p>Innlogget (lokalt): <b>${me.email}</b></p>
+      <p>Profiler i databasen: <b>${users.length}</b></p>
+      <p><a class="btn" href="./elev.html">← Til elev</a></p>
+    `;
+  } catch (e) {
+    app.innerHTML = `<div style="color:#b00020">Feil (admin): ${e.message||e}</div>`;
+    console.error(e);
+  }
+})();
+</script>
+</body>
+</html>
