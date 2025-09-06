@@ -2,54 +2,188 @@
 <html lang="no">
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Elev – test</title>
+  <title>Mannskapsbok – Elev</title>
   <link rel="stylesheet" href="./assets/styles.css">
 </head>
 <body>
-<div class="wrap" id="app">Laster …</div>
+<div class="wrap">
+  <div id="app">Laster …</div>
+</div>
 
 <script type="module">
-import { ensureLocalUser } from "./assets/common.js";
+import {
+  sb, ROLES,
+  ensureLocalUser, setLocalIdentity,
+  loadCatalog, loadMyProgress, upsertProgress
+} from "./assets/common.js";
 
-(async () => {
-  const app = document.getElementById("app");
-  try {
-    const me = await ensureLocalUser();
-    app.innerHTML = `
-      <h1>Elev OK</h1>
-      <p>Du er registrert lokalt som <b>${me.name}</b> (${me.email})</p>
-      <p class="note">Dette er en enkel testside. Når denne virker kan vi bytte til full elev-UI.</p>
-      <p><a class="btn" href="./admin.html">Gå til Admin</a></p>
-    `;
-  } catch (e) {
-    app.innerHTML = `<div style="color:#b00020">Feil (elev): ${e.message||e}</div>`;
-    console.error(e);
+(function(){
+  const $ = (s,r=document)=>r.querySelector(s);
+  const $$ = (s,r=document)=>Array.from(r.querySelectorAll(s));
+  const esc = s => (s||'').replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
+  const today = ()=>new Date().toISOString().slice(0,10);
+  const clsFor=(done,total)=> total===0||done===0?'gray':(done<total?'yellow':'green');
+
+  let me = null;
+  let catalog = {};
+  let myProg = new Map();
+  let activeRole = ROLES[0];
+  let rt = null;
+
+  async function init(){
+    try{
+      me = await ensureLocalUser();
+      [catalog, myProg] = await Promise.all([ loadCatalog(), loadMyProgress(me.id) ]);
+      renderShell();
+      renderHeader();
+      renderCards();
+      renderTabs(activeRole);
+      renderRole(activeRole);
+      bindRealtime();
+    }catch(e){
+      $("#app").innerHTML = `<div class="box"><div class="hd">Feil</div><div class="bd" style="color:#b00020">${esc(e.message||e)}</div></div>`;
+      console.error(e);
+    }
   }
+
+  function renderShell(){
+    $("#app").innerHTML = `
+      <h1>Mannskapsbok</h1>
+      <div class="row" id="hdr"></div>
+      <div id="cards" class="grid" style="margin-top:6px"></div>
+      <div id="tabs" class="tabs"></div>
+      <div id="panel"></div>
+    `;
+  }
+
+  function renderHeader(){
+    const hdr = $("#hdr");
+    hdr.innerHTML = `
+      <span>Innlogget som <b>${esc(me.name||me.email)}</b></span>
+      <a class="btn" href="./admin.html">Admin</a>
+      <button id="btnEdit" class="btn">Endre navn/e-post</button>
+      <button id="btnReset" class="btn">Nullstill lokal bruker</button>
+    `;
+    $("#btnEdit").onclick = openEditDialog;
+    $("#btnReset").onclick = ()=>{
+      if(confirm("Slette lokal identitet på denne maskinen?")) {
+        localStorage.removeItem("mb_uid");
+        localStorage.removeItem("mb_email");
+        localStorage.removeItem("mb_name");
+        location.reload();
+      }
+    };
+  }
+
+  function openEditDialog(){
+    const box = document.createElement("div");
+    box.className="box";
+    box.innerHTML = `
+      <div class="hd">Oppretter av mannskapsboka</div>
+      <div class="bd">
+        <div class="row" style="gap:10px;flex-wrap:wrap">
+          <input id="ownerName"  class="field" placeholder="Navn"  value="${esc(me.name||"")}"  style="max-width:260px">
+          <input id="ownerEmail" class="field" placeholder="E-post" value="${esc(me.email||"")}" style="max-width:260px">
+          <button id="saveOwner" class="btn">Lagre</button>
+          <button id="closeOwner" class="btn">Lukk</button>
+        </div>
+      </div>
+    `;
+    $("#app").insertBefore(box, $("#cards"));
+    $("#saveOwner").onclick = async ()=>{
+      const name  = $("#ownerName").value.trim();
+      const email = $("#ownerEmail").value.trim();
+      await setLocalIdentity({ name, email });
+      me = await ensureLocalUser();
+      renderHeader();
+      alert("Lagret!");
+      box.remove();
+    };
+    $("#closeOwner").onclick = ()=> box.remove();
+  }
+
+  function renderCards(){
+    const grid=$("#cards"); grid.innerHTML='';
+    ROLES.forEach(role=>{
+      const its=(catalog[role]||[]).flatMap(s=>s.items);
+      const total=its.length;
+      const done=its.filter(it=>myProg.get(it.id)?.done).length;
+      const card=document.createElement('div'); card.className='card';
+      const btn=document.createElement('button'); btn.className=clsFor(done,total);
+      btn.innerHTML=`${role}<span class="sub">${done}/${total} fullført</span>`;
+      btn.onclick=()=>{ activeRole=role; renderTabs(role); renderRole(role); };
+      card.appendChild(btn); grid.appendChild(card);
+    });
+  }
+
+  function renderTabs(active){
+    const tabs=$("#tabs"); tabs.innerHTML='';
+    ROLES.forEach(r=>{
+      const b=document.createElement('button'); b.className='tab'+(r===active?' active':''); b.textContent=r;
+      b.onclick=()=>{ activeRole=r; renderTabs(r); renderRole(r); };
+      tabs.appendChild(b);
+    });
+  }
+
+  function renderRole(role){
+    const panel=$("#panel"); const secs=catalog[role]||[];
+    if(!secs.length){ panel.innerHTML='<div class="box"><div class="bd">Ingen punkter.</div></div>'; return; }
+    panel.innerHTML = secs.map((s,si)=>`
+      <div class="box" style="margin-bottom:10px">
+        <div class="hd"><span class="tag">${esc(s.title)}</span></div>
+        <div class="bd">
+          <table>
+            <thead><tr><th style="width:66px">#</th><th>Beskrivelse</th><th style="width:140px">Dato</th><th style="width:180px">Signert</th><th style="width:80px">Ferdig</th></tr></thead>
+            <tbody>
+              ${s.items.map((it,pi)=>{
+                const pr=myProg.get(it.id)||{};
+                return `<tr data-id="${it.id}">
+                  <td>${si+1}.${pi+1}</td>
+                  <td>${esc(it.text)}</td>
+                  <td><input type="date" value="${pr.date||''}"></td>
+                  <td><input type="text" value="${esc(pr.signed_by||'')}" placeholder="Signert av"></td>
+                  <td><input type="checkbox" ${pr.done?'checked':''}></td>
+                </tr>`;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `).join('');
+
+    $$('#panel tbody tr').forEach(tr=>{
+      const id=+tr.getAttribute('data-id');
+      const d=tr.querySelector('input[type="date"]');
+      const s=tr.querySelector('input[type="text"]');
+      const c=tr.querySelector('input[type="checkbox"]');
+      async function commit(){
+        if(c.checked && !d.value) d.value=today();
+        try{
+          await upsertProgress(id,{date:d.value||null,signed_by:(s.value||null),done:!!c.checked}, me.id);
+          myProg.set(id,{ item_id:id, date:d.value||null, signed_by:s.value||null, done:!!c.checked });
+          renderCards(); // oppdater kort
+        }catch(e){
+          alert('Kunne ikke lagre: ' + (e.message||e));
+        }
+      }
+      d.onchange=commit; s.onchange=commit; c.onchange=commit;
+    });
+  }
+
+  function bindRealtime(){
+    if(rt){ sb.removeChannel(rt); rt=null; }
+    rt = sb.channel('mb-live')
+      .on('postgres_changes',{ event:'*', schema:'public', table:'progress', filter:`user_id=eq.${me.id}` },
+        async()=>{ myProg = await loadMyProgress(me.id); renderCards(); renderRole(activeRole); })
+      .on('postgres_changes',{ event:'*', schema:'public', table:'sections' },
+        async()=>{ catalog = await loadCatalog(); renderCards(); renderTabs(activeRole); renderRole(activeRole); })
+      .on('postgres_changes',{ event:'*', schema:'public', table:'items' },
+        async()=>{ catalog = await loadCatalog(); renderCards(); renderTabs(activeRole); renderRole(activeRole); })
+      .subscribe();
+  }
+
+  init();
 })();
 </script>
 </body>
 </html>
-import { ensureLocalUser, setLocalIdentity } from "./assets/common.js";
-// ...
-const me = await ensureLocalUser();
-app.innerHTML = `
-  <h1>Elev OK</h1>
-  <p>Du er registrert lokalt som <b>${me.name}</b> (${me.email})</p>
-  <div style="margin:12px 0;padding:10px;border:1px solid #eee;border-radius:8px;">
-    <div style="font-weight:700;margin-bottom:6px">Oppretter av mannskapsboka</div>
-    <input id="ownerName"  class="field" placeholder="Navn"  value="${me.name}"  style="max-width:260px">
-    <input id="ownerEmail" class="field" placeholder="E-post" value="${me.email}" style="max-width:260px">
-    <button id="saveOwner" class="btn">Lagre</button>
-  </div>
-  <p class="note">Dette er en enkel testside. Når denne virker kan vi bytte til full elev-UI.</p>
-  <p><a class="btn" href="./admin.html">Gå til Admin</a></p>
-`;
-
-document.getElementById('saveOwner').onclick = async () => {
-  const name  = document.getElementById('ownerName').value.trim();
-  const email = document.getElementById('ownerEmail').value.trim();
-  await setLocalIdentity({ name, email });
-  alert('Lagret!');
-  location.reload();
-};
-
