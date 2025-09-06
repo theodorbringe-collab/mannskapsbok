@@ -10,8 +10,7 @@
 
 <script type="module">
 import {
-  sb, ROLES,
-  ensureLocalUser, setLocalIdentity,
+  sb, ROLES, ensureLocalUser, setLocalIdentity,
   loadCatalog, loadMyProgress, upsertProgress
 } from "./assets/common.js";
 
@@ -68,11 +67,10 @@ import {
       </div>
 
       <div id="roleBar" class="rolebar"></div>
-
       <div id="panel"></div>
     `;
 
-    $('#btnSave').onclick=()=> showToast('Lagret ✅'); // autosave skjer uansett
+    $('#btnSave').onclick=()=> showToast('Lagret ✅'); // autosave skjer likevel
     $('#saveOwner').onclick=async()=>{
       const name=$('#ownerName').value.trim(), email=$('#ownerEmail').value.trim();
       await setLocalIdentity({ name, email });
@@ -85,20 +83,16 @@ import {
     renderRole(activeRole);
   }
 
-  // Aktiv knapp + riktig farge
   function renderRoleBar(){
     const host=$('#roleBar'); host.innerHTML='';
     ROLES.forEach(role=>{
       const its=(catalog[role]||[]).flatMap(s=>s.items);
       const total=its.length;
       const done=its.filter(it=>myProg.get(String(it.id))?.done).length;
-
       const b=document.createElement('button');
-      b.className=`rolebtn ${clsFor(done,total)}${role===activeRole?' active':''}`;
-      b.type='button';
-      b.ariaPressed = role===activeRole ? 'true' : 'false';
+      b.className=`rolebtn ${clsFor(done,total)}`;
       b.innerHTML = `${role}<span class="sub">${done}/${total} fullført</span>`;
-      b.onclick=()=>{ activeRole=role; renderRoleBar(); renderRole(role); };
+      b.onclick=()=>{ activeRole=role; renderRole(activeRole); };
       host.appendChild(b);
     });
   }
@@ -129,7 +123,7 @@ import {
                   <td><input type="text" value="${esc(pr.signed_by||'')}" placeholder="Skriv inn navn"></td>
                   <td class="datecell">
                     <input type="date" value="${pr.date||''}">
-                    <button class="btn mini-check" title="Avkrysset punkt">✓</button>
+                    <button class="btn mini-check ${pr.done?'active':''}" title="${pr.done?'Avkrysset':'Marker som fullført'}">✓</button>
                   </td>
                 </tr>`;
               }).join('')}
@@ -141,19 +135,21 @@ import {
 
     // hendelser
     $$('#panel tbody tr').forEach(tr=>{
-      const id=tr.getAttribute('data-id'); // behold som STRING
+      const id=String(tr.dataset.id);
       const d=tr.querySelector('input[type="date"]');
       const s=tr.querySelector('input[type="text"]');
       const checkBtn=tr.querySelector('.mini-check');
 
-      async function commit(setDone=null){
-        let done = myProg.get(String(id))?.done || false;
-        if(setDone!==null) done = setDone;
+      async function commit(action=null){
+        let done = !!myProg.get(id)?.done;
+        if(action==='toggle') done = !done;
         if(done && !d.value) d.value = today();
+        if(!done && action==='toggle') d.value = ''; // fjern dato hvis man «angrer»
         try{
           await upsertProgress(id,{date:d.value||null,signed_by:(s.value||null),done}, me.id);
-          myProg.set(String(id),{ item_id:id, date:d.value||null, signed_by:s.value||null, done });
-          renderRoleBar(); // oppdater farge og teller
+          myProg.set(id,{ item_id:id, date:d.value||null, signed_by:s.value||null, done });
+          checkBtn.classList.toggle('active', done);
+          renderRoleBar(); // oppdater teller/farge på rolleknapper
           $('#lastUpd').textContent = lastUpdatedFromProgress();
         }catch(e){
           alert('Kunne ikke lagre: ' + (e.message||e));
@@ -162,15 +158,15 @@ import {
 
       s.onchange = ()=>commit();
       d.onchange = ()=>commit();
-      checkBtn.onclick = ()=>commit(true); // marker ferdig (og sett dato ved behov)
+      checkBtn.onclick = ()=>commit('toggle');   // nå toggler den blå/av
     });
   }
 
   // enkel toast
   function showToast(msg){
     let t=document.getElementById('toast');
-    if(!t){ t=document.createElement('div'); t.id='toast'; t.className='toast'; document.body.appendChild(t); }
-    t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),1200);
+    if(!t){ t=document.createElement('div'); t.id='toast'; document.body.appendChild(t); }
+    t.textContent=msg; t.className='show'; setTimeout(()=>t.className='',1200);
   }
 
   function bindRealtime(){
