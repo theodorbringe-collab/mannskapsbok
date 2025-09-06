@@ -10,9 +10,10 @@
 
 <script type="module">
 import {
-  ROLES, ensureLocalUser, listUsers, loadCatalog, loadProgressFor, loadComments, loadLogs,
+  ROLES, ensureLocalUser, listUsers, loadCatalog, loadProgressFor, getUserDoneCounts,
+  loadComments, loadLogs,
   addComment, addSection, updateSectionTitle, deleteSection, moveSection,
-  addItem, editItem, deleteItem, moveItem, upsertProgress, deleteUserCascade
+  addItem, editItem, deleteItem, moveItem, upsertProgress, deleteUserCascade, sb
 } from "./assets/common.js";
 
 (function(){
@@ -21,11 +22,12 @@ import {
   const esc=s=>(s||'').replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[m]));
   const fmt=v=>v??'';
 
-  let me=null, users=[], catalog={}, selUserId=null, progMap=new Map(), rt=null;
+  let me=null, users=[], catalog={}, selUserId=null, progMap=new Map(), rt=null, totalItems=0;
 
   async function init(){
     me = await ensureLocalUser();
     [users, catalog] = await Promise.all([listUsers(), loadCatalog()]);
+    totalItems = Object.values(catalog).flatMap(secs=>secs.flatMap(s=>s.items)).length;
     render();
     bindRealtime();
   }
@@ -92,20 +94,12 @@ import {
     `;
 
     $('#userSearch').oninput = drawUsers;
-    $('#addSec').onclick = async()=>{ await addSection($('#catRole').value); catalog=await loadCatalog(); drawCatalogEditor(); };
+    $('#addSec').onclick = async()=>{ await addSection($('#catRole').value); catalog=await loadCatalog(); totalItems = Object.values(catalog).flatMap(secs=>secs.flatMap(s=>s.items)).length; drawCatalogEditor(); };
     $('#catRole').onchange = drawCatalogEditor;
 
     drawUsers();
     drawCatalogEditor();
     drawLog();
-  }
-
-  function totalsFor(uid){
-    const its=Object.values(catalog).flatMap(secs=>secs.flatMap(s=>s.items));
-    return loadProgressFor(uid).then(map=>{
-      let done=0; for(const it of its) if(map.get(String(it.id))?.done) done++;
-      return { done, total: its.length, map };
-    });
   }
 
   async function drawUsers(){
@@ -114,11 +108,14 @@ import {
     const arr=users.filter(u=>(u.name||'').toLowerCase().includes(q)||(u.email||'').toLowerCase().includes(q));
     if(!arr.length){ list.innerHTML='<li><span class="note">Ingen brukere</span></li>'; return; }
 
+    // Hent alle "done"-tellere i EN spørring
+    const doneMap = await getUserDoneCounts();
+
     list.innerHTML = arr.map(u=>`
       <li data-id="${u.id}">
         <span>${esc(u.name||u.email||u.id)}</span>
         <span class="row" style="gap:8px">
-          <span class="tag" id="sum-${u.id}">…</span>
+          <span class="tag" id="sum-${u.id}">${(doneMap.get(u.id)||0)}/${totalItems}</span>
           <button class="btn small" data-act="open">Åpne</button>
           <button class="btn small" data-act="del">Slett</button>
         </span>
@@ -141,11 +138,14 @@ import {
         }catch(err){ alert('Kunne ikke slette: '+(err.message||err)); }
       };
     });
+  }
 
-    // vis totaler
-    for(const u of arr){
-      totalsFor(u.id).then(t=>{ const el=$(`#sum-${u.id}`); if(el) el.textContent=`${t.done}/${t.total}`; });
-    }
+  function totalsFor(uid){
+    const its=Object.values(catalog).flatMap(secs=>secs.flatMap(s=>s.items));
+    return loadProgressFor(uid).then(map=>{
+      let done=0; for(const it of its) if(map.get(String(it.id))?.done) done++;
+      return { done, total: its.length, map };
+    });
   }
 
   async function drawCatalogEditor(){
@@ -187,15 +187,15 @@ import {
 
     // seksjonshendelser
     $$('#catWrap .secTitle').forEach(inp=>{
-      inp.onchange=async()=>{ const si=+inp.dataset.si; await updateSectionTitle(secs[si].id, inp.value.trim()||secs[si].title); catalog=await loadCatalog(); drawCatalogEditor(); };
+      inp.onchange=async()=>{ const si=+inp.dataset.si; await updateSectionTitle(secs[si].id, inp.value.trim()||secs[si].title); catalog=await loadCatalog(); totalItems = Object.values(catalog).flatMap(se=>se.flatMap(x=>x.items)).length; drawCatalogEditor(); };
     });
     $$('#catWrap [data-act]').forEach(btn=>{
       btn.onclick=async()=>{
         const act=btn.dataset.act; const si=+btn.dataset.si;
-        if(act==='secDel'){ if(!confirm('Slette inndeling?')) return; await deleteSection(secs[si].id); catalog=await loadCatalog(); drawCatalogEditor(); return; }
+        if(act==='secDel'){ if(!confirm('Slette inndeling?')) return; await deleteSection(secs[si].id); catalog=await loadCatalog(); totalItems = Object.values(catalog).flatMap(se=>se.flatMap(x=>x.items)).length; drawCatalogEditor(); return; }
         if(act==='secUp')  { if(si>0){ const a=secs[si], b=secs[si-1]; await moveSection(a.id,a.position,b.id,b.position); catalog=await loadCatalog(); drawCatalogEditor(); } return; }
         if(act==='secDown'){ if(si<secs.length-1){ const a=secs[si], b=secs[si+1]; await moveSection(a.id,a.position,b.id,b.position); catalog=await loadCatalog(); drawCatalogEditor(); } return; }
-        if(act==='addItem'){ const inp=$(`#catWrap .newItem[data-si="${si}"]`); const txt=(inp.value||'').trim(); if(!txt) return; await addItem(secs[si].id, txt); inp.value=''; catalog=await loadCatalog(); drawCatalogEditor(); return; }
+        if(act==='addItem'){ const inp=$(`#catWrap .newItem[data-si="${si}"]`); const txt=(inp.value||'').trim(); if(!txt) return; await addItem(secs[si].id, txt); inp.value=''; catalog=await loadCatalog(); totalItems = Object.values(catalog).flatMap(se=>se.flatMap(x=>x.items)).length; drawCatalogEditor(); return; }
       };
     });
 
@@ -207,7 +207,7 @@ import {
         if(btn.dataset.act==='itUp'){ if(ii>0){ const a=catalog[role][si].items[ii], b=catalog[role][si].items[ii-1]; await moveItem(a.id,a.position,b.id,b.position); catalog=await loadCatalog(); drawCatalogEditor(); } }
         if(btn.dataset.act==='itDown'){ const arr=catalog[role][si].items; if(ii<arr.length-1){ const a=arr[ii], b=arr[ii+1]; await moveItem(a.id,a.position,b.id,b.position); catalog=await loadCatalog(); drawCatalogEditor(); } }
         if(btn.dataset.act==='itEdit'){ const nt=prompt('Rediger beskrivelse:', cur.text); if(nt!=null){ await editItem(cur.id, nt.trim()); catalog=await loadCatalog(); drawCatalogEditor(); } }
-        if(btn.dataset.act==='itDel'){ if(!confirm('Slette punkt?')) return; await deleteItem(cur.id); catalog=await loadCatalog(); drawCatalogEditor(); }
+        if(btn.dataset.act==='itDel'){ if(!confirm('Slette punkt?')) return; await deleteItem(cur.id); catalog=await loadCatalog(); totalItems = Object.values(catalog).flatMap(se=>se.flatMap(x=>x.items)).length; drawCatalogEditor(); }
       };
     });
   }
@@ -222,12 +222,12 @@ import {
     $('#selSum').textContent = `— ${totals.done}/${totals.total} fullført`;
 
     await renderUserBook(uid);
-    await drawComments(uid);
 
     $('#addComment').onclick=async()=>{
       const t=$('#commentTxt').value.trim(); if(!t) return;
       await addComment(uid, t, me.id); $('#commentTxt').value=''; await drawComments(uid);
     };
+    await drawComments(uid);
   }
 
   async function renderUserBook(uid){
@@ -293,32 +293,33 @@ import {
     </div>`).join('') || '<div class="note">Tom logg.</div>';
   }
 
-  // Realtime: speil endringer inn i admin
+  // Realtime: speil endringer inn i admin og oppdater lister
   function bindRealtime(){
-    if(rt){ return; }
-    rt = window._mb_admin_rt = (window._mb_admin_rt || 
-      import("./assets/common.js").then(()=>{}));
-
-    const ch = (window._mb_admin_ch = (window._mb_admin_ch || 
-      window.supabaseChannel || null));
-
-    const sbAny = (await import("./assets/common.js"));
-
-    const chan = sbAny.sb.channel('mb-live-admin')
+    if(rt){ sb.removeChannel(rt); rt=null; }
+    rt = sb.channel('mb-live-admin')
       .on('postgres_changes',{event:'*',schema:'public',table:'sections'},
-        async()=>{ catalog=await loadCatalog(); drawCatalogEditor(); })
+        async()=>{ catalog=await loadCatalog(); totalItems = Object.values(catalog).flatMap(se=>se.flatMap(x=>x.items)).length; drawCatalogEditor(); })
       .on('postgres_changes',{event:'*',schema:'public',table:'items'},
-        async()=>{ catalog=await loadCatalog(); drawCatalogEditor(); })
+        async()=>{ catalog=await loadCatalog(); totalItems = Object.values(catalog).flatMap(se=>se.flatMap(x=>x.items)).length; drawCatalogEditor(); })
       .on('postgres_changes',{event:'*',schema:'public',table:'progress'},
-        async(payload)=>{
+        async()=>{
           if(selUserId){
             progMap = await loadProgressFor(selUserId);
             await renderUserBook(selUserId);
-            // oppdater badges
-            const totals = await totalsFor(selUserId);
-            $('#selSum').textContent = `— ${totals.done}/${totals.total} fullført`;
-            const tag=$(`#sum-${selUserId}`); if(tag) tag.textContent=`${totals.done}/${totals.total}`;
+            const tag=$(`#sum-${selUserId}`);
+            if(tag){
+              const totals = await totalsFor(selUserId);
+              tag.textContent = `${totals.done}/${totals.total}`;
+              $('#selSum').textContent = `— ${totals.done}/${totals.total} fullført`;
+            }
           }
+          // Oppdater tellerne i brukerlista uten N+1
+          const doneMap = await getUserDoneCounts();
+          $$('#userList li').forEach(li=>{
+            const uid=li.dataset.id;
+            const el=$(`#sum-${uid}`);
+            if(el) el.textContent = `${(doneMap.get(uid)||0)}/${totalItems}`;
+          });
         })
       .subscribe();
   }
