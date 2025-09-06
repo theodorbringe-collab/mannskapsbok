@@ -108,3 +108,10 @@ input[type="checkbox"]{width:18px;height:18px}
 .mini-check[data-done="1"], .mini-check.is-done{
   background:#2563eb;border-color:#1d4ed8;color:#fff;
 }
+/* --- Modal for logg --- */
+.modal{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.45);z-index:1000}
+.modal.open{display:flex}
+.modal .sheet{width:min(800px,94%);max-height:80vh;overflow:auto;background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow)}
+.modal .sheet .hd{padding:12px 14px;border-bottom:1px solid var(--line);background:#f8fafc;font-weight:700;display:flex;justify-content:space-between;align-items:center}
+.modal .sheet .bd{padding:12px 14px}
+
