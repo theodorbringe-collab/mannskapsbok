@@ -19,24 +19,20 @@ import {
   const $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
   const esc=s=>(s||'').replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[m]));
   const today=()=>new Date().toISOString().slice(0,10);
-  const clsFor=(done,total)=> total===0||done===0?'gray':(done<total?'yellow':'green');
+  const clsFor=(d,t)=> t===0||d===0?'gray':(d<t?'yellow':'green');
 
   let me=null, catalog={}, myProg=new Map(), activeRole=ROLES[0], rt=null;
 
-  function lastUpdatedFromProgress(){
-    let d=null;
-    for(const v of myProg.values()){
-      if(v?.date){ const t=new Date(v.date); if(!d || t>d) d=t; }
-    }
+  const lastUpdated=()=>{
+    let d=null; for(const v of myProg.values()){ if(v?.date){const t=new Date(v.date); if(!d||t>d)d=t; } }
     return d ? d.toLocaleDateString('no-NO') : '—';
-  }
+  };
 
   async function init(){
     try{
       me = await ensureLocalUser();
       [catalog, myProg] = await Promise.all([loadCatalog(), loadMyProgress(me.id)]);
-      render();
-      bindRealtime();
+      render(); bindRealtime();
     }catch(e){
       $("#app").innerHTML = `<div class="box"><div class="hd">Feil</div><div class="bd" style="color:#b00020">${esc(e.message||e)}</div></div>`;
       console.error(e);
@@ -46,11 +42,10 @@ import {
   function render(){
     $("#app").innerHTML = `
       <h1 style="margin-bottom:8px">Mannskapsbok</h1>
-
       <div class="row" style="margin-bottom:10px">
         <button id="btnSave" class="btn">Lagre</button>
         <a class="btn" href="./admin.html">Admin</a>
-        <span class="note" style="margin-left:auto">Sist oppdatert: <b id="lastUpd">${lastUpdatedFromProgress()}</b></span>
+        <span class="note" style="margin-left:auto">Sist oppdatert: <b id="lastUpd">${lastUpdated()}</b></span>
       </div>
 
       <div class="box" style="margin-bottom:12px">
@@ -69,35 +64,30 @@ import {
       <div id="roleBar" class="rolebar"></div>
       <div id="panel"></div>
     `;
-
-    $('#btnSave').onclick=()=> showToast('Lagret ✅'); // autosave skjer uansett
+    $('#btnSave').onclick=()=> toast('Lagret ✅');
     $('#saveOwner').onclick=async()=>{
       const name=$('#ownerName').value.trim(), email=$('#ownerEmail').value.trim();
-      await setLocalIdentity({ name, email });
-      me = await ensureLocalUser();
-      $('#meName').textContent = me.name||me.email;
-      showToast('Oppdatert');
+      await setLocalIdentity({ name, email }); me = await ensureLocalUser();
+      $('#meName').textContent = me.name||me.email; toast('Oppdatert');
     };
-
-    renderRoleBar();
-    renderRole(activeRole);
+    drawRoleBar(); drawRole(activeRole);
   }
 
-  function renderRoleBar(){
+  function drawRoleBar(){
     const host=$('#roleBar'); host.innerHTML='';
     ROLES.forEach(role=>{
       const its=(catalog[role]||[]).flatMap(s=>s.items);
       const total=its.length;
-      const done=its.filter(it=>myProg.get(Number(it.id))?.done).length; // NB: Number-id
+      const done=its.filter(it=>myProg.get(Number(it.id))?.done).length;
       const b=document.createElement('button');
       b.className=`rolebtn ${clsFor(done,total)}`;
       b.innerHTML = `${role}<span class="sub">${done}/${total} fullført</span>`;
-      b.onclick=()=>{ activeRole=role; renderRole(activeRole); };
+      b.onclick=()=>{ activeRole=role; drawRole(activeRole); };
       host.appendChild(b);
     });
   }
 
-  function renderRole(role){
+  function drawRole(role){
     const panel=$("#panel"); const secs=catalog[role]||[];
     if(!secs.length){ panel.innerHTML='<div class="box"><div class="bd">Ingen punkter.</div></div>'; return; }
 
@@ -106,14 +96,12 @@ import {
         <div class="hd">${esc(s.title)}</div>
         <div class="bd">
           <table>
-            <thead>
-              <tr>
-                <th style="width:60px">#</th>
-                <th>Jeg kan dette</th>
-                <th style="width:220px">Sjekket ut av</th>
-                <th style="width:170px">Dato</th>
-              </tr>
-            </thead>
+            <thead><tr>
+              <th style="width:60px">#</th>
+              <th>Jeg kan dette</th>
+              <th style="width:220px">Sjekket ut av</th>
+              <th style="width:170px">Dato</th>
+            </tr></thead>
             <tbody>
               ${s.items.map((it,pi)=>{
                 const pr = myProg.get(Number(it.id)) || {};
@@ -123,7 +111,7 @@ import {
                   <td><input type="text" value="${esc(pr.signed_by||'')}" placeholder="Skriv inn navn"></td>
                   <td class="datecell">
                     <input type="date" value="${pr.date||''}">
-                    <button class="btn mini-check" data-done="${pr.done?1:0}" title="${pr.done?'Avkrysset':'Marker som fullført'}">✓</button>
+                    <button class="mini-check" data-done="${pr.done?1:0}" title="${pr.done?'Avkrysset':'Marker som fullført'}">✓</button>
                   </td>
                 </tr>`;
               }).join('')}
@@ -133,39 +121,29 @@ import {
       </div>
     `).join('');
 
-    // hendelser
     $$('#panel tbody tr').forEach(tr=>{
-      const id = Number(tr.dataset.id);                    // <- numeric id
-      const d  = tr.querySelector('input[type="date"]');
-      const s  = tr.querySelector('input[type="text"]');
-      const checkBtn = tr.querySelector('.mini-check');
+      const id  = Number(tr.dataset.id);
+      const d   = tr.querySelector('input[type="date"]');
+      const s   = tr.querySelector('input[type="text"]');
+      const btn = tr.querySelector('.mini-check');
 
       async function commit(action=null){
         let done = !!myProg.get(id)?.done;
-        if(action==='toggle'){
-          done = !done;
-          if(done && !d.value) d.value = today(); // sett dato ved avhuking
-          if(!done) d.value = '';                 // fjern dato ved «angre»
-        }
+        if(action==='toggle'){ done=!done; if(done && !d.value) d.value=today(); if(!done) d.value=''; }
         try{
           await upsertProgress(id,{date:d.value||null,signed_by:(s.value||null),done}, me.id);
           myProg.set(id,{ item_id:id, date:d.value||null, signed_by:s.value||null, done });
-          checkBtn.setAttribute('data-done', done ? '1' : '0');   // <- farger styres her
-          renderRoleBar();                                        // oppdater teller/farge
-          $('#lastUpd').textContent = lastUpdatedFromProgress();
-        }catch(e){
-          alert('Kunne ikke lagre: ' + (e.message||e));
-        }
+          btn.setAttribute('data-done', done ? '1' : '0');   // ← styr fargen
+          drawRoleBar(); $('#lastUpd').textContent = lastUpdated();
+        }catch(e){ alert('Kunne ikke lagre: '+(e.message||e)); }
       }
-
-      s.onchange = ()=>commit();
-      d.onchange = ()=>commit();
-      checkBtn.onclick = ()=>commit('toggle'); // nå toggler blå/grå
+      s.onchange=()=>commit();
+      d.onchange=()=>commit();
+      btn.onclick =()=>commit('toggle');
     });
   }
 
-  // enkel toast
-  function showToast(msg){
+  function toast(msg){
     let t=document.getElementById('toast');
     if(!t){ t=document.createElement('div'); t.id='toast'; document.body.appendChild(t); }
     t.textContent=msg; t.className='show'; setTimeout(()=>t.className='',1200);
@@ -175,11 +153,11 @@ import {
     if(rt){ sb.removeChannel(rt); rt=null; }
     rt = sb.channel('mb-live-elev')
       .on('postgres_changes',{event:'*',schema:'public',table:'progress',filter:`user_id=eq.${me.id}`},
-        async()=>{ myProg=await loadMyProgress(me.id); renderRoleBar(); renderRole(activeRole); $('#lastUpd').textContent = lastUpdatedFromProgress(); })
+        async()=>{ myProg=await loadMyProgress(me.id); drawRoleBar(); drawRole(activeRole); $('#lastUpd').textContent=lastUpdated(); })
       .on('postgres_changes',{event:'*',schema:'public',table:'sections'},
-        async()=>{ catalog=await loadCatalog(); renderRoleBar(); renderRole(activeRole); })
+        async()=>{ catalog=await loadCatalog(); drawRoleBar(); drawRole(activeRole); })
       .on('postgres_changes',{event:'*',schema:'public',table:'items'},
-        async()=>{ catalog=await loadCatalog(); renderRoleBar(); renderRole(activeRole); })
+        async()=>{ catalog=await loadCatalog(); drawRoleBar(); drawRole(activeRole); })
       .subscribe();
   }
 
