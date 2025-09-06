@@ -117,18 +117,24 @@ input[type="checkbox"]{width:18px;height:18px}
 .rolebtn.green{background:#ecfdf5;border-color:#34d399}
 .rolebtn.green .sub{color:#065f46}
 
-/* Dato + sjekk-knapp */
+/* Dato + sjekk-knapp (kvadratisk boks) */
 .datecell{display:flex;gap:8px;align-items:center}
-.mini-check{
-  padding:8px 10px;font-size:14px;border-radius:12px;
-  background:#fff;border:2px solid #cbd5e1;color:#334155;line-height:1;
-  cursor:pointer;
-}
-.mini-check:hover{border-color:var(--accent)}
 
-/* BLÅ bare når ferdig */
+.mini-check{
+  width:36px;height:36px;             /* kvadratisk */
+  display:inline-flex;align-items:center;justify-content:center;
+  padding:0;border-radius:10px;        /* lett avrundet boks */
+  background:#fff;
+  border:2px solid #cbd5e1;            /* grå ramme */
+  color:#94a3b8;                       /* diskret hake */
+  line-height:1; cursor:pointer; user-select:none;
+}
+.mini-check:hover{border-color:#94a3b8}
+.mini-check:focus-visible{outline:3px solid rgba(37,99,235,.35)}
+
+/* BLÅ kun når ferdig */
 .mini-check[data-done="1"]{
-  background:var(--accent);
-  border-color:var(--accent-2);
-  color:#fff;
+  background:#2563eb;                  /* knall blå */
+  border-color:#1d4ed8;
+  color:#fff;                          /* hvit hake */
 }
