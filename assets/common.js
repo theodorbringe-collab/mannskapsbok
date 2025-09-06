@@ -1,10 +1,10 @@
 // assets/common.js
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
 
-// === DITT SUPABASE-PROSJEKT ===
+/* === DITT SUPABASE-PROSJEKT === */
 export const SUPABASE_URL  = "https://yqiqvtuxwvgbcfpsoyno.supabase.co";
-export const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlxaXF2dHV4d3ZnYmNmcHNveW5vIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY4NDI1NjcsImV4cCI6MjA3MjQxODU2N30.JKgTfWJ6HqJ96P_ghVYP5vasph12yuk36jlfEBN3PBA";
-// ===============================
+export const SUPABASE_ANON = "SETT_INN_DIN_ANON_PUBLIC_KEY_HER";
+/* ============================== */
 
 export const sb = createClient(SUPABASE_URL, SUPABASE_ANON);
 
@@ -83,16 +83,25 @@ export async function loadCatalog() {
   return out;
 }
 
+// NB: Map-nøkler er STRINGS for å unngå mismatch (uuid vs number)
 export async function loadMyProgress(uid) {
-  const { data, error } = await sb.from("progress").select("item_id,done,date,signed_by").eq("user_id", uid);
+  const { data, error } = await sb
+    .from("progress")
+    .select("item_id,done,date,signed_by")
+    .eq("user_id", uid);
   if (error) throw error;
-  const map = new Map(); (data||[]).forEach(r => map.set(r.item_id, r));
+  const map = new Map();
+  (data || []).forEach(r => map.set(String(r.item_id), r));
   return map;
 }
 
 export async function loadProgressFor(uid) {
-  const { data } = await sb.from("progress").select("item_id,done,date,signed_by").eq("user_id", uid);
-  const map = new Map(); (data||[]).forEach(r => map.set(r.item_id, r));
+  const { data } = await sb
+    .from("progress")
+    .select("item_id,done,date,signed_by")
+    .eq("user_id", uid);
+  const map = new Map();
+  (data || []).forEach(r => map.set(String(r.item_id), r));
   return map;
 }
 
@@ -115,7 +124,7 @@ export async function loadLogs(limit=200) {
 /* -----------------------------
    Skriv / endre
 --------------------------------*/
-export async function upsertProgress(itemId, patch, uid) {
+export async function upsertProgress(itemId, patch, uid){
   const row = {
     user_id: uid,
     item_id: itemId,
@@ -170,4 +179,14 @@ export async function moveItem(aId, aPos, bId, bPos) {
   if (r.error) throw r.error;
   r = await sb.from("items").update({ position:aPos }).eq("id", bId);
   if (r.error) throw r.error;
+}
+
+/* -----------------------------
+   Slett bruker (public-data)
+--------------------------------*/
+export async function deleteUserCascade(uid){
+  await sb.from('progress').delete().eq('user_id', uid);
+  await sb.from('comments').delete().or(`user_id.eq.${uid},author_id.eq.${uid}`);
+  await sb.from('logs').delete().eq('actor_id', uid);
+  await sb.from('profiles').delete().eq('id', uid);
 }
