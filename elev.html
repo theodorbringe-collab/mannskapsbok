@@ -18,27 +18,20 @@ import {
 } from "./assets/common.js";
 
 (function(){
-  const $ = (s,r=document)=>r.querySelector(s);
-  const $$ = (s,r=document)=>Array.from(r.querySelectorAll(s));
-  const esc = s => (s||'').replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
-  const today = ()=>new Date().toISOString().slice(0,10);
+  const $=(s,r=document)=>r.querySelector(s);
+  const $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
+  const esc=s=>(s||'').replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[m]));
+  const today=()=>new Date().toISOString().slice(0,10);
   const clsFor=(done,total)=> total===0||done===0?'gray':(done<total?'yellow':'green');
 
-  let me = null;
-  let catalog = {};
-  let myProg = new Map();
-  let activeRole = ROLES[0];
-  let rt = null;
+  let me=null, catalog={}, myProg=new Map(), activeRole=null, rt=null;
 
   async function init(){
     try{
       me = await ensureLocalUser();
-      [catalog, myProg] = await Promise.all([ loadCatalog(), loadMyProgress(me.id) ]);
-      renderShell();
-      renderHeader();
-      renderCards();
-      renderTabs(activeRole);
-      renderRole(activeRole);
+      [catalog, myProg] = await Promise.all([loadCatalog(), loadMyProgress(me.id)]);
+      activeRole = ROLES[0];
+      renderShell(); renderHeader(); renderCards(); renderTabs(activeRole); renderRole(activeRole);
       bindRealtime();
     }catch(e){
       $("#app").innerHTML = `<div class="box"><div class="hd">Feil</div><div class="bd" style="color:#b00020">${esc(e.message||e)}</div></div>`;
@@ -57,57 +50,42 @@ import {
   }
 
   function renderHeader(){
-    const hdr = $("#hdr");
+    const hdr=$("#hdr");
     hdr.innerHTML = `
       <span>Innlogget som <b>${esc(me.name||me.email)}</b></span>
       <a class="btn" href="./admin.html">Admin</a>
       <button id="btnEdit" class="btn">Endre navn/e-post</button>
       <button id="btnReset" class="btn">Nullstill lokal bruker</button>
     `;
-    $("#btnEdit").onclick = openEditDialog;
-    $("#btnReset").onclick = ()=>{
-      if(confirm("Slette lokal identitet på denne maskinen?")) {
-        localStorage.removeItem("mb_uid");
-        localStorage.removeItem("mb_email");
-        localStorage.removeItem("mb_name");
-        location.reload();
-      }
-    };
+    $("#btnEdit").onclick=openEditDialog;
+    $("#btnReset").onclick=()=>{ if(confirm("Slette lokal identitet på denne maskinen?")){ localStorage.clear(); location.reload(); } };
   }
 
   function openEditDialog(){
-    const box = document.createElement("div");
-    box.className="box";
-    box.innerHTML = `
+    const box=document.createElement("div"); box.className="box";
+    box.innerHTML=`
       <div class="hd">Oppretter av mannskapsboka</div>
       <div class="bd">
-        <div class="row" style="gap:10px;flex-wrap:wrap">
-          <input id="ownerName"  class="field" placeholder="Navn"  value="${esc(me.name||"")}"  style="max-width:260px">
-          <input id="ownerEmail" class="field" placeholder="E-post" value="${esc(me.email||"")}" style="max-width:260px">
+        <input id="ownerName"  class="field" placeholder="Navn"  value="${esc(me.name||"")}"  style="max-width:260px">
+        <input id="ownerEmail" class="field" placeholder="E-post" value="${esc(me.email||"")}" style="max-width:260px">
+        <div class="row" style="margin-top:8px">
           <button id="saveOwner" class="btn">Lagre</button>
           <button id="closeOwner" class="btn">Lukk</button>
         </div>
-      </div>
-    `;
-    $("#app").insertBefore(box, $("#cards"));
-    $("#saveOwner").onclick = async ()=>{
-      const name  = $("#ownerName").value.trim();
-      const email = $("#ownerEmail").value.trim();
-      await setLocalIdentity({ name, email });
-      me = await ensureLocalUser();
-      renderHeader();
-      alert("Lagret!");
-      box.remove();
+      </div>`;
+    $("#app").insertBefore(box,$("#cards"));
+    $("#saveOwner").onclick=async()=>{
+      const name=$("#ownerName").value.trim(), email=$("#ownerEmail").value.trim();
+      await setLocalIdentity({ name, email }); me=await ensureLocalUser(); renderHeader(); alert("Lagret!"); box.remove();
     };
-    $("#closeOwner").onclick = ()=> box.remove();
+    $("#closeOwner").onclick=()=>box.remove();
   }
 
   function renderCards(){
     const grid=$("#cards"); grid.innerHTML='';
     ROLES.forEach(role=>{
       const its=(catalog[role]||[]).flatMap(s=>s.items);
-      const total=its.length;
-      const done=its.filter(it=>myProg.get(it.id)?.done).length;
+      const total=its.length, done=its.filter(it=>myProg.get(it.id)?.done).length;
       const card=document.createElement('div'); card.className='card';
       const btn=document.createElement('button'); btn.className=clsFor(done,total);
       btn.innerHTML=`${role}<span class="sub">${done}/${total} fullført</span>`;
@@ -148,23 +126,17 @@ import {
             </tbody>
           </table>
         </div>
-      </div>
-    `).join('');
+      </div>`).join('');
 
     $$('#panel tbody tr').forEach(tr=>{
-      const id=+tr.getAttribute('data-id');
-      const d=tr.querySelector('input[type="date"]');
-      const s=tr.querySelector('input[type="text"]');
-      const c=tr.querySelector('input[type="checkbox"]');
+      const id=+tr.dataset.id, d=tr.querySelector('input[type="date"]'), s=tr.querySelector('input[type="text"]'), c=tr.querySelector('input[type="checkbox"]');
       async function commit(){
         if(c.checked && !d.value) d.value=today();
         try{
           await upsertProgress(id,{date:d.value||null,signed_by:(s.value||null),done:!!c.checked}, me.id);
           myProg.set(id,{ item_id:id, date:d.value||null, signed_by:s.value||null, done:!!c.checked });
-          renderCards(); // oppdater kort
-        }catch(e){
-          alert('Kunne ikke lagre: ' + (e.message||e));
-        }
+          renderCards();
+        }catch(e){ alert('Kunne ikke lagre: '+(e.message||e)); }
       }
       d.onchange=commit; s.onchange=commit; c.onchange=commit;
     });
@@ -173,12 +145,9 @@ import {
   function bindRealtime(){
     if(rt){ sb.removeChannel(rt); rt=null; }
     rt = sb.channel('mb-live')
-      .on('postgres_changes',{ event:'*', schema:'public', table:'progress', filter:`user_id=eq.${me.id}` },
-        async()=>{ myProg = await loadMyProgress(me.id); renderCards(); renderRole(activeRole); })
-      .on('postgres_changes',{ event:'*', schema:'public', table:'sections' },
-        async()=>{ catalog = await loadCatalog(); renderCards(); renderTabs(activeRole); renderRole(activeRole); })
-      .on('postgres_changes',{ event:'*', schema:'public', table:'items' },
-        async()=>{ catalog = await loadCatalog(); renderCards(); renderTabs(activeRole); renderRole(activeRole); })
+      .on('postgres_changes',{event:'*',schema:'public',table:'progress',filter:`user_id=eq.${me.id}`},async()=>{ myProg=await loadMyProgress(me.id); renderCards(); renderRole(activeRole); })
+      .on('postgres_changes',{event:'*',schema:'public',table:'sections'},async()=>{ catalog=await loadCatalog(); renderCards(); renderTabs(activeRole); renderRole(activeRole); })
+      .on('postgres_changes',{event:'*',schema:'public',table:'items'},async()=>{ catalog=await loadCatalog(); renderCards(); renderTabs(activeRole); renderRole(activeRole); })
       .subscribe();
   }
 
