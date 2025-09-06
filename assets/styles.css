@@ -121,3 +121,18 @@ input[type="checkbox"]{width:18px;height:18px}
 /* Toast (hvis du bruker det senere) */
 .toast{position:fixed;right:16px;bottom:16px;background:#111;color:#fff;padding:10px 12px;border-radius:10px;opacity:0;transform:translateY(6px);transition:.2s}
 .toast.show{opacity:1;transform:translateY(0)}
+/* Rolleknapper (FS/NK/...) i en enkel rad */
+.rolebar{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 12px}
+.rolebtn{
+  border:1px solid var(--line); background:#fff; color:var(--text);
+  border-radius:12px; padding:8px 10px; cursor:pointer; box-shadow:var(--shadow);
+}
+.rolebtn .sub{display:block;font-size:12px;color:var(--muted)}
+.rolebtn.gray{background:#fff}
+.rolebtn.yellow{background:#fff7ed}
+.rolebtn.green{background:#ecfdf5}
+
+/* Dato + “avkrysset punkt” til høyre */
+.datecell{display:flex;gap:6px;align-items:center}
+.mini-check{padding:6px 8px;font-size:13px;border-radius:10px}
+
