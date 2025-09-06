@@ -2,45 +2,38 @@
 <html lang="no">
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Mannskapsbok – Elev</title>
+  <title>Mannskapsbok – Admin</title>
   <link rel="stylesheet" href="./assets/styles.css">
   <style>
-    /* Sikkerhetsnett: gjør avkryss-knappen grå som default og blå når ferdig */
+    /* Mini logg-dropdown */
+    .drop-wrap{position:relative}
+    .drop-btn{position:relative}
+    .drop-panel{
+      position:absolute; top:42px; right:0; z-index:30;
+      width:min(520px,90vw); max-height:240px; overflow:auto;
+      background:var(--card); border:1px solid var(--line);
+      border-radius:12px; box-shadow:var(--shadow); display:none;
+    }
+    .drop-panel.open{display:block; animation:fadeIn .12s ease-out}
+    .drop-hd{position:sticky; top:0; z-index:1; display:flex; justify-content:space-between; gap:8px; align-items:center; padding:8px 10px; font-weight:700; background:#f8fafc; border-bottom:1px solid var(--line)}
+    .drop-bd{padding:8px 10px}
+    .log-row{display:flex; gap:8px; align-items:center; font-size:12px; color:var(--muted); padding:2px 0}
+    .log-row .msg{color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+    @keyframes fadeIn{from{opacity:0; transform:translateY(-2px)} to{opacity:1; transform:translateY(0)}}
+
+    /* Grå → blå “avkryss” */
     .mini-check{
       border:1px solid var(--line);
       background:#fff;
-      color:#94a3b8; /* grå hake */
+      color:#94a3b8;
       border-radius:14px;
       padding:8px 10px;
       line-height:1;
     }
     .mini-check:hover{filter:brightness(.98)}
-    .mini-check[data-done="1"]{
-      background:var(--accent);
-      color:#fff;
-      border-color:var(--accent);
-    }
-    /* Rolleknapper – gjør dem større og med luft */
-    .rolebar{display:flex;gap:12px;flex-wrap:wrap;margin:12px 0 16px}
-    .rolebtn{
-      min-width:170px;
-      padding:14px 16px;
-      border-radius:14px;
-      border:1px solid var(--line);
-      background:#fff;
-      box-shadow:var(--shadow);
-      cursor:pointer;
-      text-align:left;
-      font-weight:700;
-    }
-    .rolebtn .sub{display:block;margin-top:2px;font-weight:500;color:var(--muted);font-size:12px}
-    .rolebtn.gray{background:#fff}
-    .rolebtn.yellow{background:#fff7ed}
-    .rolebtn.yellow .sub{color:#b45309}
-    .rolebtn.green{background:#ecfdf5}
-    .rolebtn.green .sub{color:#065f46}
+    .mini-check[data-done="1"]{ background:var(--accent); color:#fff; border-color:var(--accent) }
 
-    /* Røde Kors toppstripe (samme stil som admin) */
+    /* Røde Kors header (samme som elev) */
     .rk-header{background:#fff;border-bottom:1px solid var(--line)}
     .rk-header .inner{max-width:1100px;margin:0 auto;padding:10px 16px;display:flex;align-items:center;gap:10px}
     .rk-logo{width:28px;height:28px;flex:0 0 28px}
@@ -70,191 +63,349 @@
 
   <div class="wrap" id="app">Laster …</div>
 
-  <script type="module">
-  import {
-    sb, ROLES,
-    ensureLocalUser, setLocalIdentity,
-    loadCatalog, loadMyProgress, upsertProgress
-  } from "./assets/common.js";
+<script type="module">
+import {
+  sb, ROLES,
+  ensureLocalUser,
+  listUsers, loadCatalog, loadProgressFor, loadComments, loadLogs,
+  upsertProgress, addComment,
+  addSection, updateSectionTitle, moveSection, deleteSection,
+  addItem, editItem, deleteItem, moveItem
+} from "./assets/common.js";
 
-  (function(){
-    const $=(s,r=document)=>r.querySelector(s);
-    const $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
-    const esc=s=>(s||'').replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[m]));
-    const today=()=>new Date().toISOString().slice(0,10);
-    const getProg=(map,id)=> map.get(id) ?? map.get(String(id)) ?? map.get(Number(id));
+(function(){
+  const $=(s,r=document)=>r.querySelector(s);
+  const $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
+  const esc=s=>(s||"").replace(/[&<>"]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[m]));
+  const today=()=>new Date().toISOString().slice(0,10);
+  const getProg=(map,id)=> map.get(id) ?? map.get(String(id)) ?? map.get(Number(id));
 
-    const clsFor=(done,total)=> total===0||done===0?'gray':(done<total?'yellow':'green');
+  let me=null, users=[], catalog={}, selUserId=null, selUserProg=new Map(), rt=null;
 
-    let me=null, catalog={}, myProg=new Map(), activeRole=ROLES[0], rt=null;
-
-    function lastUpdatedFromProgress(){
-      let d=null;
-      for(const v of myProg.values()){
-        if(v?.date){ const t=new Date(v.date); if(!d || t>d) d=t; }
-      }
-      return d ? d.toLocaleDateString('no-NO') : '—';
+  async function init(){
+    try{
+      me = await ensureLocalUser();
+      [users, catalog] = await Promise.all([listUsers(), loadCatalog()]);
+      render(); bindRealtime();
+    }catch(e){
+      $('#app').innerHTML = `<div class="box"><div class="hd">Feil</div><div class="bd" style="color:#b00020">${esc(e.message||e)}</div></div>`;
+      console.error(e);
     }
+  }
 
-    async function init(){
-      try{
-        me = await ensureLocalUser();
-        [catalog, myProg] = await Promise.all([loadCatalog(), loadMyProgress(me.id)]);
-        render();
-        bindRealtime();
-      }catch(e){
-        $("#app").innerHTML = `<div class="box"><div class="hd">Feil</div><div class="bd" style="color:#b00020">${esc(e.message||e)}</div></div>`;
-        console.error(e);
-      }
-    }
-
-    function render(){
-      $("#app").innerHTML = `
-        <h1 style="margin-bottom:8px">Mannskapsbok</h1>
-
-        <div class="box" style="margin-bottom:12px">
-          <div class="bd">
-            <div class="row" style="gap:12px;flex-wrap:wrap">
-              <div style="min-width:160px"><span class="note">Navn</span><div><b id="meName">${esc(me.name||me.email)}</b></div></div>
-              <div class="row" style="gap:8px;flex-wrap:wrap">
-                <input id="ownerName"  class="field" placeholder="Endre navn"  value="${esc(me.name||'')}"  style="max-width:220px">
-                <input id="ownerEmail" class="field" placeholder="Endre e-post" value="${esc(me.email||'')}" style="max-width:240px">
-                <button id="saveOwner" class="btn">Oppdater</button>
+  function render(){
+    $('#app').innerHTML = `
+      <div class="row" style="justify-content:space-between">
+        <h1>Admin</h1>
+        <div class="row drop-wrap" id="logWrapBtn">
+          <button id="btnLog" class="btn drop-btn" aria-expanded="false" aria-controls="logDrop">Logg</button>
+          <div id="logDrop" class="drop-panel" role="region" aria-hidden="true">
+            <div class="drop-hd">
+              <span>Systemlogg</span>
+              <div class="row" style="gap:6px">
+                <button id="logRefresh" class="btn small">Oppdater</button>
+                <button id="logClose" class="btn small">Lukk</button>
               </div>
-              <span class="note" style="margin-left:auto">Sist oppdatert: <b id="lastUpd">${lastUpdatedFromProgress()}</b></span>
-              <a class="btn" href="./admin.html">Admin</a>
+            </div>
+            <div id="logList" class="drop-bd">—</div>
+          </div>
+          <a class="btn" href="./elev.html">← Til elev-siden</a>
+        </div>
+      </div>
+
+      <div class="split">
+        <div>
+          <div class="box">
+            <div class="hd">Brukere</div>
+            <div class="bd">
+              <input id="userSearch" class="field" placeholder="Søk navn/epost …" style="width:100%;margin-bottom:10px">
+              <ul id="userList" class="list"></ul>
+            </div>
+          </div>
+
+          <div class="box" style="margin-top:12px">
+            <div class="hd">Katalog (punkter)</div>
+            <div class="bd">
+              <div class="row" style="gap:8px;align-items:center;margin-bottom:8px">
+                <label>Rolle:
+                  <select id="catRole" class="field" style="min-width:160px">
+                    ${ROLES.map(r=>`<option value="${r}">${r}</option>`).join('')}
+                  </select>
+                </label>
+                <button id="addSec" class="btn small primary">+ Inndeling</button>
+              </div>
+              <div id="catWrap"></div>
             </div>
           </div>
         </div>
 
-        <div id="roleBar" class="rolebar"></div>
-        <div id="panel"></div>
-      `;
+        <div>
+          <div class="box">
+            <div class="hd">
+              <span id="selHdr">Velg en bruker</span>
+              <div class="row" style="gap:8px;margin-left:auto">
+                <label class="note"><input id="editToggle" type="checkbox" checked style="vertical-align:middle"> Rediger som admin</label>
+                <button id="btnDeleteUser" class="btn small" disabled>Slett bruker</button>
+              </div>
+            </div>
+            <div class="bd" id="userBook"><div class="note">Ingen valgt.</div></div>
+          </div>
 
-      $('#saveOwner').onclick=async()=>{
-        const name=$('#ownerName').value.trim(), email=$('#ownerEmail').value.trim();
-        await setLocalIdentity({ name, email });
-        me = await ensureLocalUser();
-        $('#meName').textContent = me.name||me.email;
-        showToast('Oppdatert');
+          <div class="box" style="margin-top:12px">
+            <div class="hd">Kommentarer</div>
+            <div class="bd">
+              <div class="row" style="gap:8px">
+                <input id="commentTxt" class="field" placeholder="Skriv kommentar til elev" style="flex:1;min-width:240px">
+                <button id="addComment" class="btn small">Legg til</button>
+              </div>
+              <ul id="commentList" class="list" style="margin-top:8px;max-height:220px"></ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+
+    // logg dropdown
+    $('#btnLog').onclick    = async (e)=>{ e.stopPropagation(); await toggleLog(true); };
+    $('#logRefresh').onclick= async (e)=>{ e.stopPropagation(); await fillLogList(); };
+    $('#logClose').onclick  = (e)=>{ e.stopPropagation(); toggleLog(false); };
+    document.addEventListener('click',(ev)=>{
+      const drop = $('#logDrop'); const wrap=$('#logWrapBtn');
+      if(drop.classList.contains('open') && !wrap.contains(ev.target)){ toggleLog(false); }
+    });
+
+    $('#userSearch').oninput = drawUsers;
+    $('#catRole').onchange   = drawCatalogEditor;
+    $('#addSec').onclick     = async()=>{
+      await addSection($('#catRole').value);
+      catalog = await loadCatalog();
+      drawCatalogEditor();
+    };
+
+    drawUsers();
+    drawCatalogEditor();
+  }
+
+  async function fillLogList(){
+    const entries = await loadLogs(150);
+    $('#logList').innerHTML = entries.map(l=>`
+      <div class="log-row">
+        <span class="note">${new Date(l.created_at).toLocaleTimeString('no-NO',{hour:'2-digit',minute:'2-digit'})}</span>
+        <span class="msg">${esc(l.message||'')}</span>
+      </div>
+    `).join('') || '<div class="note">Tom logg.</div>';
+  }
+  async function toggleLog(open){
+    const drop = $('#logDrop');
+    const willOpen = (open===true) ? true : (open===false ? false : !drop.classList.contains('open'));
+    if(willOpen){ await fillLogList(); }
+    drop.classList.toggle('open', willOpen);
+    $('#btnLog').setAttribute('aria-expanded', willOpen?'true':'false');
+    drop.setAttribute('aria-hidden', willOpen?'false':'true');
+  }
+
+  // — brukerliste —
+  async function drawUsers(){
+    const list = $('#userList');
+    const q = ($('#userSearch').value||'').toLowerCase();
+    const arr = users.filter(u => (u.name||'').toLowerCase().includes(q) || (u.email||'').toLowerCase().includes(q));
+    if(!arr.length){ list.innerHTML='<li><span class="note">Ingen brukere</span></li>'; return; }
+
+    list.innerHTML = arr.map(u=>`
+      <li data-id="${u.id}">
+        <div>
+          <div><b>${esc(u.name||u.email||u.id)}</b></div>
+          <div class="note">${esc(u.email||'')}</div>
+        </div>
+        <span class="badge" id="sum-${u.id}">…</span>
+      </li>
+    `).join('');
+
+    $$('#userList li').forEach(li => li.onclick = ()=> selectUser(li.getAttribute('data-id')));
+
+    // hent summer parallelt (raskere)
+    const total = Object.values(catalog).flatMap(secs=>secs.flatMap(s=>s.items)).length;
+    await Promise.allSettled(arr.map(async u=>{
+      const map = await loadProgressFor(u.id);
+      let done=0; for(const v of map.values()) if(v?.done) done++;
+      const chip = $(`#sum-${u.id}`); if(chip) chip.textContent = `${done}/${total}`;
+    }));
+  }
+
+  // — katalog-editor —
+  async function drawCatalogEditor(){
+    const role=$('#catRole').value; const secs=catalog[role]||[]; const wrap=$('#catWrap');
+    if(!secs.length){ wrap.innerHTML='<div class="note">Ingen inndelinger. Trykk “+ Inndeling”.</div>'; return; }
+
+    wrap.innerHTML = secs.map((s,si)=>`
+      <div class="box" style="margin-bottom:10px">
+        <div class="hd">
+          <div class="row" style="gap:8px;align-items:center">
+            <span class="note">${si+1}</span>
+            <input class="field secTitle" data-si="${si}" value="${esc(s.title)}" style="min-width:220px">
+            <button class="btn small" data-act="secUp" data-si="${si}">↑</button>
+            <button class="btn small" data-act="secDown" data-si="${si}">↓</button>
+            <button class="btn small" data-act="secDel" data-si="${si}">Slett</button>
+            <span class="note" style="margin-left:auto">Nytt punkt</span>
+            <input class="field newItem" data-si="${si}" placeholder="Beskrivelse …" style="min-width:260px">
+            <button class="btn small primary" data-act="addItem" data-si="${si}">+ Legg til</button>
+          </div>
+        </div>
+        <div class="bd">
+          <ul class="list">
+            ${(s.items||[]).map((it,ii)=>`
+              <li data-si="${si}" data-ii="${ii}">
+                <span class="muted">${esc(it.text)}</span>
+                <div class="row" style="gap:6px">
+                  <button class="btn small" data-act="itUp">↑</button>
+                  <button class="btn small" data-act="itDown">↓</button>
+                  <button class="btn small" data-act="itEdit">Rediger</button>
+                  <button class="btn small" data-act="itDel">Slett</button>
+                </div>
+              </li>`).join('')}
+          </ul>
+        </div>
+      </div>
+    `).join('');
+
+    $$('#catWrap .secTitle').forEach(inp=>{
+      inp.onchange=async()=>{ const si=+inp.dataset.si; await updateSectionTitle(secs[si].id, inp.value.trim()||secs[si].title); catalog=await loadCatalog(); drawCatalogEditor(); };
+    });
+    $$('#catWrap [data-act]').forEach(btn=>{
+      btn.onclick=async()=>{
+        const act=btn.dataset.act; const si=+btn.dataset.si;
+        if(act==='secDel'){ if(!confirm('Slette inndeling?')) return; await deleteSection(secs[si].id); catalog=await loadCatalog(); drawCatalogEditor(); return; }
+        if(act==='secUp')  { if(si>0){ await moveSection(secs[si].id, secs[si].position, secs[si-1].id, secs[si-1].position); catalog=await loadCatalog(); drawCatalogEditor(); } return; }
+        if(act==='secDown'){ if(si<secs.length-1){ await moveSection(secs[si].id, secs[si].position, secs[si+1].id, secs[si+1].position); catalog=await loadCatalog(); drawCatalogEditor(); } return; }
+        if(act==='addItem'){ const inp=$(`#catWrap .newItem[data-si="${si}"]`); const txt=(inp.value||'').trim(); if(!txt) return; await addItem(secs[si].id, txt); inp.value=''; catalog=await loadCatalog(); drawCatalogEditor(); return; }
       };
+    });
 
-      renderRoleBar();
-      renderRole(activeRole);
-    }
+    $$('#catWrap li [data-act]').forEach(btn=>{
+      btn.onclick=async()=>{
+        const li=btn.closest('li'); const si=+li.dataset.si; const ii=+li.dataset.ii; const s=catalog[$('#catRole').value][si]; const it=s.items[ii];
+        if(btn.dataset.act==='itUp'){ if(ii>0){ await moveItem(it.id, it.position, s.items[ii-1].id, s.items[ii-1].position); catalog=await loadCatalog(); drawCatalogEditor(); } }
+        if(btn.dataset.act==='itDown'){ if(ii<s.items.length-1){ await moveItem(it.id, it.position, s.items[ii+1].id, s.items[ii+1].position); catalog=await loadCatalog(); drawCatalogEditor(); } }
+        if(btn.dataset.act==='itEdit'){ const nt=prompt('Rediger beskrivelse:', it.text); if(nt!=null){ await editItem(it.id, nt.trim()); catalog=await loadCatalog(); drawCatalogEditor(); } }
+        if(btn.dataset.act==='itDel'){ if(!confirm('Slette punkt?')) return; await deleteItem(it.id); catalog=await loadCatalog(); drawCatalogEditor(); }
+      };
+    });
+  }
 
-    function renderRoleBar(){
-      const host=$('#roleBar'); host.innerHTML='';
-      ROLES.forEach(role=>{
-        const its=(catalog[role]||[]).flatMap(s=>s.items);
-        const total=its.length;
-        let done=0;
-        for(const it of its){
-          const pr=getProg(myProg, it.id);
-          if(pr?.done) done++;
-        }
-        const b=document.createElement('button');
-        b.className=`rolebtn ${clsFor(done,total)}`;
-        b.innerHTML = `${role}<span class="sub">${done}/${total} fullført</span>`;
-        b.onclick=()=>{ activeRole=role; renderRole(activeRole); };
-        host.appendChild(b);
-      });
-    }
+  // — velg bruker og rediger bok —
+  async function selectUser(uid){
+    selUserId = uid;
+    const u = users.find(x=>x.id===uid);
+    if(!u){ $('#userBook').innerHTML='<div class="note">Fant ikke bruker.</div>'; return; }
 
-    function renderRole(role){
-      const panel=$("#panel"); const secs=catalog[role]||[];
-      if(!secs.length){ panel.innerHTML='<div class="box"><div class="bd">Ingen punkter.</div></div>'; return; }
+    selUserProg = await loadProgressFor(uid);
+    $('#selHdr').textContent = u.name || u.email || u.id;
+    $('#btnDeleteUser').disabled = false;
 
-      panel.innerHTML = secs.map((s,si)=>`
-        <div class="box" style="margin-bottom:14px">
-          <div class="hd">${esc(s.title)}</div>
+    await renderUserBook(uid, $('#editToggle').checked);
+    await drawComments(uid);
+
+    $('#editToggle').onchange = ()=> renderUserBook(uid, $('#editToggle').checked);
+    $('#addComment').onclick = async ()=>{
+      const t=($('#commentTxt').value||'').trim(); if(!t) return;
+      await addComment(uid, t, me.id); $('#commentTxt').value=''; await drawComments(uid);
+    };
+    $('#btnDeleteUser').onclick = ()=> deleteUser(uid);
+  }
+
+  async function renderUserBook(uid, editable){
+    const el = $('#userBook');
+    const html = ROLES.map(role=>{
+      const secs=catalog[role]||[]; if(!secs.length) return '';
+      return `
+        <div class="box" style="margin-bottom:12px">
+          <div class="hd">${role}</div>
           <div class="bd">
             <table>
-              <thead>
-                <tr>
-                  <th style="width:60px">#</th>
-                  <th>Jeg kan dette</th>
-                  <th style="width:280px">Sjekket ut av</th>
-                  <th style="width:210px">Dato</th>
-                </tr>
-              </thead>
+              <thead><tr><th style="width:60px">#</th><th>Beskrivelse</th><th style="width:240px">Sjekket ut av</th><th style="width:200px">Dato</th></tr></thead>
               <tbody>
-                ${s.items.map((it,pi)=>{
-                  const pr=getProg(myProg, it.id)||{};
-                  const done = !!pr.done;
-                  return `<tr data-id="${String(it.id)}">
-                    <td>${si+1}.${pi+1}</td>
-                    <td>${esc(it.text)}</td>
-                    <td><input type="text" class="field" value="${esc(pr.signed_by||'')}" placeholder="Skriv inn navn" style="width:100%"></td>
-                    <td class="datecell">
-                      <input type="date" class="field" value="${pr.date||''}">
-                      <button class="mini-check" data-done="${done?1:0}" title="Avkryss">✓</button>
-                    </td>
-                  </tr>`;
-                }).join('')}
+                ${secs.map((s,si)=> s.items.map((it,ii)=>{
+                  const key = String(it.id);
+                  const pr  = getProg(selUserProg, key)||{};
+                  const dis = editable?'':'disabled';
+                  return `
+                    <tr data-id="${key}">
+                      <td>${si+1}.${ii+1}</td>
+                      <td>${esc(it.text)}</td>
+                      <td><input ${dis} class="field" type="text" value="${esc(pr.signed_by||'')}" placeholder="Skriv inn navn" style="width:100%"></td>
+                      <td class="datecell">
+                        <input ${dis} class="field" type="date" value="${pr.date||''}">
+                        <button ${dis} class="mini-check" data-done="${pr.done?1:0}" title="Avkryss">✓</button>
+                      </td>
+                    </tr>`;
+                }).join('')).join('')}
               </tbody>
             </table>
           </div>
-        </div>
-      `).join('');
+        </div>`;
+    }).join('') || '<div class="note">Ingen punkter i katalogen.</div>';
 
-      // hendelser for alle rader
-      $$('#panel tbody tr').forEach(tr=>{
-        const idStr = tr.getAttribute('data-id'); // alltid string i DOM
-        const idNum = Number(idStr);              // trygt for DB
-        const d=tr.querySelector('input[type="date"]');
-        const s=tr.querySelector('input[type="text"]');
-        const b=tr.querySelector('.mini-check');
+    el.innerHTML = html;
 
-        async function commit(kind=null){
-          let rec = getProg(myProg, idStr) || {};
+    if(editable){
+      $$('#userBook tbody tr').forEach(tr=>{
+        const idStr = tr.getAttribute('data-id');
+        const idNum = Number(idStr);
+        const d  = tr.querySelector('input[type="date"]');
+        const s  = tr.querySelector('input[type="text"]');
+        const b  = tr.querySelector('.mini-check');
+
+        async function commit(action=null){
+          let rec = getProg(selUserProg, idStr) || {};
           let done = !!rec.done;
-
-          if(kind==='toggle'){
-            done = !done;
-            if(done && !d.value) d.value = today();
-            if(!done) d.value = '';
-          }
-          try{
-            // Bruk *nummer* for item_id for å unngå null/undefined-problemer
-            await upsertProgress(idNum, { date:d.value||null, signed_by:(s.value||null), done }, me.id);
-            myProg.set(idNum, { item_id:idNum, date:d.value||null, signed_by:s.value||null, done });
-            b.setAttribute('data-done', done ? '1':'0');
-            renderRoleBar();
-            $('#lastUpd').textContent = lastUpdatedFromProgress();
-          }catch(e){
-            alert('Kunne ikke lagre: ' + (e.message||e));
-          }
+          if(action==='toggle'){ done=!done; if(done && !d.value) d.value=today(); if(!done) d.value=''; }
+          await upsertProgress(idNum,{ date:d.value||null, signed_by:(s.value||null), done }, uid);
+          selUserProg.set(idNum,{ item_id:idNum, date:d.value||null, signed_by:s.value||null, done });
+          b.setAttribute('data-done', done ? '1':'0');
         }
-
-        s.onchange = ()=>commit();
-        d.onchange = ()=>commit();
-        b.onclick  = ()=>commit('toggle');
+        s.onchange=()=>commit();
+        d.onchange=()=>commit();
+        b.onclick =()=>commit('toggle');
       });
     }
+  }
 
-    // enkel toast
-    function showToast(msg){
-      let t=document.getElementById('toast');
-      if(!t){ t=document.createElement('div'); t.id='toast'; t.className='toast'; document.body.appendChild(t); }
-      t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),1200);
-    }
+  async function drawComments(uid){
+    const arr = await loadComments(uid);
+    $('#commentList').innerHTML = arr.map(c=>`
+      <li><span>${esc(c.text)}</span><span class="note">${new Date(c.created_at).toLocaleString('no-NO')}</span></li>
+    `).join('') || '<li><span class="note">Ingen kommentarer.</span></li>';
+  }
 
-    // Realtime (oppdaterer elevsiden når admin gjør endringer)
-    function bindRealtime(){
-      if(rt){ sb.removeChannel(rt); rt=null; }
-      rt = sb.channel('mb-live-elev')
-        .on('postgres_changes',{event:'*',schema:'public',table:'progress',filter:`user_id=eq.${me.id}`},
-          async()=>{ myProg=await loadMyProgress(me.id); renderRoleBar(); renderRole(activeRole); $('#lastUpd').textContent = lastUpdatedFromProgress(); })
-        .on('postgres_changes',{event:'*',schema:'public',table:'sections'},
-          async()=>{ catalog=await loadCatalog(); renderRoleBar(); renderRole(activeRole); })
-        .on('postgres_changes',{event:'*',schema:'public',table:'items'},
-          async()=>{ catalog=await loadCatalog(); renderRoleBar(); renderRole(activeRole); })
-        .subscribe();
-    }
+  async function deleteUser(uid){
+    const u = users.find(x=>x.id===uid);
+    if(!confirm(`Slette bruker "${u?.name||u?.email||uid}"? Dette sletter progresjon, kommentarer, logger og profil.`)) return;
+    await sb.from('progress').delete().eq('user_id', uid);
+    await sb.from('comments').delete().or(`user_id.eq.${uid},author_id.eq.${uid}`);
+    await sb.from('logs').delete().eq('actor_id', uid);
+    await sb.from('profiles').delete().eq('id', uid);
+    users = users.filter(x=>x.id!==uid);
+    selUserId=null; selUserProg=new Map();
+    render();
+  }
 
-    init();
-  })();
-  </script>
+  function bindRealtime(){
+    if(rt){ sb.removeChannel(rt); rt=null; }
+    rt = sb.channel('mb-live-admin')
+      .on('postgres_changes',{event:'*',schema:'public',table:'sections'}, async()=>{ catalog=await loadCatalog(); drawCatalogEditor(); if(selUserId) renderUserBook(selUserId, $('#editToggle').checked); })
+      .on('postgres_changes',{event:'*',schema:'public',table:'items'},    async()=>{ catalog=await loadCatalog(); drawCatalogEditor(); if(selUserId) renderUserBook(selUserId, $('#editToggle').checked); })
+      .on('postgres_changes',{event:'*',schema:'public',table:'progress'}, async(payload)=>{
+        const row = payload.new || payload.old;
+        if(selUserId && row?.user_id===selUserId){
+          selUserProg = await loadProgressFor(selUserId);
+          renderUserBook(selUserId, $('#editToggle').checked);
+        }
+      })
+      .subscribe();
+  }
+
+  init();
+})();
+</script>
 </body>
 </html>
