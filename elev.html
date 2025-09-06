@@ -85,13 +85,13 @@ import {
     renderRole(activeRole);
   }
 
-  // === OPPDATERT: aktiv klasse + re-tegning for tydelig farge/valg ===
+  // Aktiv knapp + riktig farge
   function renderRoleBar(){
     const host=$('#roleBar'); host.innerHTML='';
     ROLES.forEach(role=>{
       const its=(catalog[role]||[]).flatMap(s=>s.items);
       const total=its.length;
-      const done=its.filter(it=>myProg.get(it.id)?.done).length;
+      const done=its.filter(it=>myProg.get(String(it.id))?.done).length;
 
       const b=document.createElement('button');
       b.className=`rolebtn ${clsFor(done,total)}${role===activeRole?' active':''}`;
@@ -122,7 +122,7 @@ import {
             </thead>
             <tbody>
               ${s.items.map((it,pi)=>{
-                const pr=myProg.get(it.id)||{};
+                const pr=myProg.get(String(it.id))||{};
                 return `<tr data-id="${it.id}">
                   <td>${si+1}.${pi+1}</td>
                   <td>${esc(it.text)}</td>
@@ -141,18 +141,18 @@ import {
 
     // hendelser
     $$('#panel tbody tr').forEach(tr=>{
-      const id=+tr.dataset.id;
+      const id=tr.getAttribute('data-id'); // behold som STRING
       const d=tr.querySelector('input[type="date"]');
       const s=tr.querySelector('input[type="text"]');
       const checkBtn=tr.querySelector('.mini-check');
 
       async function commit(setDone=null){
-        let done = myProg.get(id)?.done || false;
+        let done = myProg.get(String(id))?.done || false;
         if(setDone!==null) done = setDone;
         if(done && !d.value) d.value = today();
         try{
           await upsertProgress(id,{date:d.value||null,signed_by:(s.value||null),done}, me.id);
-          myProg.set(id,{ item_id:id, date:d.value||null, signed_by:s.value||null, done });
+          myProg.set(String(id),{ item_id:id, date:d.value||null, signed_by:s.value||null, done });
           renderRoleBar(); // oppdater farge og teller
           $('#lastUpd').textContent = lastUpdatedFromProgress();
         }catch(e){
