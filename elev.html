@@ -29,3 +29,27 @@ import { ensureLocalUser } from "./assets/common.js";
 </script>
 </body>
 </html>
+import { ensureLocalUser, setLocalIdentity } from "./assets/common.js";
+// ...
+const me = await ensureLocalUser();
+app.innerHTML = `
+  <h1>Elev OK</h1>
+  <p>Du er registrert lokalt som <b>${me.name}</b> (${me.email})</p>
+  <div style="margin:12px 0;padding:10px;border:1px solid #eee;border-radius:8px;">
+    <div style="font-weight:700;margin-bottom:6px">Oppretter av mannskapsboka</div>
+    <input id="ownerName"  class="field" placeholder="Navn"  value="${me.name}"  style="max-width:260px">
+    <input id="ownerEmail" class="field" placeholder="E-post" value="${me.email}" style="max-width:260px">
+    <button id="saveOwner" class="btn">Lagre</button>
+  </div>
+  <p class="note">Dette er en enkel testside. Når denne virker kan vi bytte til full elev-UI.</p>
+  <p><a class="btn" href="./admin.html">Gå til Admin</a></p>
+`;
+
+document.getElementById('saveOwner').onclick = async () => {
+  const name  = document.getElementById('ownerName').value.trim();
+  const email = document.getElementById('ownerEmail').value.trim();
+  await setLocalIdentity({ name, email });
+  alert('Lagret!');
+  location.reload();
+};
+
