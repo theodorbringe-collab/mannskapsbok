@@ -5,61 +5,28 @@
   <title>Mannskapsbok – Admin</title>
   <link rel="stylesheet" href="./assets/styles.css">
   <style>
-    /* Mini logg-dropdown */
+    /* Kompakt logg-dropdown */
     .drop-wrap{position:relative}
-    .drop-btn{position:relative}
     .drop-panel{
       position:absolute; top:42px; right:0; z-index:30;
-      width:min(520px,90vw); max-height:240px; overflow:auto;
+      width:min(520px,90vw); max-height:220px; overflow:auto;
       background:var(--card); border:1px solid var(--line);
       border-radius:12px; box-shadow:var(--shadow); display:none;
     }
-    .drop-panel.open{display:block; animation:fadeIn .12s ease-out}
-    .drop-hd{position:sticky; top:0; z-index:1; display:flex; justify-content:space-between; gap:8px; align-items:center; padding:8px 10px; font-weight:700; background:#f8fafc; border-bottom:1px solid var(--line)}
+    .drop-panel.open{display:block}
+    .drop-hd{position:sticky; top:0; display:flex; justify-content:space-between; gap:8px; padding:8px 10px; font-weight:700; background:#f8fafc; border-bottom:1px solid var(--line)}
     .drop-bd{padding:8px 10px}
     .log-row{display:flex; gap:8px; align-items:center; font-size:12px; color:var(--muted); padding:2px 0}
     .log-row .msg{color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
-    @keyframes fadeIn{from{opacity:0; transform:translateY(-2px)} to{opacity:1; transform:translateY(0)}}
-
-    /* Grå → blå “avkryss” */
-    .mini-check{
-      border:1px solid var(--line);
-      background:#fff;
-      color:#94a3b8;
-      border-radius:14px;
-      padding:8px 10px;
-      line-height:1;
-    }
-    .mini-check:hover{filter:brightness(.98)}
-    .mini-check[data-done="1"]{ background:var(--accent); color:#fff; border-color:var(--accent) }
-
-    /* Røde Kors header (samme som elev) */
-    .rk-header{background:#fff;border-bottom:1px solid var(--line)}
-    .rk-header .inner{max-width:1100px;margin:0 auto;padding:10px 16px;display:flex;align-items:center;gap:10px}
-    .rk-logo{width:28px;height:28px;flex:0 0 28px}
-    .rk-brand{font-weight:800;font-size:20px;letter-spacing:.2px}
-    .rk-brand .light{font-weight:600;margin-left:6px}
-    .rk-subbar{background:#ff1a1a;color:#fff}
-    .rk-subbar .inner{max-width:1100px;margin:0 auto;padding:6px 16px;font-size:13px}
-    .rk-subbar a{color:#fff;text-decoration:none}
-    .rk-subbar a:hover{text-decoration:underline}
   </style>
 </head>
 <body>
-
-  <!-- Røde Kors header -->
-  <header class="rk-header">
-    <div class="inner">
-      <svg class="rk-logo" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-        <rect x="9" y="2" width="6" height="20" fill="#ff1a1a"></rect>
-        <rect x="2" y="9" width="20" height="6" fill="#ff1a1a"></rect>
-      </svg>
-      <div class="rk-brand">Røde Kors <span class="light">Båten Bjørgvin</span></div>
+  <div class="header">
+    <div class="bar">
+      <div class="brand">Røde Kors<span class="sub">Båten Bjørgvin</span></div>
     </div>
-    <nav class="rk-subbar"><div class="inner">
-      <a href="./elev.html">Mannskapsbok</a><span aria-hidden="true"> | </span><a href="./admin.html">Admin</a>
-    </div></nav>
-  </header>
+    <div class="redstripe"></div>
+  </div>
 
   <div class="wrap" id="app">Laster …</div>
 
@@ -78,7 +45,6 @@ import {
   const $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
   const esc=s=>(s||"").replace(/[&<>"]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[m]));
   const today=()=>new Date().toISOString().slice(0,10);
-  const getProg=(map,id)=> map.get(id) ?? map.get(String(id)) ?? map.get(Number(id));
 
   let me=null, users=[], catalog={}, selUserId=null, selUserProg=new Map(), rt=null;
 
@@ -98,8 +64,8 @@ import {
       <div class="row" style="justify-content:space-between">
         <h1>Admin</h1>
         <div class="row drop-wrap" id="logWrapBtn">
-          <button id="btnLog" class="btn drop-btn" aria-expanded="false" aria-controls="logDrop">Logg</button>
-          <div id="logDrop" class="drop-panel" role="region" aria-hidden="true">
+          <button id="btnLog" class="btn">Logg</button>
+          <div id="logDrop" class="drop-panel" aria-hidden="true">
             <div class="drop-hd">
               <span>Systemlogg</span>
               <div class="row" style="gap:6px">
@@ -176,11 +142,7 @@ import {
 
     $('#userSearch').oninput = drawUsers;
     $('#catRole').onchange   = drawCatalogEditor;
-    $('#addSec').onclick     = async()=>{
-      await addSection($('#catRole').value);
-      catalog = await loadCatalog();
-      drawCatalogEditor();
-    };
+    $('#addSec').onclick     = async()=>{ await addSection($('#catRole').value); catalog = await loadCatalog(); drawCatalogEditor(); };
 
     drawUsers();
     drawCatalogEditor();
@@ -197,14 +159,11 @@ import {
   }
   async function toggleLog(open){
     const drop = $('#logDrop');
-    const willOpen = (open===true) ? true : (open===false ? false : !drop.classList.contains('open'));
-    if(willOpen){ await fillLogList(); }
-    drop.classList.toggle('open', willOpen);
-    $('#btnLog').setAttribute('aria-expanded', willOpen?'true':'false');
-    drop.setAttribute('aria-hidden', willOpen?'false':'true');
+    if(open){ await fillLogList(); drop.classList.add('open'); drop.setAttribute('aria-hidden','false'); }
+    else{ drop.classList.remove('open'); drop.setAttribute('aria-hidden','true'); }
   }
 
-  // — brukerliste —
+  // Brukere
   async function drawUsers(){
     const list = $('#userList');
     const q = ($('#userSearch').value||'').toLowerCase();
@@ -223,16 +182,15 @@ import {
 
     $$('#userList li').forEach(li => li.onclick = ()=> selectUser(li.getAttribute('data-id')));
 
-    // hent summer parallelt (raskere)
-    const total = Object.values(catalog).flatMap(secs=>secs.flatMap(s=>s.items)).length;
-    await Promise.allSettled(arr.map(async u=>{
+    for(const u of arr){
       const map = await loadProgressFor(u.id);
+      const total = Object.values(catalog).flatMap(secs=>secs.flatMap(s=>s.items)).length;
       let done=0; for(const v of map.values()) if(v?.done) done++;
       const chip = $(`#sum-${u.id}`); if(chip) chip.textContent = `${done}/${total}`;
-    }));
+    }
   }
 
-  // — katalog-editor —
+  // Katalog-editor
   async function drawCatalogEditor(){
     const role=$('#catRole').value; const secs=catalog[role]||[]; const wrap=$('#catWrap');
     if(!secs.length){ wrap.innerHTML='<div class="note">Ingen inndelinger. Trykk “+ Inndeling”.</div>'; return; }
@@ -292,7 +250,7 @@ import {
     });
   }
 
-  // — velg bruker og rediger bok —
+  // Velg bruker og rediger bok
   async function selectUser(uid){
     selUserId = uid;
     const u = users.find(x=>x.id===uid);
@@ -306,10 +264,7 @@ import {
     await drawComments(uid);
 
     $('#editToggle').onchange = ()=> renderUserBook(uid, $('#editToggle').checked);
-    $('#addComment').onclick = async ()=>{
-      const t=($('#commentTxt').value||'').trim(); if(!t) return;
-      await addComment(uid, t, me.id); $('#commentTxt').value=''; await drawComments(uid);
-    };
+    $('#addComment').onclick = async ()=>{ const t=($('#commentTxt').value||'').trim(); if(!t) return; await addComment(uid, t, me.id); $('#commentTxt').value=''; await drawComments(uid); };
     $('#btnDeleteUser').onclick = ()=> deleteUser(uid);
   }
 
@@ -326,7 +281,7 @@ import {
               <tbody>
                 ${secs.map((s,si)=> s.items.map((it,ii)=>{
                   const key = String(it.id);
-                  const pr  = getProg(selUserProg, key)||{};
+                  const pr  = selUserProg.get(key)||{};
                   const dis = editable?'':'disabled';
                   return `
                     <tr data-id="${key}">
@@ -349,18 +304,16 @@ import {
 
     if(editable){
       $$('#userBook tbody tr').forEach(tr=>{
-        const idStr = tr.getAttribute('data-id');
-        const idNum = Number(idStr);
+        const id = tr.getAttribute('data-id'); // streng
         const d  = tr.querySelector('input[type="date"]');
         const s  = tr.querySelector('input[type="text"]');
         const b  = tr.querySelector('.mini-check');
 
         async function commit(action=null){
-          let rec = getProg(selUserProg, idStr) || {};
-          let done = !!rec.done;
+          let done = !!selUserProg.get(String(id))?.done;
           if(action==='toggle'){ done=!done; if(done && !d.value) d.value=today(); if(!done) d.value=''; }
-          await upsertProgress(idNum,{ date:d.value||null, signed_by:(s.value||null), done }, uid);
-          selUserProg.set(idNum,{ item_id:idNum, date:d.value||null, signed_by:s.value||null, done });
+          await upsertProgress(id,{ date:d.value||null, signed_by:(s.value||null), done }, uid);
+          selUserProg.set(String(id),{ item_id:id, date:d.value||null, signed_by:s.value||null, done });
           b.setAttribute('data-done', done ? '1':'0');
         }
         s.onchange=()=>commit();
