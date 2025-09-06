@@ -6,14 +6,6 @@
   <link rel="stylesheet" href="./assets/styles.css">
 </head>
 <body>
-  <!-- Røde-Kors header -->
-  <div class="header">
-    <div class="bar">
-      <div class="brand">Røde Kors<span class="sub">Båten Bjørgvin</span></div>
-    </div>
-    <div class="redstripe"></div>
-  </div>
-
   <div class="wrap" id="app">Laster …</div>
 
 <script type="module">
@@ -29,14 +21,13 @@ import {
   const esc=s=>(s||'').replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[m]));
   const today=()=>new Date().toISOString().slice(0,10);
   const clsFor=(done,total)=> total===0||done===0?'gray':(done<total?'yellow':'green');
-  const getProg=(map,id)=> map.get(String(id)) || map.get(Number(id)) || null;
 
   let me=null, catalog={}, myProg=new Map(), activeRole=ROLES[0], rt=null;
 
-  const lastUpdated = ()=>{
+  function lastUpdatedFromProgress(){
     let d=null; for(const v of myProg.values()){ if(v?.date){ const t=new Date(v.date); if(!d||t>d) d=t; } }
     return d ? d.toLocaleDateString('no-NO') : '—';
-  };
+  }
 
   async function init(){
     try{
@@ -51,23 +42,27 @@ import {
 
   function render(){
     $("#app").innerHTML = `
-      <div class="row" style="justify-content:space-between">
-        <h1>Mannskapsbok</h1>
+      <div class="rk-header">
+        <div class="rk-logo"></div>
+        <div class="rk-title">Røde Kors <span class="note" style="font-weight:700;color:#000">Båten Bjørgvin</span></div>
+      </div>
+      <div class="rk-subbar"></div>
+
+      <div class="row" style="justify-content:space-between;margin:10px 0 6px">
+        <h1 style="margin:0">Mannskapsbok</h1>
         <div class="row">
           <a class="btn" href="./admin.html">Admin</a>
-          <span class="note">Sist oppdatert: <b id="lastUpd">${lastUpdated()}</b></span>
         </div>
       </div>
 
-      <div class="box">
+      <div class="box" style="margin-bottom:12px">
         <div class="bd">
           <div class="row" style="gap:12px;flex-wrap:wrap">
             <div><span class="note">Navn</span><div><b id="meName">${esc(me.name||me.email)}</b></div></div>
-            <div class="row" style="gap:8px">
-              <input id="ownerName"  class="field" placeholder="Endre navn"  value="${esc(me.name||'')}"  style="max-width:220px">
-              <input id="ownerEmail" class="field" placeholder="Endre e-post" value="${esc(me.email||'')}" style="max-width:240px">
-              <button id="saveOwner" class="btn">Oppdater</button>
-            </div>
+            <input id="ownerName"  class="field" placeholder="Endre navn"  value="${esc(me.name||'')}"  style="max-width:220px">
+            <input id="ownerEmail" class="field" placeholder="Endre e-post" value="${esc(me.email||'')}" style="max-width:240px">
+            <button id="saveOwner" class="btn">Oppdater</button>
+            <span class="note" style="margin-left:auto">Sist oppdatert: <b id="lastUpd">${lastUpdatedFromProgress()}</b></span>
           </div>
         </div>
       </div>
@@ -78,31 +73,29 @@ import {
 
     $('#saveOwner').onclick=async()=>{
       const name=$('#ownerName').value.trim(), email=$('#ownerEmail').value.trim();
-      await setLocalIdentity({ name, email });
-      me = await ensureLocalUser();
+      await setLocalIdentity({ name, email }); me = await ensureLocalUser();
       $('#meName').textContent = me.name||me.email;
-      toast('Oppdatert');
     };
 
-    drawRoleBar();
-    drawRole(activeRole);
+    renderRoleBar();
+    renderRole(activeRole);
   }
 
-  function drawRoleBar(){
+  function renderRoleBar(){
     const host=$('#roleBar'); host.innerHTML='';
     ROLES.forEach(role=>{
       const its=(catalog[role]||[]).flatMap(s=>s.items);
       const total=its.length;
-      const done=its.filter(it=>getProg(myProg,it.id)?.done).length;
+      const done=its.filter(it=>myProg.get(String(it.id))?.done).length;
       const b=document.createElement('button');
       b.className=`rolebtn ${clsFor(done,total)}`;
       b.innerHTML = `${role}<span class="sub">${done}/${total} fullført</span>`;
-      b.onclick=()=>{ activeRole=role; drawRole(role); };
+      b.onclick=()=>{ activeRole=role; renderRole(activeRole); };
       host.appendChild(b);
     });
   }
 
-  function drawRole(role){
+  function renderRole(role){
     const panel=$("#panel"); const secs=catalog[role]||[];
     if(!secs.length){ panel.innerHTML='<div class="box"><div class="bd">Ingen punkter.</div></div>'; return; }
 
@@ -120,9 +113,9 @@ import {
               </tr>
             </thead>
             <tbody>
-              ${(s.items||[]).map((it,pi)=>{
-                const pr=getProg(myProg,it.id)||{};
-                return `<tr data-id="${it.id}">
+              ${s.items.map((it,pi)=>{
+                const pr=myProg.get(String(it.id))||{};
+                return `<tr data-item-id="${it.id}">
                   <td>${si+1}.${pi+1}</td>
                   <td>${esc(it.text)}</td>
                   <td><input class="field" type="text" value="${esc(pr.signed_by||'')}" placeholder="Skriv inn navn" style="width:100%"></td>
@@ -138,32 +131,25 @@ import {
       </div>
     `).join('');
 
-    // lagre-hendelser
+    // event-binding med robust itemId
     $$('#panel tbody tr').forEach(tr=>{
-      const itemId = tr.getAttribute('data-id'); // **streng!**
-      const d = tr.querySelector('input[type="date"]');
-      const s = tr.querySelector('input[type="text"]');
-      const b = tr.querySelector('button.mini-check');
+      const itemIdAttr = tr.getAttribute('data-item-id');
+      if(!itemIdAttr) return; // sikkerhet
+      const itemId = Number(itemIdAttr);
+
+      const d  = tr.querySelector('input[type="date"]');
+      const s  = tr.querySelector('input[type="text"]');
+      const b  = tr.querySelector('.mini-check');
 
       async function commit(action=null){
-        let rec  = getProg(myProg, itemId) || {};
-        let done = !!rec.done;
-
-        if(action==='toggle'){
-          done = !done;
-          if(done && !d.value) d.value = today();
-          if(!done) d.value = '';
-        }
-
         try{
+          let done = !!myProg.get(String(itemId))?.done;
+          if(action==='toggle'){ done = !done; if(done && !d.value) d.value = today(); if(!done) d.value=''; }
           await upsertProgress(itemId, { date:d.value||null, signed_by:(s.value||null), done }, me.id);
           myProg.set(String(itemId), { item_id:itemId, date:d.value||null, signed_by:s.value||null, done });
-          b.setAttribute('data-done', done ? '1':'0');
-          drawRoleBar();
-          $('#lastUpd').textContent = lastUpdated();
-        }catch(e){
-          alert('Kunne ikke lagre: ' + (e.message||e));
-        }
+          b.setAttribute('data-done', done ? '1' : '0');
+          renderRoleBar(); $('#lastUpd').textContent = lastUpdatedFromProgress();
+        }catch(e){ alert('Kunne ikke lagre: ' + (e.message||e)); }
       }
 
       s.onchange = ()=>commit();
@@ -172,23 +158,15 @@ import {
     });
   }
 
-  // Toast
-  function toast(msg){
-    let t=document.getElementById('toast');
-    if(!t){ t=document.createElement('div'); t.id='toast'; t.className='toast'; document.body.appendChild(t); }
-    t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),1200);
-  }
-
-  // Realtime
   function bindRealtime(){
     if(rt){ sb.removeChannel(rt); rt=null; }
     rt = sb.channel('mb-live-elev')
       .on('postgres_changes',{event:'*',schema:'public',table:'progress',filter:`user_id=eq.${me.id}`},
-        async()=>{ myProg=await loadMyProgress(me.id); drawRoleBar(); drawRole(activeRole); $('#lastUpd').textContent = lastUpdated(); })
+        async()=>{ myProg=await loadMyProgress(me.id); renderRoleBar(); renderRole(activeRole); $('#lastUpd').textContent=lastUpdatedFromProgress(); })
       .on('postgres_changes',{event:'*',schema:'public',table:'sections'},
-        async()=>{ catalog=await loadCatalog(); drawRoleBar(); drawRole(activeRole); })
+        async()=>{ catalog=await loadCatalog(); renderRoleBar(); renderRole(activeRole); })
       .on('postgres_changes',{event:'*',schema:'public',table:'items'},
-        async()=>{ catalog=await loadCatalog(); drawRoleBar(); drawRole(activeRole); })
+        async()=>{ catalog=await loadCatalog(); renderRoleBar(); renderRole(activeRole); })
       .subscribe();
   }
 
