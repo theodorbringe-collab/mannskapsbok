@@ -5,7 +5,7 @@
   --muted:#64748b;
   --line:#e5e7eb;
 
-  /* tydeligere farger */
+  /* tydelig palett */
   --accent:#2563eb;
   --accent-2:#1d4ed8;
   --good:#22c55e;
@@ -18,19 +18,13 @@
 
 *{box-sizing:border-box}
 html,body{height:100%}
-body{
-  margin:0;background:var(--bg);color:var(--text);
-  font:15px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sans-serif;
-}
-
+body{margin:0;background:var(--bg);color:var(--text);font:15px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sans-serif}
 a{color:var(--accent);text-decoration:none}
 a:hover{text-decoration:underline}
-
 h1{margin:8px 0 12px;font-size:28px;letter-spacing:.2px}
 h2,h3{margin:12px 0 8px}
 .wrap{max-width:1100px;margin:32px auto;padding:0 16px}
 
-/* smånyttige */
 .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 .note{color:var(--muted);font-size:12px}
 .tag{display:inline-block;background:#eef2ff;color:#3730a3;padding:4px 8px;border-radius:999px;font-size:12px}
@@ -39,19 +33,16 @@ h2,h3{margin:12px 0 8px}
 /* kort */
 .grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));margin:12px 0}
 .card{border-radius:16px;background:transparent}
-.card>button{
-  width:100%;border:0;cursor:pointer;padding:18px 16px;border-radius:16px;font-weight:700;
-  background:var(--card);box-shadow:var(--shadow);text-align:left;
-}
+.card>button{width:100%;border:0;cursor:pointer;padding:18px 16px;border-radius:16px;font-weight:700;background:var(--card);box-shadow:var(--shadow);text-align:left}
 .card .sub{display:block;margin-top:2px;font-weight:500;color:var(--muted);font-size:12px}
 .card>button:hover{transform:translateY(-1px);transition:.15s}
 
 /* statusfarger */
-.gray   {background:var(--card)}
-.yellow {background:#fffbeb}
+.gray{background:var(--card)}
+.yellow{background:#fffbeb}
 .yellow .sub{color:#92400e}
-.green  {background:#ecfdf5}
-.green  .sub{color:#065f46}
+.green{background:#ecfdf5}
+.green .sub{color:#065f46}
 
 /* tabs */
 .tabs{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}
@@ -78,9 +69,7 @@ tbody tr:hover{background:#fbfdff}
 
 /* inputs/knapper */
 .field,
-input[type="text"],input[type="date"],select{
-  width:auto;min-height:36px;padding:8px 10px;border-radius:10px;border:1px solid var(--line);background:#fff;color:var(--text)
-}
+input[type="text"],input[type="date"],select{width:auto;min-height:36px;padding:8px 10px;border-radius:10px;border:1px solid var(--line);background:#fff;color:var(--text)}
 .field:focus,
 input[type="text"]:focus,input[type="date"]:focus,select:focus{outline:2px solid rgba(37,99,235,.25);border-color:var(--accent)}
 input[type="checkbox"]{width:18px;height:18px}
@@ -90,26 +79,16 @@ input[type="checkbox"]{width:18px;height:18px}
 .btn.primary{--bg:var(--accent);--fg:#fff;--bd:var(--accent)}
 .btn.small{padding:6px 8px;font-size:12px}
 
-/* admin-layout */
+/* admin layout */
 .split{display:grid;grid-template-columns:320px 1fr;gap:12px}
-@media (max-width:900px){ .split{grid-template-columns:1fr} }
-
-/* mobil */
-@media (max-width:640px){
-  h1{font-size:22px}
-  th:nth-child(1),td:nth-child(1){width:56px}
-}
-
-/* toast */
+@media (max-width:900px){.split{grid-template-columns:1fr}}
+@media (max-width:640px){h1{font-size:22px}th:nth-child(1),td:nth-child(1){width:56px}}
 #toast{position:fixed;right:16px;bottom:16px;background:#111;color:#fff;padding:10px 12px;border-radius:10px;opacity:0;transform:translateY(6px);transition:.2s}
 #toast.show{opacity:1;transform:translateY(0)}
 
-/* Rolleknapper – større + tydeligere + mer spacing */
+/* Rolleknapper */
 .rolebar{display:flex;gap:12px;flex-wrap:wrap;margin:12px 0 18px}
-.rolebtn{
-  border:2px solid #cbd5e1;background:#fff;color:#111;border-radius:14px;
-  padding:14px 16px;font-weight:700;box-shadow:var(--shadow);min-width:160px;text-align:left;
-}
+.rolebtn{border:2px solid #cbd5e1;background:#fff;color:#111;border-radius:14px;padding:14px 16px;font-weight:700;box-shadow:var(--shadow);min-width:160px;text-align:left}
 .rolebtn .sub{display:block;font-size:12px;color:var(--muted);margin-top:2px}
 .rolebtn.gray{background:#fff;border-color:#cbd5e1}
 .rolebtn.yellow{background:#fffbeb;border-color:#fbbf24}
@@ -119,22 +98,13 @@ input[type="checkbox"]{width:18px;height:18px}
 
 /* Dato + sjekk-knapp (kvadratisk boks) */
 .datecell{display:flex;gap:8px;align-items:center}
-
 .mini-check{
-  width:36px;height:36px;
-  display:inline-flex;align-items:center;justify-content:center;
-  padding:0;border-radius:10px;
-  background:#fff;
-  border:2px solid #cbd5e1;   /* grå outline */
-  color:#94a3b8;               /* diskret hake */
-  line-height:1; cursor:pointer; user-select:none;
+  width:36px;height:36px;display:inline-flex;align-items:center;justify-content:center;
+  padding:0;border-radius:10px;background:#fff;border:2px solid #cbd5e1;color:#94a3b8;line-height:1;cursor:pointer;user-select:none
 }
 .mini-check:hover{border-color:#94a3b8}
 .mini-check:focus-visible{outline:3px solid rgba(37,99,235,.35)}
-
-/* BLÅ kun når ferdig */
-.mini-check[data-done="1"]{
-  background:#2563eb;
-  border-color:#1d4ed8;
-  color:#fff;
+/* BLÅ KUN når ferdig */
+.mini-check[data-done="1"], .mini-check.is-done{
+  background:#2563eb;border-color:#1d4ed8;color:#fff;
 }
