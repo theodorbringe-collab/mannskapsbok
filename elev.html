@@ -1,24 +1,22 @@
 <!doctype html>
 <html lang="no">
 <head>
-  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Mannskapsbok – Elev</title>
   <link rel="stylesheet" href="./assets/styles.css">
 </head>
 <body>
 
-<!-- Header + toppmeny -->
+<!-- RK-header + meny -->
 <div class="rk-header">
-  <div class="wrap">
-    <div class="rk-logo"></div>
-    <div class="rk-title">Røde Kors <span class="note" style="font-weight:700;color:#000">Båten Bjørgvin</span></div>
+  <div class="wrap rk-head-inner">
+    <span class="rk-logo" aria-hidden="true"></span>
+    <span class="rk-title">Røde Kors <span class="rk-sub">Båten Bjørgvin</span></span>
   </div>
 </div>
 <nav class="rk-nav">
   <div class="wrap">
     <a href="./elev.html">Hovedmeny</a>
-    <span class="sep">|</span>
-    <a href="#" target="_blank" rel="noopener">Organisere Røde Kors Båten Bjørgvin</a>
   </div>
 </nav>
 
@@ -32,7 +30,7 @@ import {
 } from "./assets/common.js";
 
 (function(){
-  const $=(s,r=document)=>r.querySelector(s);
+  const $ =(s,r=document)=>r.querySelector(s);
   const $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
   const esc=s=>(s||'').replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[m]));
   const today=()=>new Date().toISOString().slice(0,10);
@@ -40,7 +38,7 @@ import {
 
   let me=null, catalog={}, myProg=new Map(), activeRole=ROLES[0], rt=null;
 
-  function lastUpdated(){
+  function lastUpdatedFromProgress(){
     let d=null;
     for(const v of myProg.values()){
       if(v?.date){ const t=new Date(v.date); if(!d || t>d) d=t; }
@@ -50,9 +48,13 @@ import {
 
   async function init(){
     try{
-      me = await ensureLocalUser();
-      [catalog, myProg] = await Promise.all([loadCatalog(), loadMyProgress(me.id)]);
-      render(); bindRealtime();
+      me = await ensureLocalUser();                                 // lokal “elev”
+      [catalog, myProg] = await Promise.all([
+        loadCatalog(),                                              // punkter
+        loadMyProgress(me.id)                                       // egen progresjon
+      ]);
+      render();
+      bindRealtime();
     }catch(e){
       $("#app").innerHTML = `<div class="box"><div class="hd">Feil</div><div class="bd" style="color:#b00020">${esc(e.message||e)}</div></div>`;
       console.error(e);
@@ -61,7 +63,13 @@ import {
 
   function render(){
     $("#app").innerHTML = `
-      <h1>Mannskapsbok</h1>
+      <h1 style="margin-bottom:8px">Mannskapsbok</h1>
+
+      <div class="row" style="margin-bottom:10px">
+        <button id="btnSave" class="btn">Lagre</button>
+        <a class="btn" href="./admin.html">Admin</a>
+        <span class="note" style="margin-left:auto">Sist oppdatert: <b id="lastUpd">${lastUpdatedFromProgress()}</b></span>
+      </div>
 
       <div class="box" style="margin-bottom:12px">
         <div class="bd">
@@ -72,8 +80,6 @@ import {
               <input id="ownerEmail" class="field" placeholder="Endre e-post" value="${esc(me.email||'')}" style="max-width:240px">
               <button id="saveOwner" class="btn">Oppdater</button>
             </div>
-            <div class="note" style="margin-left:auto">Sist oppdatert: <b id="lastUpd">${lastUpdated()}</b></div>
-            <a class="btn" href="./admin.html">Admin</a>
           </div>
         </div>
       </div>
@@ -82,6 +88,7 @@ import {
       <div id="panel"></div>
     `;
 
+    $('#btnSave').onclick=()=> showToast('Lagret ✅'); // autosave skjer uansett
     $('#saveOwner').onclick=async()=>{
       const name=$('#ownerName').value.trim(), email=$('#ownerEmail').value.trim();
       await setLocalIdentity({ name, email });
@@ -97,9 +104,9 @@ import {
   function renderRoleBar(){
     const host=$('#roleBar'); host.innerHTML='';
     ROLES.forEach(role=>{
-      const its=(catalog[role]||[]).flatMap(s=>s.items);
+      const its=(catalog[role]||[]).flatMap(s=>(s.items||[]));
       const total=its.length;
-      const done=its.filter(it=>myProg.get(it.id)?.done).length;
+      const done=its.filter(it=>myProg.get(String(it.id))?.done).length;
       const b=document.createElement('button');
       b.className=`rolebtn ${clsFor(done,total)}`;
       b.innerHTML = `${role}<span class="sub">${done}/${total} fullført</span>`;
@@ -126,15 +133,15 @@ import {
               </tr>
             </thead>
             <tbody>
-              ${s.items.map((it,pi)=>{
-                const pr=myProg.get(it.id)||{};
+              ${(s.items||[]).map((it,pi)=>{
+                const pr=myProg.get(String(it.id))||{};
                 return `<tr data-id="${String(it.id)}">
                   <td>${si+1}.${pi+1}</td>
                   <td>${esc(it.text)}</td>
-                  <td><input type="text" class="field" value="${esc(pr.signed_by||'')}" placeholder="Skriv inn navn"></td>
+                  <td><input class="field" type="text" value="${esc(pr.signed_by||'')}" placeholder="Skriv inn navn" style="width:100%"></td>
                   <td class="datecell">
-                    <input type="date" class="field" value="${pr.date||''}">
-                    <button class="mini-check ${pr.done?'is-done':''}" title="Avkrysset punkt">✓</button>
+                    <input class="field" type="date" value="${pr.date||''}">
+                    <button class="mini-check" data-done="${pr.done?1:0}" title="Avkryss">✓</button>
                   </td>
                 </tr>`;
               }).join('')}
@@ -144,32 +151,40 @@ import {
       </div>
     `).join('');
 
+    // hendelser
     $$('#panel tbody tr').forEach(tr=>{
-      const id = Number(tr.getAttribute('data-id'));
+      const id = tr.getAttribute('data-id');               // <- alltid en streng
       const d  = tr.querySelector('input[type="date"]');
       const s  = tr.querySelector('input[type="text"]');
       const b  = tr.querySelector('.mini-check');
 
-      async function commit(setDone=null){
-        let done = !!myProg.get(id)?.done;
-        if(setDone!==null){ done=setDone; }
-        if(done && !d.value) d.value=today();
+      async function commit(action=null){
+        let cur = myProg.get(id)||{};
+        let done = !!cur.done;
+        if(action==='toggle'){
+          done = !done;
+          if(done && !d.value) d.value = today();
+          if(!done) d.value = '';
+        }
         try{
-          await upsertProgress(id,{ date:d.value||null, signed_by:(s.value||null), done }, me.id);
-          myProg.set(id,{ item_id:id, date:d.value||null, signed_by:s.value||null, done });
-          b.classList.toggle('is-done', done);
+          // send tall hvis mulig – ellers streng
+          const itemId = Number.isFinite(Number(id)) ? Number(id) : id;
+          await upsertProgress(itemId,{ date:d.value||null, signed_by:(s.value||null), done }, me.id);
+          myProg.set(id,{ item_id:itemId, date:d.value||null, signed_by:s.value||null, done });
+          b.setAttribute('data-done', done ? '1':'0');
           renderRoleBar();
-          $('#lastUpd').textContent = lastUpdated();
+          $('#lastUpd').textContent = lastUpdatedFromProgress();
         }catch(e){
           alert('Kunne ikke lagre: ' + (e.message||e));
         }
       }
       s.onchange=()=>commit();
       d.onchange=()=>commit();
-      b.onclick =()=>commit(!(myProg.get(id)?.done));
+      b.onclick =()=>commit('toggle');
     });
   }
 
+  // enkel toast
   function showToast(msg){
     let t=document.getElementById('toast');
     if(!t){ t=document.createElement('div'); t.id='toast'; t.className='toast'; document.body.appendChild(t); }
@@ -180,7 +195,7 @@ import {
     if(rt){ sb.removeChannel(rt); rt=null; }
     rt = sb.channel('mb-live-elev')
       .on('postgres_changes',{event:'*',schema:'public',table:'progress',filter:`user_id=eq.${me.id}`},
-        async()=>{ myProg=await loadMyProgress(me.id); renderRoleBar(); renderRole(activeRole); $('#lastUpd').textContent = lastUpdated(); })
+        async()=>{ myProg=await loadMyProgress(me.id); renderRoleBar(); renderRole(activeRole); $('#lastUpd').textContent = lastUpdatedFromProgress(); })
       .on('postgres_changes',{event:'*',schema:'public',table:'sections'},
         async()=>{ catalog=await loadCatalog(); renderRoleBar(); renderRole(activeRole); })
       .on('postgres_changes',{event:'*',schema:'public',table:'items'},
