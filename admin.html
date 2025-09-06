@@ -282,4 +282,12 @@ async function drawUsers(){
     totalsFor(u.id).then(t=>{ const el=$(`#sum-${u.id}`); if(el) el.textContent=`${t.done}/${t.total}`; });
   }
 }
+// Slett bruker (public-data). auth.users må evt. slettes i Supabase Studio.
+export async function deleteUserCascade(uid){
+  await sb.from('progress').delete().eq('user_id', uid);
+  await sb.from('comments').delete().or(`user_id.eq.${uid},author_id.eq.${uid}`);
+  await sb.from('logs').delete().eq('actor_id', uid);
+  await sb.from('profiles').delete().eq('id', uid);
+}
+
 
