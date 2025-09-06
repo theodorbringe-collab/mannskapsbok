@@ -4,16 +4,12 @@ import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js
 /* === DITT SUPABASE-PROSJEKT === */
 export const SUPABASE_URL  = "https://yqiqvtuxwvgbcfpsoyno.supabase.co";
 export const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlxaXF2dHV4d3ZnYmNmcHNveW5vIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY4NDI1NjcsImV4cCI6MjA3MjQxODU2N30.JKgTfWJ6HqJ96P_ghVYP5vasph12yuk36jlfEBN3PBA";
-/* ============================== */
+/* ================================= */
 
 export const sb = createClient(SUPABASE_URL, SUPABASE_ANON);
-
-// Roller brukt i katalogen (kan utvides)
 export const ROLES = ["Fartøysjef","NK","Matros","Aspirant","Rescuerunner"];
 
-/* -----------------------------
-   Lokal “bruker” i browseren
---------------------------------*/
+/* ---------- Lokal identitet (demo) ---------- */
 export function getLocalIdentity() {
   return {
     id:    localStorage.getItem("mb_uid"),
@@ -22,7 +18,6 @@ export function getLocalIdentity() {
   };
 }
 
-// Opprett/vedlikehold lokal identitet, og sørg for en rad i public.profiles
 export async function ensureLocalUser(){
   let id = localStorage.getItem("mb_uid");
   if (!id) {
@@ -40,7 +35,6 @@ export async function ensureLocalUser(){
   return { id, email, name };
 }
 
-// La brukeren endre navn/e-post (f.eks. “Oppretter av mannskapsboka”)
 export async function setLocalIdentity({ name, email }) {
   const me = await ensureLocalUser();
   const patch = {};
@@ -52,9 +46,7 @@ export async function setLocalIdentity({ name, email }) {
   return { id: me.id, name: localStorage.getItem("mb_name"), email: localStorage.getItem("mb_email") };
 }
 
-/* -----------------------------
-   Lesing
---------------------------------*/
+/* ---------- Lesing ---------- */
 export async function listUsers() {
   const { data, error } = await sb.from("profiles").select("id,email,name").order("email",{ascending:true});
   if (error) throw error;
@@ -75,7 +67,10 @@ export async function loadCatalog() {
         .in("section_id", ids)
         .order("position",{ascending:true});
       for (const s of secs) {
-        list.push({ id:s.id, title:s.title, position:s.position, items:(items||[]).filter(i => i.section_id === s.id) });
+        list.push({ id:String(s.id), title:s.title, position:s.position,
+          items:(items||[]).filter(i => String(i.section_id) === String(s.id))
+                             .map(i=>({ id:String(i.id), section_id:String(i.section_id), text:i.text, position:i.position }))
+        });
       }
     }
     out[role] = list;
@@ -83,37 +78,21 @@ export async function loadCatalog() {
   return out;
 }
 
-// NB: Map-nøkler er STRINGS for å unngå mismatch (uuid vs number)
 export async function loadMyProgress(uid) {
-  const { data, error } = await sb
-    .from("progress")
-    .select("item_id,done,date,signed_by")
-    .eq("user_id", uid);
+  const { data, error } = await sb.from("progress")
+    .select("item_id,done,date,signed_by").eq("user_id", uid);
   if (error) throw error;
   const map = new Map();
-  (data || []).forEach(r => map.set(String(r.item_id), r));
+  (data || []).forEach(r => map.set(String(r.item_id), r)); // STRINGS!
   return map;
 }
 
 export async function loadProgressFor(uid) {
-  const { data } = await sb
-    .from("progress")
-    .select("item_id,done,date,signed_by")
-    .eq("user_id", uid);
+  const { data } = await sb.from("progress")
+    .select("item_id,done,date,signed_by").eq("user_id", uid);
   const map = new Map();
   (data || []).forEach(r => map.set(String(r.item_id), r));
   return map;
-}
-
-// Hent “done”-teller pr. bruker i én spørring (for brukerlista i Admin)
-export async function getUserDoneCounts(){
-  const { data, error } = await sb.from("progress").select("user_id,done");
-  if(error) throw error;
-  const m=new Map();
-  for(const r of (data||[])){
-    if(r.done) m.set(r.user_id, (m.get(r.user_id)||0)+1);
-  }
-  return m; // Map<user_id, doneCount>
 }
 
 export async function loadComments(uid) {
@@ -132,13 +111,11 @@ export async function loadLogs(limit=200) {
   return data || [];
 }
 
-/* -----------------------------
-   Skriv / endre
---------------------------------*/
-export async function upsertProgress(itemId, patch, uid){
+/* ---------- Skriving/endre ---------- */
+export async function upsertProgress(itemId, patch, uid) {
   const row = {
     user_id: uid,
-    item_id: itemId,
+    item_id: itemId,                 // behold string
     done: !!patch.done,
     date: patch.date || null,
     signed_by: patch.signed_by || null
@@ -154,6 +131,7 @@ export async function addComment(uid, text, authorId) {
   await sb.from("logs").insert({ actor_id: authorId, message: `comment added for user ${uid}` });
 }
 
+/* --- Katalog (sections/items) --- */
 export async function addSection(role) {
   const { error } = await sb.from("sections").insert({ role, title:"Ny inndeling", position: Date.now() });
   if (error) throw error;
@@ -192,12 +170,12 @@ export async function moveItem(aId, aPos, bId, bPos) {
   if (r.error) throw r.error;
 }
 
-/* -----------------------------
-   Slett bruker (public-data)
---------------------------------*/
-export async function deleteUserCascade(uid){
-  await sb.from('progress').delete().eq('user_id', uid);
-  await sb.from('comments').delete().or(`user_id.eq.${uid},author_id.eq.${uid}`);
-  await sb.from('logs').delete().eq('actor_id', uid);
-  await sb.from('profiles').delete().eq('id', uid);
+/* --- Admin: slett bruker med data --- */
+export async function deleteUserCompletely(uid){
+  // slett elevens data først
+  await sb.from("progress").delete().eq("user_id", uid);
+  await sb.from("comments").delete().or(`user_id.eq.${uid},author_id.eq.${uid}`);
+  await sb.from("logs").delete().eq("actor_id", uid);
+  // til slutt profilrad
+  await sb.from("profiles").delete().eq("id", uid);
 }
