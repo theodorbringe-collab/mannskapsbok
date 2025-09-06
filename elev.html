@@ -70,7 +70,7 @@ import {
       <div id="panel"></div>
     `;
 
-    $('#btnSave').onclick=()=> showToast('Lagret ✅'); // autosave skjer likevel
+    $('#btnSave').onclick=()=> showToast('Lagret ✅'); // autosave skjer uansett
     $('#saveOwner').onclick=async()=>{
       const name=$('#ownerName').value.trim(), email=$('#ownerEmail').value.trim();
       await setLocalIdentity({ name, email });
@@ -88,7 +88,7 @@ import {
     ROLES.forEach(role=>{
       const its=(catalog[role]||[]).flatMap(s=>s.items);
       const total=its.length;
-      const done=its.filter(it=>myProg.get(String(it.id))?.done).length;
+      const done=its.filter(it=>myProg.get(Number(it.id))?.done).length; // NB: Number-id
       const b=document.createElement('button');
       b.className=`rolebtn ${clsFor(done,total)}`;
       b.innerHTML = `${role}<span class="sub">${done}/${total} fullført</span>`;
@@ -116,14 +116,14 @@ import {
             </thead>
             <tbody>
               ${s.items.map((it,pi)=>{
-                const pr=myProg.get(String(it.id))||{};
+                const pr = myProg.get(Number(it.id)) || {};
                 return `<tr data-id="${it.id}">
                   <td>${si+1}.${pi+1}</td>
                   <td>${esc(it.text)}</td>
                   <td><input type="text" value="${esc(pr.signed_by||'')}" placeholder="Skriv inn navn"></td>
                   <td class="datecell">
                     <input type="date" value="${pr.date||''}">
-                    <button class="btn mini-check ${pr.done?'active':''}" title="${pr.done?'Avkrysset':'Marker som fullført'}">✓</button>
+                    <button class="btn mini-check" data-done="${pr.done?1:0}" title="${pr.done?'Avkrysset':'Marker som fullført'}">✓</button>
                   </td>
                 </tr>`;
               }).join('')}
@@ -135,21 +135,23 @@ import {
 
     // hendelser
     $$('#panel tbody tr').forEach(tr=>{
-      const id=String(tr.dataset.id);
-      const d=tr.querySelector('input[type="date"]');
-      const s=tr.querySelector('input[type="text"]');
-      const checkBtn=tr.querySelector('.mini-check');
+      const id = Number(tr.dataset.id);                    // <- numeric id
+      const d  = tr.querySelector('input[type="date"]');
+      const s  = tr.querySelector('input[type="text"]');
+      const checkBtn = tr.querySelector('.mini-check');
 
       async function commit(action=null){
         let done = !!myProg.get(id)?.done;
-        if(action==='toggle') done = !done;
-        if(done && !d.value) d.value = today();
-        if(!done && action==='toggle') d.value = ''; // fjern dato hvis man «angrer»
+        if(action==='toggle'){
+          done = !done;
+          if(done && !d.value) d.value = today(); // sett dato ved avhuking
+          if(!done) d.value = '';                 // fjern dato ved «angre»
+        }
         try{
           await upsertProgress(id,{date:d.value||null,signed_by:(s.value||null),done}, me.id);
           myProg.set(id,{ item_id:id, date:d.value||null, signed_by:s.value||null, done });
-          checkBtn.classList.toggle('active', done);
-          renderRoleBar(); // oppdater teller/farge på rolleknapper
+          checkBtn.setAttribute('data-done', done ? '1' : '0');   // <- farger styres her
+          renderRoleBar();                                        // oppdater teller/farge
           $('#lastUpd').textContent = lastUpdatedFromProgress();
         }catch(e){
           alert('Kunne ikke lagre: ' + (e.message||e));
@@ -158,7 +160,7 @@ import {
 
       s.onchange = ()=>commit();
       d.onchange = ()=>commit();
-      checkBtn.onclick = ()=>commit('toggle');   // nå toggler den blå/av
+      checkBtn.onclick = ()=>commit('toggle'); // nå toggler blå/grå
     });
   }
 
