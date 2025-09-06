@@ -78,7 +78,7 @@ import {
     ROLES.forEach(role=>{
       const its=(catalog[role]||[]).flatMap(s=>s.items);
       const total=its.length;
-      const done=its.filter(it=>myProg.get(Number(it.id))?.done).length;
+      const done=its.filter(it=>myProg.get(String(it.id))?.done).length;  // streng-ID
       const b=document.createElement('button');
       b.className=`rolebtn ${clsFor(done,total)}`;
       b.innerHTML = `${role}<span class="sub">${done}/${total} fullført</span>`;
@@ -104,8 +104,8 @@ import {
             </tr></thead>
             <tbody>
               ${s.items.map((it,pi)=>{
-                const pr = myProg.get(Number(it.id)) || {};
-                return `<tr data-id="${it.id}">
+                const pr = myProg.get(String(it.id)) || {};
+                return `<tr data-id="${String(it.id)}">
                   <td>${si+1}.${pi+1}</td>
                   <td>${esc(it.text)}</td>
                   <td><input type="text" value="${esc(pr.signed_by||'')}" placeholder="Skriv inn navn"></td>
@@ -122,7 +122,7 @@ import {
     `).join('');
 
     $$('#panel tbody tr').forEach(tr=>{
-      const id  = Number(tr.dataset.id);
+      const id  = tr.getAttribute('data-id'); // behold som string
       const d   = tr.querySelector('input[type="date"]');
       const s   = tr.querySelector('input[type="text"]');
       const btn = tr.querySelector('.mini-check');
@@ -133,7 +133,7 @@ import {
         try{
           await upsertProgress(id,{date:d.value||null,signed_by:(s.value||null),done}, me.id);
           myProg.set(id,{ item_id:id, date:d.value||null, signed_by:s.value||null, done });
-          btn.setAttribute('data-done', done ? '1' : '0');   // ← styr fargen
+          btn.setAttribute('data-done', done ? '1' : '0');
           drawRoleBar(); $('#lastUpd').textContent = lastUpdated();
         }catch(e){ alert('Kunne ikke lagre: '+(e.message||e)); }
       }
