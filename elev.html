@@ -85,16 +85,20 @@ import {
     renderRole(activeRole);
   }
 
+  // === OPPDATERT: aktiv klasse + re-tegning for tydelig farge/valg ===
   function renderRoleBar(){
     const host=$('#roleBar'); host.innerHTML='';
     ROLES.forEach(role=>{
       const its=(catalog[role]||[]).flatMap(s=>s.items);
       const total=its.length;
       const done=its.filter(it=>myProg.get(it.id)?.done).length;
+
       const b=document.createElement('button');
-      b.className=`rolebtn ${clsFor(done,total)}`;
+      b.className=`rolebtn ${clsFor(done,total)}${role===activeRole?' active':''}`;
+      b.type='button';
+      b.ariaPressed = role===activeRole ? 'true' : 'false';
       b.innerHTML = `${role}<span class="sub">${done}/${total} fullført</span>`;
-      b.onclick=()=>{ activeRole=role; renderRole(activeRole); };
+      b.onclick=()=>{ activeRole=role; renderRoleBar(); renderRole(role); };
       host.appendChild(b);
     });
   }
