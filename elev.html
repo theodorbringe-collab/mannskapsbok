@@ -4,14 +4,31 @@
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Mannskapsbok – Elev</title>
   <link rel="stylesheet" href="./assets/styles.css">
+  <!-- Isolated Røde-Kors header styles (only .rk-*) -->
+  <style>
+    .rk-header{background:#fff;border-bottom:1px solid #eaeaea}
+    .rk-head-inner{display:flex;align-items:center;gap:14px;padding:10px 0}
+    .rk-logo{position:relative;width:42px;height:42px;flex:0 0 42px}
+    .rk-logo::before,.rk-logo::after{content:"";position:absolute;background:#ff1a1a;border-radius:2px}
+    .rk-logo::before{width:70%;height:26%;left:15%;top:37%}
+    .rk-logo::after{width:26%;height:70%;left:37%;top:15%}
+    .rk-title{font-size:28px;font-weight:800;letter-spacing:.2px;color:#000}
+    .rk-title .rk-sub{font-weight:600;margin-left:.25em}
+    .rk-nav{background:#ff1a1a}
+    .rk-nav .wrap{display:flex;gap:12px;padding:6px 0;font-weight:700}
+    .rk-nav a{color:#fff;text-decoration:none}
+    .rk-nav a:hover{text-decoration:underline}
+    .rk-nav .sep{opacity:.7;color:#fff}
+    .rk-header + .rk-nav + .wrap{margin-top:16px}
+  </style>
 </head>
 <body>
 
-<!-- RK-header + meny -->
+<!-- Header + rød meny (isolert) -->
 <div class="rk-header">
   <div class="wrap rk-head-inner">
-    <span class="rk-logo" aria-hidden="true"></span>
-    <span class="rk-title">Røde Kors <span class="rk-sub">Båten Bjørgvin</span></span>
+    <div class="rk-logo"></div>
+    <div class="rk-title">Røde Kors<span class="rk-sub">Båten Bjørgvin</span></div>
   </div>
 </div>
 <nav class="rk-nav">
@@ -30,7 +47,7 @@ import {
 } from "./assets/common.js";
 
 (function(){
-  const $ =(s,r=document)=>r.querySelector(s);
+  const $=(s,r=document)=>r.querySelector(s);
   const $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
   const esc=s=>(s||'').replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[m]));
   const today=()=>new Date().toISOString().slice(0,10);
@@ -38,7 +55,7 @@ import {
 
   let me=null, catalog={}, myProg=new Map(), activeRole=ROLES[0], rt=null;
 
-  function lastUpdatedFromProgress(){
+  function lastUpdated(){
     let d=null;
     for(const v of myProg.values()){
       if(v?.date){ const t=new Date(v.date); if(!d || t>d) d=t; }
@@ -48,11 +65,9 @@ import {
 
   async function init(){
     try{
-      me = await ensureLocalUser();                                 // lokal “elev”
-      [catalog, myProg] = await Promise.all([
-        loadCatalog(),                                              // punkter
-        loadMyProgress(me.id)                                       // egen progresjon
-      ]);
+      me = await ensureLocalUser();
+      const [cat, prog] = await Promise.all([loadCatalog(), loadMyProgress(me.id)]);
+      catalog = cat; myProg = prog;
       render();
       bindRealtime();
     }catch(e){
@@ -63,12 +78,12 @@ import {
 
   function render(){
     $("#app").innerHTML = `
-      <h1 style="margin-bottom:8px">Mannskapsbok</h1>
+      <h1>Mannskapsbok</h1>
 
       <div class="row" style="margin-bottom:10px">
         <button id="btnSave" class="btn">Lagre</button>
         <a class="btn" href="./admin.html">Admin</a>
-        <span class="note" style="margin-left:auto">Sist oppdatert: <b id="lastUpd">${lastUpdatedFromProgress()}</b></span>
+        <span class="note" style="margin-left:auto">Sist oppdatert: <b id="lastUpd">${lastUpdated()}</b></span>
       </div>
 
       <div class="box" style="margin-bottom:12px">
@@ -85,37 +100,38 @@ import {
       </div>
 
       <div id="roleBar" class="rolebar"></div>
+
       <div id="panel"></div>
     `;
 
-    $('#btnSave').onclick=()=> showToast('Lagret ✅'); // autosave skjer uansett
+    $('#btnSave').onclick=()=> toast('Lagret ✅');
     $('#saveOwner').onclick=async()=>{
       const name=$('#ownerName').value.trim(), email=$('#ownerEmail').value.trim();
       await setLocalIdentity({ name, email });
       me = await ensureLocalUser();
       $('#meName').textContent = me.name||me.email;
-      showToast('Oppdatert');
+      toast('Oppdatert');
     };
 
-    renderRoleBar();
-    renderRole(activeRole);
+    drawRoleBar();
+    drawRole(activeRole);
   }
 
-  function renderRoleBar(){
+  function drawRoleBar(){
     const host=$('#roleBar'); host.innerHTML='';
     ROLES.forEach(role=>{
-      const its=(catalog[role]||[]).flatMap(s=>(s.items||[]));
+      const its=(catalog[role]||[]).flatMap(s=>s.items);
       const total=its.length;
       const done=its.filter(it=>myProg.get(String(it.id))?.done).length;
       const b=document.createElement('button');
       b.className=`rolebtn ${clsFor(done,total)}`;
       b.innerHTML = `${role}<span class="sub">${done}/${total} fullført</span>`;
-      b.onclick=()=>{ activeRole=role; renderRole(activeRole); };
+      b.onclick=()=>{ activeRole=role; drawRole(activeRole); };
       host.appendChild(b);
     });
   }
 
-  function renderRole(role){
+  function drawRole(role){
     const panel=$("#panel"); const secs=catalog[role]||[];
     if(!secs.length){ panel.innerHTML='<div class="box"><div class="bd">Ingen punkter.</div></div>'; return; }
 
@@ -133,15 +149,15 @@ import {
               </tr>
             </thead>
             <tbody>
-              ${(s.items||[]).map((it,pi)=>{
+              ${s.items.map((it,pi)=>{
                 const pr=myProg.get(String(it.id))||{};
                 return `<tr data-id="${String(it.id)}">
                   <td>${si+1}.${pi+1}</td>
                   <td>${esc(it.text)}</td>
-                  <td><input class="field" type="text" value="${esc(pr.signed_by||'')}" placeholder="Skriv inn navn" style="width:100%"></td>
+                  <td><input class="field" type="text" value="${esc(pr.signed_by||'')}" placeholder="Skriv inn navn"></td>
                   <td class="datecell">
                     <input class="field" type="date" value="${pr.date||''}">
-                    <button class="mini-check" data-done="${pr.done?1:0}" title="Avkryss">✓</button>
+                    <button class="mini-check" data-done="${pr.done?1:0}" title="Avkrysset">✓</button>
                   </td>
                 </tr>`;
               }).join('')}
@@ -151,29 +167,22 @@ import {
       </div>
     `).join('');
 
-    // hendelser
+    // handlers
     $$('#panel tbody tr').forEach(tr=>{
-      const id = tr.getAttribute('data-id');               // <- alltid en streng
+      const id = tr.getAttribute('data-id');             // always a string -> avoids null item_id
       const d  = tr.querySelector('input[type="date"]');
       const s  = tr.querySelector('input[type="text"]');
       const b  = tr.querySelector('.mini-check');
 
       async function commit(action=null){
-        let cur = myProg.get(id)||{};
-        let done = !!cur.done;
-        if(action==='toggle'){
-          done = !done;
-          if(done && !d.value) d.value = today();
-          if(!done) d.value = '';
-        }
+        let done = !!myProg.get(id)?.done;
+        if(action==='toggle'){ done=!done; if(done && !d.value) d.value=today(); if(!done) d.value=''; }
         try{
-          // send tall hvis mulig – ellers streng
-          const itemId = Number.isFinite(Number(id)) ? Number(id) : id;
-          await upsertProgress(itemId,{ date:d.value||null, signed_by:(s.value||null), done }, me.id);
-          myProg.set(id,{ item_id:itemId, date:d.value||null, signed_by:s.value||null, done });
-          b.setAttribute('data-done', done ? '1':'0');
-          renderRoleBar();
-          $('#lastUpd').textContent = lastUpdatedFromProgress();
+          await upsertProgress(id,{ date:d.value||null, signed_by:(s.value||null), done }, me.id);
+          myProg.set(id,{ item_id:id, date:d.value||null, signed_by:s.value||null, done });
+          b.setAttribute('data-done', done ? '1' : '0');
+          drawRoleBar();
+          $('#lastUpd').textContent = lastUpdated();
         }catch(e){
           alert('Kunne ikke lagre: ' + (e.message||e));
         }
@@ -184,8 +193,8 @@ import {
     });
   }
 
-  // enkel toast
-  function showToast(msg){
+  // small toast
+  function toast(msg){
     let t=document.getElementById('toast');
     if(!t){ t=document.createElement('div'); t.id='toast'; t.className='toast'; document.body.appendChild(t); }
     t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),1200);
@@ -195,11 +204,11 @@ import {
     if(rt){ sb.removeChannel(rt); rt=null; }
     rt = sb.channel('mb-live-elev')
       .on('postgres_changes',{event:'*',schema:'public',table:'progress',filter:`user_id=eq.${me.id}`},
-        async()=>{ myProg=await loadMyProgress(me.id); renderRoleBar(); renderRole(activeRole); $('#lastUpd').textContent = lastUpdatedFromProgress(); })
+        async()=>{ myProg=await loadMyProgress(me.id); drawRoleBar(); drawRole(activeRole); $('#lastUpd').textContent=lastUpdated(); })
       .on('postgres_changes',{event:'*',schema:'public',table:'sections'},
-        async()=>{ catalog=await loadCatalog(); renderRoleBar(); renderRole(activeRole); })
+        async()=>{ catalog=await loadCatalog(); drawRoleBar(); drawRole(activeRole); })
       .on('postgres_changes',{event:'*',schema:'public',table:'items'},
-        async()=>{ catalog=await loadCatalog(); renderRoleBar(); renderRole(activeRole); })
+        async()=>{ catalog=await loadCatalog(); drawRoleBar(); drawRole(activeRole); })
       .subscribe();
   }
 
