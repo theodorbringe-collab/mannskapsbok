@@ -29,12 +29,27 @@
   </style>
 </head>
 <body>
+
+  <!-- Røde Kors toppstripe (valgfritt – fjern hvis du ikke vil ha den her) -->
+  <header class="rk-header">
+    <div class="inner">
+      <svg class="rk-logo" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <rect x="9" y="2" width="6" height="20" fill="#ff1a1a"></rect>
+        <rect x="2" y="9" width="20" height="6" fill="#ff1a1a"></rect>
+      </svg>
+      <div class="rk-brand">Røde Kors <span class="light">Båten Bjørgvin</span></div>
+    </div>
+    <nav class="rk-subbar"><div class="inner">
+      <a href="./elev.html">Mannskapsbok</a><span aria-hidden="true"> | </span><a href="./admin.html">Admin</a>
+    </div></nav>
+  </header>
+
   <div class="wrap" id="app">Laster …</div>
 
 <script type="module">
 import {
   sb, ROLES,
-  ensureUser, ensureLocalUser,
+  ensureLocalUser,
   listUsers, loadCatalog, loadProgressFor, loadComments, loadLogs,
   upsertProgress, addComment,
   addSection, updateSectionTitle, moveSection, deleteSection,
@@ -51,7 +66,7 @@ import {
 
   async function init(){
     try{
-      try{ me = await ensureUser(); }catch{ me = await ensureLocalUser(); }
+      me = await ensureLocalUser();               // <— kun lokal identitet
       [users, catalog] = await Promise.all([listUsers(), loadCatalog()]);
       render(); bindRealtime();
     }catch(e){
@@ -292,11 +307,11 @@ import {
               <thead><tr><th style="width:60px">#</th><th>Beskrivelse</th><th style="width:240px">Sjekket ut av</th><th style="width:200px">Dato</th></tr></thead>
               <tbody>
                 ${secs.map((s,si)=> s.items.map((it,ii)=>{
-                  const key = String(it.id);
-                  const pr  = selUserProg.get(key)||{};
+                  const id  = String(it.id);
+                  const pr  = selUserProg.get(id)||{};
                   const dis = editable?'':'disabled';
                   return `
-                    <tr data-id="${key}">
+                    <tr data-id="${id}">
                       <td>${si+1}.${ii+1}</td>
                       <td>${esc(it.text)}</td>
                       <td><input ${dis} class="field" type="text" value="${esc(pr.signed_by||'')}" placeholder="Skriv inn navn" style="width:100%"></td>
