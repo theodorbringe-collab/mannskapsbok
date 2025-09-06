@@ -3,7 +3,7 @@ import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js
 
 /* === DITT SUPABASE-PROSJEKT === */
 export const SUPABASE_URL  = "https://yqiqvtuxwvgbcfpsoyno.supabase.co";
-export const SUPABASE_ANON = "SETT_INN_DIN_ANON_PUBLIC_KEY_HER";
+export const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlxaXF2dHV4d3ZnYmNmcHNveW5vIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY4NDI1NjcsImV4cCI6MjA3MjQxODU2N30.JKgTfWJ6HqJ96P_ghVYP5vasph12yuk36jlfEBN3PBA";
 /* ============================== */
 
 export const sb = createClient(SUPABASE_URL, SUPABASE_ANON);
@@ -103,6 +103,17 @@ export async function loadProgressFor(uid) {
   const map = new Map();
   (data || []).forEach(r => map.set(String(r.item_id), r));
   return map;
+}
+
+// Hent “done”-teller pr. bruker i én spørring (for brukerlista i Admin)
+export async function getUserDoneCounts(){
+  const { data, error } = await sb.from("progress").select("user_id,done");
+  if(error) throw error;
+  const m=new Map();
+  for(const r of (data||[])){
+    if(r.done) m.set(r.user_id, (m.get(r.user_id)||0)+1);
+  }
+  return m; // Map<user_id, doneCount>
 }
 
 export async function loadComments(uid) {
