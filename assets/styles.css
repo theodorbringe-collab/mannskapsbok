@@ -122,8 +122,13 @@ input[type="checkbox"]{width:18px;height:18px}
 .mini-check{
   padding:8px 10px;font-size:14px;border-radius:12px;
   background:#fff;border:2px solid #cbd5e1;color:#334155;line-height:1;
+  cursor:pointer;
 }
 .mini-check:hover{border-color:var(--accent)}
-.mini-check.active{
-  background:var(--accent);border-color:var(--accent-2);color:#fff;
+
+/* BLÅ bare når ferdig */
+.mini-check[data-done="1"]{
+  background:var(--accent);
+  border-color:var(--accent-2);
+  color:#fff;
 }
