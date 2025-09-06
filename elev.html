@@ -4,46 +4,15 @@
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Mannskapsbok – Elev</title>
   <link rel="stylesheet" href="./assets/styles.css">
-  <style>
-    /* Røde Kors header (samme som admin) */
-    .rk-header{background:#fff;border-bottom:1px solid var(--line)}
-    .rk-header .inner{max-width:1100px;margin:0 auto;padding:10px 16px;display:flex;align-items:center;gap:10px}
-    .rk-logo{width:28px;height:28px;flex:0 0 28px}
-    .rk-brand{font-weight:800;font-size:20px;letter-spacing:.2px}
-    .rk-brand .light{font-weight:600;margin-left:6px}
-    .rk-subbar{background:#ff1a1a;color:#fff}
-    .rk-subbar .inner{max-width:1100px;margin:0 auto;padding:6px 16px;font-size:13px}
-    .rk-subbar a{color:#fff;text-decoration:none}
-    .rk-subbar a:hover{text-decoration:underline}
-
-    /* Grå → blå “avkryss” */
-    .mini-check{
-      border:1px solid var(--line);
-      background:#fff;
-      color:#94a3b8;
-      border-radius:14px;
-      padding:8px 10px;
-      line-height:1;
-    }
-    .mini-check:hover{filter:brightness(.98)}
-    .mini-check[data-done="1"]{ background:var(--accent); color:#fff; border-color:var(--accent) }
-  </style>
 </head>
 <body>
-
-  <!-- Røde Kors header -->
-  <header class="rk-header">
-    <div class="inner">
-      <svg class="rk-logo" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-        <rect x="9" y="2" width="6" height="20" fill="#ff1a1a"></rect>
-        <rect x="2" y="9" width="20" height="6" fill="#ff1a1a"></rect>
-      </svg>
-      <div class="rk-brand">Røde Kors <span class="light">Båten Bjørgvin</span></div>
+  <!-- Røde-Kors header -->
+  <div class="header">
+    <div class="bar">
+      <div class="brand">Røde Kors<span class="sub">Båten Bjørgvin</span></div>
     </div>
-    <nav class="rk-subbar"><div class="inner">
-      <a href="./elev.html">Mannskapsbok</a><span aria-hidden="true"> | </span><a href="./admin.html">Admin</a>
-    </div></nav>
-  </header>
+    <div class="redstripe"></div>
+  </div>
 
   <div class="wrap" id="app">Laster …</div>
 
@@ -60,11 +29,11 @@ import {
   const esc=s=>(s||'').replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[m]));
   const today=()=>new Date().toISOString().slice(0,10);
   const clsFor=(done,total)=> total===0||done===0?'gray':(done<total?'yellow':'green');
-  const getProg=(map,id)=> map.get(id) ?? map.get(String(id)) ?? map.get(Number(id));
+  const getProg=(map,id)=> map.get(String(id)) || map.get(Number(id)) || null;
 
   let me=null, catalog={}, myProg=new Map(), activeRole=ROLES[0], rt=null;
 
-  const lastUpdated=()=> {
+  const lastUpdated = ()=>{
     let d=null; for(const v of myProg.values()){ if(v?.date){ const t=new Date(v.date); if(!d||t>d) d=t; } }
     return d ? d.toLocaleDateString('no-NO') : '—';
   };
@@ -73,8 +42,7 @@ import {
     try{
       me = await ensureLocalUser();
       [catalog, myProg] = await Promise.all([loadCatalog(), loadMyProgress(me.id)]);
-      render();
-      bindRealtime();
+      render(); bindRealtime();
     }catch(e){
       $("#app").innerHTML = `<div class="box"><div class="hd">Feil</div><div class="bd" style="color:#b00020">${esc(e.message||e)}</div></div>`;
       console.error(e);
@@ -83,15 +51,15 @@ import {
 
   function render(){
     $("#app").innerHTML = `
-      <h1 style="margin-bottom:8px">Mannskapsbok</h1>
-
-      <div class="row" style="margin-bottom:10px">
-        <button id="btnSave" class="btn">Lagre</button>
-        <a class="btn" href="./admin.html">Admin</a>
-        <span class="note" style="margin-left:auto">Sist oppdatert: <b id="lastUpd">${lastUpdated()}</b></span>
+      <div class="row" style="justify-content:space-between">
+        <h1>Mannskapsbok</h1>
+        <div class="row">
+          <a class="btn" href="./admin.html">Admin</a>
+          <span class="note">Sist oppdatert: <b id="lastUpd">${lastUpdated()}</b></span>
+        </div>
       </div>
 
-      <div class="box" style="margin-bottom:12px">
+      <div class="box">
         <div class="bd">
           <div class="row" style="gap:12px;flex-wrap:wrap">
             <div><span class="note">Navn</span><div><b id="meName">${esc(me.name||me.email)}</b></div></div>
@@ -108,7 +76,6 @@ import {
       <div id="panel"></div>
     `;
 
-    $('#btnSave').onclick=()=> toast('Lagret ✅'); // autosave skjer uansett
     $('#saveOwner').onclick=async()=>{
       const name=$('#ownerName').value.trim(), email=$('#ownerEmail').value.trim();
       await setLocalIdentity({ name, email });
@@ -130,7 +97,7 @@ import {
       const b=document.createElement('button');
       b.className=`rolebtn ${clsFor(done,total)}`;
       b.innerHTML = `${role}<span class="sub">${done}/${total} fullført</span>`;
-      b.onclick=()=>{ activeRole=role; drawRole(activeRole); };
+      b.onclick=()=>{ activeRole=role; drawRole(role); };
       host.appendChild(b);
     });
   }
@@ -148,15 +115,14 @@ import {
               <tr>
                 <th style="width:60px">#</th>
                 <th>Jeg kan dette</th>
-                <th style="width:220px">Sjekket ut av</th>
-                <th style="width:170px">Dato</th>
+                <th style="width:240px">Sjekket ut av</th>
+                <th style="width:200px">Dato</th>
               </tr>
             </thead>
             <tbody>
-              ${s.items.map((it,pi)=>{
+              ${(s.items||[]).map((it,pi)=>{
                 const pr=getProg(myProg,it.id)||{};
-                const idStr=String(it.id);
-                return `<tr data-id="${idStr}">
+                return `<tr data-id="${it.id}">
                   <td>${si+1}.${pi+1}</td>
                   <td>${esc(it.text)}</td>
                   <td><input class="field" type="text" value="${esc(pr.signed_by||'')}" placeholder="Skriv inn navn" style="width:100%"></td>
@@ -172,21 +138,26 @@ import {
       </div>
     `).join('');
 
-    // hendelser per rad
+    // lagre-hendelser
     $$('#panel tbody tr').forEach(tr=>{
-      const idStr = tr.getAttribute('data-id');
-      const idNum = Number(idStr);
-      const d=tr.querySelector('input[type="date"]');
-      const s=tr.querySelector('input[type="text"]');
-      const b=tr.querySelector('.mini-check');
+      const itemId = tr.getAttribute('data-id'); // **streng!**
+      const d = tr.querySelector('input[type="date"]');
+      const s = tr.querySelector('input[type="text"]');
+      const b = tr.querySelector('button.mini-check');
 
       async function commit(action=null){
-        let rec = getProg(myProg, idStr) || {};
+        let rec  = getProg(myProg, itemId) || {};
         let done = !!rec.done;
-        if(action==='toggle'){ done=!done; if(done && !d.value) d.value=today(); if(!done) d.value=''; }
+
+        if(action==='toggle'){
+          done = !done;
+          if(done && !d.value) d.value = today();
+          if(!done) d.value = '';
+        }
+
         try{
-          await upsertProgress(idNum,{date:d.value||null,signed_by:(s.value||null),done}, me.id);
-          myProg.set(idNum,{ item_id:idNum, date:d.value||null, signed_by:s.value||null, done });
+          await upsertProgress(itemId, { date:d.value||null, signed_by:(s.value||null), done }, me.id);
+          myProg.set(String(itemId), { item_id:itemId, date:d.value||null, signed_by:s.value||null, done });
           b.setAttribute('data-done', done ? '1':'0');
           drawRoleBar();
           $('#lastUpd').textContent = lastUpdated();
@@ -194,28 +165,29 @@ import {
           alert('Kunne ikke lagre: ' + (e.message||e));
         }
       }
-      s.onchange=()=>commit();
-      d.onchange=()=>commit();
-      b.onclick =()=>commit('toggle');
+
+      s.onchange = ()=>commit();
+      d.onchange = ()=>commit();
+      b.onclick  = ()=>commit('toggle');
     });
   }
 
-  // enkel toast
+  // Toast
   function toast(msg){
     let t=document.getElementById('toast');
     if(!t){ t=document.createElement('div'); t.id='toast'; t.className='toast'; document.body.appendChild(t); }
     t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),1200);
   }
 
-  // realtime
+  // Realtime
   function bindRealtime(){
     if(rt){ sb.removeChannel(rt); rt=null; }
     rt = sb.channel('mb-live-elev')
-      .on('postgres_changes',{ event:'*', schema:'public', table:'progress', filter:`user_id=eq.${me.id}` },
+      .on('postgres_changes',{event:'*',schema:'public',table:'progress',filter:`user_id=eq.${me.id}`},
         async()=>{ myProg=await loadMyProgress(me.id); drawRoleBar(); drawRole(activeRole); $('#lastUpd').textContent = lastUpdated(); })
-      .on('postgres_changes',{ event:'*', schema:'public', table:'sections' },
+      .on('postgres_changes',{event:'*',schema:'public',table:'sections'},
         async()=>{ catalog=await loadCatalog(); drawRoleBar(); drawRole(activeRole); })
-      .on('postgres_changes',{ event:'*', schema:'public', table:'items' },
+      .on('postgres_changes',{event:'*',schema:'public',table:'items'},
         async()=>{ catalog=await loadCatalog(); drawRoleBar(); drawRole(activeRole); })
       .subscribe();
   }
