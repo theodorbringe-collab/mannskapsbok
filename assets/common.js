@@ -3,7 +3,7 @@ import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js
 
 // === DITT SUPABASE-PROSJEKT ===
 export const SUPABASE_URL  = "https://yqiqvtuxwvgbcfpsoyno.supabase.co";
-export const SUPABASE_ANON = "PASTE_YOUR_ANON_KEY"; // <-- Bytt til din ANON PUBLIC KEY
+export const SUPABASE_ANON = "<DIN ANON PUBLIC KEY>";
 // ===============================
 
 export const sb = createClient(SUPABASE_URL, SUPABASE_ANON);
@@ -171,3 +171,4 @@ export async function moveItem(aId, aPos, bId, bPos) {
   r = await sb.from("items").update({ position:aPos }).eq("id", bId);
   if (r.error) throw r.error;
 }
+
