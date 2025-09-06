@@ -4,7 +4,7 @@
   --text:#0f172a;
   --muted:#64748b;
   --line:#e5e7eb;
-  --accent:#2563eb;        /* primærfarge */
+  --accent:#2563eb;
   --accent-2:#1d4ed8;
   --good:#16a34a;
   --warn:#f59e0b;
@@ -16,9 +16,7 @@
 *{box-sizing:border-box}
 html,body{height:100%}
 body{
-  margin:0;
-  background:var(--bg);
-  color:var(--text);
+  margin:0; background:var(--bg); color:var(--text);
   font:15px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sans-serif;
 }
 
@@ -27,34 +25,25 @@ a:hover{text-decoration:underline}
 
 h1{margin:8px 0 12px;font-size:28px;letter-spacing:.2px}
 h2,h3{margin:12px 0 8px}
-
 .wrap{max-width:1100px;margin:32px auto;padding:0 16px}
 
 /* Rad / smånyttige */
 .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 .note{color:var(--muted);font-size:12px}
-.tag{
-  display:inline-block;background:#eef2ff;color:#3730a3;
-  padding:4px 8px;border-radius:999px;font-size:12px
-}
-.badge{
-  display:inline-block;font-size:12px;
-  background:#eef2ff;color:#1e293b;border:1px solid var(--line);
-  padding:4px 8px;border-radius:999px
-}
+.tag{display:inline-block;background:#eef2ff;color:#3730a3;padding:4px 8px;border-radius:999px;font-size:12px}
+.badge{display:inline-block;font-size:12px;background:#eef2ff;color:#1e293b;border:1px solid var(--line);padding:4px 8px;border-radius:999px}
 
 /* Kort / ruter */
 .grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));margin:12px 0}
 .card{border-radius:16px;background:transparent}
 .card > button{
-  width:100%; border:0; cursor:pointer;
-  padding:18px 16px; border-radius:16px; font-weight:700;
+  width:100%; border:0; cursor:pointer; padding:18px 16px; border-radius:16px; font-weight:700;
   background:var(--card); box-shadow:var(--shadow); text-align:left;
 }
 .card .sub{display:block;margin-top:2px;font-weight:500;color:var(--muted);font-size:12px}
 .card > button:hover{transform:translateY(-1px);transition:.15s}
 
-/* statusfarger (brukes på kort) */
+/* statusfarger (brukes bl.a. på rolleknappene) */
 .gray   {background:var(--card)}
 .yellow {background:#fff7ed}
 .yellow .sub{color:#b45309}
@@ -63,10 +52,7 @@ h2,h3{margin:12px 0 8px}
 
 /* Tabs */
 .tabs{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}
-.tab{
-  padding:10px 12px;border-radius:999px;background:var(--card);
-  border:1px solid var(--line);cursor:pointer
-}
+.tab{padding:10px 12px;border-radius:999px;background:var(--card);border:1px solid var(--line);cursor:pointer}
 .tab:hover{border-color:#cbd5e1}
 .tab.active{background:var(--accent);border-color:var(--accent);color:#fff}
 
@@ -88,13 +74,11 @@ th,td{padding:10px 8px;border-bottom:1px solid var(--line);text-align:left;verti
 tbody tr:hover{background:#fbfdff}
 
 /* Inputs / knapper */
-.field,
-input[type="text"],input[type="date"],select{
+.field, input[type="text"],input[type="date"],select{
   width:auto;min-height:36px;padding:8px 10px;border-radius:10px;
   border:1px solid var(--line);background:#fff;color:var(--text)
 }
-.field:focus,
-input[type="text"]:focus,input[type="date"]:focus,select:focus{
+.field:focus, input[type="text"]:focus,input[type="date"]:focus,select:focus{
   outline:2px solid rgba(37,99,235,.25);border-color:var(--accent)
 }
 input[type="checkbox"]{width:18px;height:18px}
@@ -118,21 +102,29 @@ input[type="checkbox"]{width:18px;height:18px}
   th:nth-child(1),td:nth-child(1){width:56px}
 }
 
-/* Toast (hvis du bruker det senere) */
+/* Toast */
 .toast{position:fixed;right:16px;bottom:16px;background:#111;color:#fff;padding:10px 12px;border-radius:10px;opacity:0;transform:translateY(6px);transition:.2s}
 .toast.show{opacity:1;transform:translateY(0)}
-/* Rolleknapper (FS/NK/...) i en enkel rad */
-.rolebar{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 12px}
+
+/* === Rolleknapper (FS/NK/...) – større, firkantede, med klar farge === */
+.rolebar{display:flex;gap:12px;flex-wrap:wrap;margin:12px 0 16px}
 .rolebtn{
-  border:1px solid var(--line); background:#fff; color:var(--text);
-  border-radius:12px; padding:8px 10px; cursor:pointer; box-shadow:var(--shadow);
+  appearance:none; border:1px solid var(--line);
+  background:#fff; color:var(--text); cursor:pointer;
+  padding:12px 14px; min-width:160px; text-align:left;
+  border-radius:6px; box-shadow:var(--shadow); font-weight:700;
 }
-.rolebtn .sub{display:block;font-size:12px;color:var(--muted)}
-.rolebtn.gray{background:#fff}
-.rolebtn.yellow{background:#fff7ed}
-.rolebtn.green{background:#ecfdf5}
+.rolebtn .sub{display:block;font-size:12px;color:var(--muted);font-weight:500;margin-top:2px}
+.rolebtn.gray   {background:#fff;}
+.rolebtn.yellow {background:#fff7ed;border-color:#fed7aa;}
+.rolebtn.green  {background:#ecfdf5;border-color:#86efac;}
+.rolebtn.active {outline:2px solid rgba(37,99,235,.30)}
+.rolebtn:hover  {transform:translateY(-1px);transition:.15s}
 
 /* Dato + “avkrysset punkt” til høyre */
 .datecell{display:flex;gap:6px;align-items:center}
-.mini-check{padding:6px 8px;font-size:13px;border-radius:10px}
-
+.mini-check{
+  padding:6px 8px;font-size:13px;border-radius:10px;
+  background:var(--accent);color:#fff;border:1px solid var(--accent)
+}
+.mini-check:hover{background:var(--accent-2);border-color:var(--accent-2)}
