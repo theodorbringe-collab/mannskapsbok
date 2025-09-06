@@ -114,4 +114,18 @@ input[type="checkbox"]{width:18px;height:18px}
 .modal .sheet{width:min(800px,94%);max-height:80vh;overflow:auto;background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow)}
 .modal .sheet .hd{padding:12px 14px;border-bottom:1px solid var(--line);background:#f8fafc;font-weight:700;display:flex;justify-content:space-between;align-items:center}
 .modal .sheet .bd{padding:12px 14px}
+/* ===== Røde Kors header ===== */
+.rk-header{position:sticky;top:0;z-index:40;background:#fff;border-bottom:1px solid var(--line)}
+.rk-header .inner{max-width:1100px;margin:0 auto;padding:10px 16px;display:flex;align-items:center;gap:10px}
+.rk-logo{width:28px;height:28px;flex:0 0 auto}
+.rk-brand{font-size:22px;line-height:1;font-weight:800;letter-spacing:.1px;color:#000}
+.rk-brand .light{font-weight:600}
+.rk-subbar{background:#ff1a1a;color:#fff}
+.rk-subbar .inner{max-width:1100px;margin:0 auto;padding:6px 16px;display:flex;gap:14px;flex-wrap:wrap}
+.rk-subbar a{color:#fff;text-decoration:none;font-weight:700}
+.rk-subbar a:hover{text-decoration:underline}
+@media (max-width:640px){
+  .rk-brand{font-size:18px}
+}
+
 
