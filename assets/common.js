@@ -3,7 +3,7 @@ import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js
 
 // === DITT SUPABASE-PROSJEKT ===
 export const SUPABASE_URL  = "https://yqiqvtuxwvgbcfpsoyno.supabase.co";
-export const SUPABASE_ANON = "<din anon public key>";
+export const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlxaXF2dHV4d3ZnYmNmcHNveW5vIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY4NDI1NjcsImV4cCI6MjA3MjQxODU2N30.JKgTfWJ6HqJ96P_ghVYP5vasph12yuk36jlfEBN3PBA";
 // ===============================
 
 export const sb = createClient(SUPABASE_URL, SUPABASE_ANON);
@@ -171,5 +171,3 @@ export async function moveItem(aId, aPos, bId, bPos) {
   r = await sb.from("items").update({ position:aPos }).eq("id", bId);
   if (r.error) throw r.error;
 }
-
-
