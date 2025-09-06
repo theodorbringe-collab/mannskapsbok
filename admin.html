@@ -4,23 +4,36 @@
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Mannskapsbok – Admin</title>
   <link rel="stylesheet" href="./assets/styles.css">
+  <!-- Isolated Røde-Kors header styles (only .rk-*) -->
   <style>
-    /* — Mini logg-dropdown — */
+    .rk-header{background:#fff;border-bottom:1px solid #eaeaea}
+    .rk-head-inner{display:flex;align-items:center;gap:14px;padding:10px 0}
+    .rk-logo{position:relative;width:42px;height:42px;flex:0 0 42px}
+    .rk-logo::before,.rk-logo::after{content:"";position:absolute;background:#ff1a1a;border-radius:2px}
+    .rk-logo::before{width:70%;height:26%;left:15%;top:37%}
+    .rk-logo::after{width:26%;height:70%;left:37%;top:15%}
+    .rk-title{font-size:28px;font-weight:800;letter-spacing:.2px;color:#000}
+    .rk-title .rk-sub{font-weight:600;margin-left:.25em}
+    .rk-nav{background:#ff1a1a}
+    .rk-nav .wrap{display:flex;gap:12px;padding:6px 0;font-weight:700}
+    .rk-nav a{color:#fff;text-decoration:none}
+    .rk-nav a:hover{text-decoration:underline}
+    .rk-nav .sep{opacity:.7;color:#fff}
+    .rk-header + .rk-nav + .wrap{margin-top:16px}
+
+    /* Mini logg-dropdown */
     .drop-wrap{position:relative}
     .drop-btn{position:relative}
     .drop-panel{
       position:absolute; top:42px; right:0; z-index:30;
       width:min(520px,90vw); max-height:220px; overflow:auto;
       background:var(--card); border:1px solid var(--line);
-      border-radius:12px; box-shadow:var(--shadow);
-      display:none;
+      border-radius:12px; box-shadow:var(--shadow); display:none;
     }
     .drop-panel.open{display:block; animation:fadeIn .12s ease-out}
     .drop-hd{
-      position:sticky; top:0; z-index:1;
-      display:flex; justify-content:space-between; align-items:center;
-      gap:8px; padding:8px 10px; font-weight:700;
-      background:#f8fafc; border-bottom:1px solid var(--line)
+      position:sticky; top:0; z-index:1; display:flex; justify-content:space-between; align-items:center;
+      gap:8px; padding:8px 10px; font-weight:700; background:#f8fafc; border-bottom:1px solid var(--line)
     }
     .drop-bd{padding:8px 10px}
     .log-row{display:flex; gap:8px; align-items:center; font-size:12px; color:var(--muted); padding:2px 0}
@@ -30,11 +43,11 @@
 </head>
 <body>
 
-<!-- RK-header + meny -->
+<!-- Header + rød meny (isolert) -->
 <div class="rk-header">
   <div class="wrap rk-head-inner">
-    <span class="rk-logo" aria-hidden="true"></span>
-    <span class="rk-title">Røde Kors <span class="rk-sub">Båten Bjørgvin</span></span>
+    <div class="rk-logo"></div>
+    <div class="rk-title">Røde Kors<span class="rk-sub">Båten Bjørgvin</span></div>
   </div>
 </div>
 <nav class="rk-nav">
@@ -157,7 +170,11 @@ import {
 
     $('#userSearch').oninput = drawUsers;
     $('#catRole').onchange   = drawCatalogEditor;
-    $('#addSec').onclick     = async()=>{ await addSection($('#catRole').value); catalog = await loadCatalog(); drawCatalogEditor(); };
+    $('#addSec').onclick     = async()=>{
+      await addSection($('#catRole').value);
+      catalog = await loadCatalog();
+      drawCatalogEditor();
+    };
 
     drawUsers();
     drawCatalogEditor();
@@ -202,7 +219,7 @@ import {
 
     for(const u of arr){
       const map = await loadProgressFor(u.id);
-      const total = Object.values(catalog).flatMap(secs=>secs.flatMap(s=>(s.items||[]))).length;
+      const total = Object.values(catalog).flatMap(secs=>secs.flatMap(s=>s.items)).length;
       let done=0; for(const v of map.values()) if(v?.done) done++;
       const chip = $(`#sum-${u.id}`); if(chip) chip.textContent = `${done}/${total}`;
     }
@@ -282,7 +299,10 @@ import {
     await drawComments(uid);
 
     $('#editToggle').onchange = ()=> renderUserBook(uid, $('#editToggle').checked);
-    $('#addComment').onclick = async ()=>{ const t=($('#commentTxt').value||'').trim(); if(!t) return; await addComment(uid, t, me.id); $('#commentTxt').value=''; await drawComments(uid); };
+    $('#addComment').onclick = async ()=>{
+      const t=($('#commentTxt').value||'').trim(); if(!t) return;
+      await addComment(uid, t, me.id); $('#commentTxt').value=''; await drawComments(uid);
+    };
     $('#btnDeleteUser').onclick = ()=> deleteUser(uid);
   }
 
@@ -298,7 +318,7 @@ import {
             <table>
               <thead><tr><th style="width:60px">#</th><th>Beskrivelse</th><th style="width:240px">Sjekket ut av</th><th style="width:200px">Dato</th></tr></thead>
               <tbody>
-                ${secs.map((s,si)=> (s.items||[]).map((it,ii)=>{
+                ${secs.map((s,si)=> s.items.map((it,ii)=>{
                   const key = String(it.id);
                   const pr  = selUserProg.get(key)||{};
                   const dis = editable?'':'disabled';
@@ -323,22 +343,16 @@ import {
 
     if(editable){
       $$('#userBook tbody tr').forEach(tr=>{
-        const id = tr.getAttribute('data-id');     // <- alltid streng
+        const id = tr.getAttribute('data-id');    // string id prevents null item_id
         const d  = tr.querySelector('input[type="date"]');
         const s  = tr.querySelector('input[type="text"]');
         const b  = tr.querySelector('.mini-check');
 
         async function commit(action=null){
-          let cur = selUserProg.get(id)||{};
-          let done = !!cur.done;
-          if(action==='toggle'){
-            done = !done;
-            if(done && !d.value) d.value=today();
-            if(!done) d.value='';
-          }
-          const itemId = Number.isFinite(Number(id)) ? Number(id) : id;
-          await upsertProgress(itemId,{ date:d.value||null, signed_by:(s.value||null), done }, uid);
-          selUserProg.set(id,{ item_id:itemId, date:d.value||null, signed_by:s.value||null, done });
+          let done = !!selUserProg.get(id)?.done;
+          if(action==='toggle'){ done=!done; if(done && !d.value) d.value=today(); if(!done) d.value=''; }
+          await upsertProgress(id,{ date:d.value||null, signed_by:(s.value||null), done }, uid);
+          selUserProg.set(id,{ item_id:id, date:d.value||null, signed_by:s.value||null, done });
           b.setAttribute('data-done', done ? '1':'0');
         }
         s.onchange=()=>commit();
