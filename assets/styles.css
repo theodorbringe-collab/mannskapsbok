@@ -1,308 +1,219 @@
-<!doctype html>
-<html lang="no">
-<head>
-  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Mannskapsbok – Elev</title>
-  <link rel="stylesheet" href="./assets/styles.css?v=otp7">
-  <style>
-    /* side-spesifikt */
-    .top-actions{display:flex;gap:8px;justify-content:center;margin:10px 0 6px}
-    .name-row{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap}
-    .name-left{display:flex;gap:12px;align-items:baseline}
-
-    /* enkel modal for eksempel-tekst */
-    .modal{position:fixed;inset:0;background:rgba(2,6,23,.48);display:none;align-items:center;justify-content:center;z-index:60}
-    .modal.open{display:flex}
-    .modal-card{width:min(720px,92vw);max-height:90vh;overflow:auto;background:#fff;border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow)}
-    .modal-hd{padding:14px 16px;background:#f8fafc;border-bottom:1px solid var(--line);font-weight:800;display:flex;justify-content:space-between;align-items:center}
-    .modal-bd{padding:14px 16px;white-space:pre-wrap}
-  </style>
-</head>
-<body>
-
-<!-- Isolert Røde-Kors header -->
-<div class="rk-header">
-  <div class="wrap rk-head-inner">
-    <div class="rk-logo"></div>
-    <div class="rk-title">Røde Kors<span class="rk-sub">Båten Bjørgvin</span></div>
-  </div>
-</div>
-<nav class="rk-nav">
-  <div class="wrap">
-    <a href="./elev.html">Hovedmeny</a>
-  </div>
-</nav>
-
-<div class="wrap" id="app">Laster …</div>
-
-<!-- Eksempel-modal (visning) -->
-<div class="modal" id="exModal" aria-hidden="true">
-  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="exTitle">
-    <div class="modal-hd">
-      <span id="exTitle">Eksempel / forklaring</span>
-      <button id="exClose" class="btn small">Lukk</button>
-    </div>
-    <div id="exBody" class="modal-bd"></div>
-  </div>
-</div>
-
-<script type="module">
-import {
-  sb, ROLES,
-  ensureUserOrRedirect, updateProfile, signOut,
-  loadCatalog, loadMyProgress, upsertProgress
-} from "./assets/common.js?v=otp7";
-
-(function(){
-  const $=(s,r=document)=>r.querySelector(s);
-  const $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
-  const esc=s=>(s||'').replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[m]));
-  const today=()=>new Date().toISOString().slice(0,10);
-  const clsFor=(done,total)=> total===0||done===0?'gray':(done<total?'yellow':'green');
-
-  let me=null, catalog={}, myProg=new Map(), activeRole=ROLES[0], rt=null;
-
-  function lastUpdated(){
-    let d=null;
-    for(const v of myProg.values()){
-      if(v?.date){ const t=new Date(v.date); if(!d || t>d) d=t; }
-    }
-    return d ? d.toLocaleDateString('no-NO') : '—';
-  }
-
-  async function init(){
-    try{
-      me = await ensureUserOrRedirect();               // 🔐 ekte login
-      const [cat, prog] = await Promise.all([loadCatalog(), loadMyProgress(me.id)]);
-      catalog = cat; myProg = prog;
-      render();
-      bindRealtime();
-      bindExampleModal();
-    }catch(e){
-      $("#app").innerHTML = `<div class="box"><div class="hd">Feil</div><div class="bd" style="color:#b00020">${esc(e.message||e)}</div></div>`;
-      console.error(e);
-    }
-  }
-
-  function render(){
-    $("#app").innerHTML = `
-      <div class="page page-narrow">
-        <h1 style="text-align:center;margin-bottom:6px">Mannskapsbok</h1>
-
-        <div class="top-actions">
-          <button id="btnSave" class="btn">Lagre</button>
-          <a class="btn" href="./admin.html">Admin</a>
-          <button id="btnLogout" class="btn">Logg ut</button>
-        </div>
-
-        <div class="box" style="margin-bottom:12px">
-          <div class="bd">
-            <div class="name-row">
-              <div class="name-left">
-                <span class="note">Navn</span>
-                <b id="meName">${esc(me.name||me.email)}</b>
-              </div>
-              <span class="note">Sist oppdatert: <b id="lastUpd">${lastUpdated()}</b></span>
-            </div>
-            <div class="row" style="gap:8px;justify-content:center;margin-top:10px;flex-wrap:wrap">
-              <input id="ownerName"  class="field" placeholder="Endre navn"  value="${esc(me.name||'')}"  style="max-width:220px">
-              <input id="ownerEmail" class="field" placeholder="Endre e-post" value="${esc(me.email||'')}" style="max-width:240px">
-              <button id="saveOwner" class="btn">Oppdater</button>
-            </div>
-          </div>
-        </div>
-
-        <div id="roleBar" class="rolebar" style="justify-content:center"></div>
-
-        <div id="panel"></div>
-      </div>
-    `;
-
-    $('#btnSave').onclick = ()=> toast('Lagret ✅');
-    $('#btnLogout').onclick = async ()=>{
-      await signOut(); location.replace('./login.html');
-    };
-    $('#saveOwner').onclick = async ()=>{
-      try{
-        const name=$('#ownerName').value.trim(), email=$('#ownerEmail').value.trim();
-        await updateProfile({ name, email });             // 🔄 lagres i profiles
-        me = await ensureUserOrRedirect();
-        $('#meName').textContent = me.name||me.email;
-        toast('Oppdatert');
-      }catch(e){ alert('Kunne ikke oppdatere: ' + (e.message||e)); }
-    };
-
-    drawRoleBar();
-    drawRole(activeRole);
-  }
-
-  function drawRoleBar(){
-    const host=$('#roleBar'); host.innerHTML='';
-    ROLES.forEach(role=>{
-      const its=(catalog[role]||[]).flatMap(s=>s.items);
-      const total=its.length;
-      const done=its.filter(it=>myProg.get(String(it.id))?.done).length;
-      const b=document.createElement('button');
-      b.className=`rolebtn ${clsFor(done,total)}`;
-      b.innerHTML = `${role}<span class="sub">${done}/${total} fullført</span>`;
-      b.onclick=()=>{ activeRole=role; drawRole(activeRole); };
-      host.appendChild(b);
-    });
-  }
-
-  function drawRole(role){
-    const panel=$("#panel"); const secs=catalog[role]||[];
-    if(!secs.length){ panel.innerHTML='<div class="box"><div class="bd">Ingen punkter.</div></div>'; return; }
-
-    // map for raskt oppslag av eksempel-tekst
-    const itemsMap = new Map();
-    secs.forEach(s=>s.items.forEach(it=> itemsMap.set(String(it.id), it)));
-
-    panel.innerHTML = secs.map((s,si)=>`
-      <div class="box" style="margin-bottom:12px">
-        <div class="hd">${esc(s.title)}</div>
-        <div class="bd">
-          <table class="mb-table">
-            <thead>
-              <tr>
-                <th style="width:56px">#</th>
-                <th>Jeg kan dette</th>
-                <th style="width:260px">Sjekket ut av</th>
-                <th style="width:160px">Dato</th>
-                <th style="width:90px">Avkryss</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${s.items.map((it,pi)=>{
-                const pr=myProg.get(String(it.id))||{};
-                const exBtn = it.has_example ? `<button class="btn small" data-ex="1" title="Vis eksempel">Eksempel</button>` : '';
-                return `<tr data-id="${String(it.id)}">
-                  <td>${si+1}.${pi+1}</td>
-                  <td>${esc(it.text)}</td>
-                  <td>
-                    <div class="row" style="gap:8px;align-items:center">
-                      <input class="field" type="text" value="${esc(pr.signed_by||'')}" placeholder="Skriv inn navn" style="width:100%">
-                      ${exBtn}
-                    </div>
-                  </td>
-                  <td><input class="field" type="date" value="${pr.date||''}" style="min-width:140px"></td>
-                  <td style="text-align:center">
-                    <button class="mini-check" data-done="${pr.done?1:0}" title="${pr.done?'Fullført':'Ikke fullført'}" aria-pressed="${pr.done?true:false}">✓</button>
-                  </td>
-                </tr>`;
-              }).join('')}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    `).join('');
-
-    // handlers
-    $$('#panel tbody tr').forEach(tr=>{
-      const id = tr.getAttribute('data-id');
-      const d  = tr.querySelector('input[type="date"]');
-      const s  = tr.querySelector('input[type="text"]');
-      const b  = tr.querySelector('.mini-check');
-      const ex = tr.querySelector('button[data-ex]');
-
-      async function commit(action=null){
-        let done = !!myProg.get(id)?.done;
-        if(action==='toggle'){ done=!done; if(done && !d.value) d.value=today(); if(!done) d.value=''; }
-        try{
-          await upsertProgress(id,{ date:d.value||null, signed_by:(s.value||null), done }, me.id);
-          myProg.set(id,{ item_id:id, date:d.value||null, signed_by:s.value||null, done });
-
-          // visuell oppdatering
-          b.setAttribute('data-done', done ? '1' : '0');
-          b.setAttribute('aria-pressed', done ? 'true' : 'false');
-          b.title = done ? 'Fullført' : 'Ikke fullført';
-          b.classList.add('flash'); setTimeout(()=>b.classList.remove('flash'), 220);
-
-          drawRoleBar();
-          $('#lastUpd').textContent = lastUpdated();
-        }catch(e){
-          alert('Kunne ikke lagre: ' + (e.message||e));
-        }
-      }
-      s.onchange=()=>commit();
-      d.onchange=()=>commit();
-      b.onclick =()=>commit('toggle');
-
-      if(ex){
-        ex.onclick = ()=>{
-          const it = itemsMap.get(id);
-          openExampleModal(it?.example_text || '', it?.text || 'Eksempel / forklaring');
-        };
-      }
-    });
-  }
-
-  // liten toast
-  function toast(msg){
-    let t=document.getElementById('toast');
-    if(!t){ t=document.createElement('div'); t.id='toast'; t.className='toast'; document.body.appendChild(t); }
-    t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),1200);
-  }
-
-  // Eksempel-modal
-  function bindExampleModal(){
-    $('#exClose').onclick = closeExampleModal;
-    $('#exModal').addEventListener('click', (e)=>{
-      if(e.target === $('#exModal')) closeExampleModal(); // klikk utenfor kortet
-    });
-    document.addEventListener('keydown', (e)=>{
-      if(e.key === 'Escape' && $('#exModal').classList.contains('open')) closeExampleModal();
-    });
-  }
-  function openExampleModal(text, title){
-    $('#exTitle').textContent = title;
-    $('#exBody').textContent  = text || '—';
-    $('#exModal').classList.add('open');
-  }
-  function closeExampleModal(){
-    $('#exModal').classList.remove('open');
-  }
-
-  function bindRealtime(){
-    if(rt){ sb.removeChannel(rt); rt=null; }
-    rt = sb.channel('mb-live-elev')
-      .on('postgres_changes',{event:'*',schema:'public',table:'progress',filter:`user_id=eq.${me.id}`},
-        async()=>{ myProg=await loadMyProgress(me.id); drawRoleBar(); drawRole(activeRole); $('#lastUpd').textContent=lastUpdated(); })
-      .on('postgres_changes',{event:'*',schema:'public',table:'sections'},
-        async()=>{ catalog=await loadCatalog(); drawRoleBar(); drawRole(activeRole); })
-      .on('postgres_changes',{event:'*',schema:'public',table:'items'},
-        async()=>{ catalog=await loadCatalog(); drawRoleBar(); drawRole(activeRole); })
-      .subscribe();
-  }
-
-  init();
-})();
-</script>
-</body>
-</html>
-/* --- Horisontal rolle-stripe (FS, NK, Matros, Rescuerunner, Aspirant) --- */
-.roles-strip{
-  display:grid;
-  grid-template-columns:repeat(5,1fr);
-  gap:8px;
-  margin:8px 0 14px;
+:root{
+  --bg:#f4f6fb;
+  --card:#ffffff;
+  --text:#0b1220;
+  --muted:#64748b;
+  --line:#e5e7eb;
+  --accent:#2563eb;
+  --accent-2:#1e40af;
+  --good:#16a34a;
+  --warn:#d97706;
+  --bad:#dc2626;
+  --radius:14px;
+  --shadow:0 8px 24px rgba(15,23,42,.08);
 }
-.roles-strip .rolebtn{
-  text-align:center;
-  min-width:0;
-  padding:12px 10px;
-  font-weight:800;
+
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0;
+  background:var(--bg);
+  color:var(--text);
+  font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sans-serif;
+}
+
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+
+h1{margin:8px 0 14px;font-size:30px;letter-spacing:.2px}
+h2,h3{margin:12px 0 8px}
+
+.wrap{max-width:1100px;margin:32px auto;padding:0 16px}
+
+/* ====== Nyttig base ====== */
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.note{color:var(--muted);font-size:12px}
+.tag{display:inline-block;background:#eef2ff;color:#1e3a8a;padding:4px 8px;border-radius:999px;font-size:12px}
+.badge{display:inline-block;font-size:12px;background:#eef2ff;color:#0f172a;border:1px solid var(--line);padding:4px 8px;border-radius:999px}
+/* Admin-merking */
+.badge.admin{
+  background:#fff7e6;
+  border-color:#f59e0b;
+  color:#b45309;
+  font-weight:700;
+}
+
+/* Kort / ruter / status */
+.grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));margin:12px 0}
+.card{border-radius:16px;background:transparent}
+.card>button{
+  width:100%;border:0;cursor:pointer;padding:18px 16px;border-radius:16px;font-weight:700;
+  background:var(--card);box-shadow:var(--shadow);text-align:left
+}
+.card .sub{display:block;margin-top:4px;font-weight:500;color:var(--muted);font-size:12px}
+.card>button:hover{transform:translateY(-1px);transition:.15s}
+
+/* Statusfarger for rolleknapper */
+.gray   {background:#fff}
+.yellow {background:#fff7e6}
+.yellow .sub{color:#b45309}
+.green  {background:#ecfdf5}
+.green  .sub{color:#065f46}
+
+/* Tabs */
+.tabs{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}
+.tab{padding:10px 12px;border-radius:999px;background:var(--card);border:1.5px solid var(--line);cursor:pointer}
+.tab:hover{border-color:#cbd5e1}
+.tab.active{background:var(--accent);border-color:var(--accent);color:#fff}
+
+/* Bokser (paneler) */
+.box{
+  background:var(--card);
+  border-radius:var(--radius);
   box-shadow:var(--shadow);
+  overflow:hidden;
+  margin-bottom:12px;
+  border:1px solid var(--line)
 }
-.roles-strip .rolebtn .sub{ display:none; } /* skjul “x/y fullført” */
-.rolebtn.active{
-  border-color:var(--accent);
-  box-shadow:0 0 0 3px rgba(37,99,235,.15);
+.box .hd{
+  padding:14px 16px;
+  background:#f8fafc;
+  border-bottom:1px solid var(--line);
+  font-weight:800
 }
-@media (max-width: 900px){
-  .roles-strip{ grid-template-columns:repeat(3,1fr); }
+.box .bd{padding:14px 16px}
+
+/* Lister */
+.list{list-style:none;margin:0;padding:0;max-height:480px;overflow:auto}
+.list li{display:flex;justify-content:space-between;gap:8px;align-items:center;padding:10px 12px;border-bottom:1px solid var(--line)}
+.list li:last-child{border-bottom:0}
+.list li:hover{background:#f8fafc}
+
+/* Tabeller – ryddig, lett å lese */
+table{width:100%;border-collapse:separate;border-spacing:0}
+thead th{
+  position:sticky; top:0; z-index:1;
+  font-weight:800; background:#f8fafc; border-bottom:1px solid var(--line)
 }
-@media (max-width: 560px){
-  .roles-strip{ grid-template-columns:repeat(2,1fr); }
+th,td{padding:12px 10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+tbody tr:nth-child(even){background:#fbfdff}
+tbody tr:hover{background:#f6fbff}
+
+/* Inputs / knapper */
+.field,
+input[type="text"],input[type="date"],input[type="email"],select{
+  width:auto;min-height:40px;padding:10px 12px;border-radius:10px;
+  border:1.5px solid var(--line);background:#fff;color:var(--text)
+}
+.field:focus,
+input[type="text"]:focus,input[type="date"]:focus,input[type="email"]:focus,select:focus{
+  outline:3px solid rgba(37,99,235,.2);border-color:var(--accent)
+}
+input[type="checkbox"]{width:18px;height:18px}
+
+.btn{
+  --bg:#fff; --fg:var(--text); --bd:var(--line);
+  background:var(--bg); color:var(--fg); border:1.5px solid var(--bd);
+  padding:10px 12px;border-radius:12px;cursor:pointer;font-weight:600
+}
+.btn:hover{filter:brightness(0.98)}
+.btn:active{transform:translateY(1px)}
+.btn.primary{--bg:var(--accent);--fg:#fff;--bd:var(--accent)}
+.btn.small{padding:6px 8px;font-size:12px}
+
+/* Layout-split på admin */
+.split{display:grid;grid-template-columns:320px 1fr;gap:12px}
+@media (max-width:900px){ .split{grid-template-columns:1fr} }
+
+/* Små forbedringer for mobil */
+@media (max-width:640px){
+  h1{font-size:24px}
+  th:nth-child(1),td:nth-child(1){width:56px}
 }
 
+/* Toast */
+.toast{position:fixed;right:16px;bottom:16px;background:#111;color:#fff;padding:10px 12px;border-radius:10px;opacity:0;transform:translateY(6px);transition:.2s}
+.toast.show{opacity:1;transform:translateY(0)}
+
+/* Rolleknapper (FS/NK/...) – tydelige “kort” m/status */
+.rolebar{display:flex;gap:12px;flex-wrap:wrap;margin:8px 0 14px}
+.rolebtn{
+  border:1.5px solid var(--line); background:#fff; color:var(--text);
+  border-radius:14px; padding:14px 16px; cursor:pointer;
+  box-shadow:var(--shadow); font-weight:800; min-width:180px; text-align:left
+}
+.rolebtn .sub{display:block;font-size:12px;color:var(--muted);margin-top:4px}
+.rolebtn.gray{background:#fff}
+.rolebtn.yellow{background:#fff7e6;border-color:#f9cf8a}
+.rolebtn.green{background:#ecfdf5;border-color:#86efac}
+.rolebtn:hover{transform:translateY(-1px);transition:.15s}
+
+/* Dato + “avkrysset punkt” til høyre */
+.datecell{display:flex;gap:10px;align-items:center}
+
+/* Check-knapp – tydelig når fullført */
+.mini-check{
+  --on:#2563eb; --off:#d1d5db;
+  width:42px;height:42px;border-radius:12px;border:2px solid var(--off);
+  background:#fff;color:#fff;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;
+  transition:background .15s ease,border-color .15s ease,box-shadow .15s ease,transform .12s ease;
+}
+.mini-check::before{content:"✓";font-weight:900;color:transparent;font-size:20px;line-height:1}
+.mini-check[data-done="1"]{background:var(--on);border-color:var(--on);box-shadow:0 0 0 4px rgba(37,99,235,.18)}
+.mini-check[data-done="1"]::before{color:#fff}
+.mini-check[data-done="0"]{background:#fff;border-color:var(--off)}
+.mini-check[data-done="0"]::before{color:transparent}
+.mini-check:hover{box-shadow:0 0 0 4px rgba(37,99,235,.12)}
+.mini-check:focus-visible{outline:3px solid rgba(37,99,235,.35)}
+.mini-check.flash{animation:pop .22s ease-out}
+@keyframes pop{from{transform:scale(.92)} to{transform:scale(1)}}
+
+/* Input for dato litt tydeligere */
+.datecell input[type="date"]{min-width:140px}
+
+/* ===== Mobilvennlig elev-tabell (stack) ===== */
+@media (max-width: 720px){
+  .top-actions{gap:8px; justify-content:stretch}
+  .top-actions .btn{flex:1; min-width:0}
+
+  .rolebar{justify-content:stretch}
+  .rolebtn{flex:1; min-width:0}
+
+  .mb-table thead{display:none}
+  .mb-table, .mb-table tbody, .mb-table tr, .mb-table td{display:block; width:100%}
+  .mb-table tr{
+    background:#fff;
+    border:1px solid var(--line);
+    border-radius:12px;
+    padding:10px 12px;
+    margin:10px 0;
+  }
+  .mb-table td{border:none; padding:8px 0}
+  .mb-table td:nth-child(1){display:none}
+
+  .mb-table td:nth-child(2)::before{content:"Jeg kan dette"; display:block; font-size:12px; color:var(--muted); margin-bottom:4px}
+  .mb-table td:nth-child(3)::before{content:"Sjekket ut av"; display:block; font-size:12px; color:var(--muted); margin-bottom:4px}
+  .mb-table td:nth-child(4)::before{content:"Dato"; display:block; font-size:12px; color:var(--muted); margin-bottom:4px}
+  .mb-table td:nth-child(5)::before{content:"Avkryss"; display:block; font-size:12px; color:var(--muted); margin-bottom:6px}
+
+  .mb-table input[type="text"]{width:100%}
+  .mb-table input[type="date"]{width:100%}
+  .mb-table td:nth-child(5){text-align:right}
+  .mb-table .mini-check{width:44px;height:44px}
+}
+
+/* ====== ISOLERT RØDE-KORS HEADER ====== */
+.rk-header{ background:#fff; border-bottom:1px solid #eaeaea; }
+.rk-head-inner{ display:flex; align-items:center; gap:14px; padding:10px 0; }
+.rk-logo{ position:relative; width:42px; height:42px; flex:0 0 42px; }
+.rk-logo::before,.rk-logo::after{ content:""; position:absolute; background:#ff1a1a; border-radius:2px; }
+.rk-logo::before{ width:70%; height:26%; left:15%; top:37%; }
+.rk-logo::after{  width:26%; height:70%; left:37%; top:15%; }
+.rk-title{ font-size:28px; font-weight:800; letter-spacing:.2px; color:#000; }
+.rk-title .rk-sub{ font-weight:600; margin-left:.25em; }
+.rk-nav{ background:#ff1a1a; }
+.rk-nav .wrap{ display:flex; gap:12px; padding:6px 0; font-weight:700; }
+.rk-nav a{ color:#fff; text-decoration:none; }
+.rk-nav a:hover{ text-decoration:underline; }
+.rk-nav .sep{ opacity:.7; color:#fff; }
+.rk-header + .rk-nav + .wrap{ margin-top:16px; }
