@@ -28,13 +28,32 @@ a:hover{text-decoration:underline}
 h1{margin:8px 0 14px;font-size:30px;letter-spacing:.2px}
 h2,h3{margin:12px 0 8px}
 
+/* Standard bredde for topp-header, men hovedinnhold bruker .page */
 .wrap{max-width:1100px;margin:32px auto;padding:0 16px}
+
+/* --- Midtstilte side-containere for hovedinnhold --- */
+.page{ max-width: 960px; margin: 0 auto; padding: 0 16px 16px; }
+.page-narrow{ max-width: 820px; margin: 0 auto; padding: 0 16px 16px; }
+@media (min-width: 1400px){
+  .page{ max-width: 900px; }
+  .page-narrow{ max-width: 780px; }
+}
 
 /* ====== Nyttig base ====== */
 .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 .note{color:var(--muted);font-size:12px}
 .tag{display:inline-block;background:#eef2ff;color:#1e3a8a;padding:4px 8px;border-radius:999px;font-size:12px}
-.badge{display:inline-block;font-size:12px;background:#eef2ff;color:#0f172a;border:1px solid var(--line);padding:4px 8px;border-radius:999px}
+.badge{
+  display:inline-block;font-size:12px;background:#eef2ff;color:#0f172a;
+  border:1px solid var(--line);padding:4px 8px;border-radius:999px
+}
+/* Admin-merking */
+.badge.admin{
+  background:#fff7e6;   /* lys oransje bakgrunn */
+  border-color:#f59e0b; /* oransje kant */
+  color:#b45309;        /* mørk oransje tekst */
+  font-weight:700;
+}
 
 /* Kort / ruter / status */
 .grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));margin:12px 0}
@@ -96,7 +115,7 @@ tbody tr:hover{background:#f6fbff}
 .field,
 input[type="text"],input[type="date"],input[type="email"],select{
   width:auto;min-height:40px;padding:10px 12px;border-radius:10px;
-  border:1.5px solid var(--line);background:#fff;color:var(--text)
+  border:1.5px solid var(--line);background:#fff;color:#var(--text)
 }
 .field:focus,
 input[type="text"]:focus,input[type="date"]:focus,input[type="email"]:focus,select:focus{
@@ -114,8 +133,9 @@ input[type="checkbox"]{width:18px;height:18px}
 .btn.primary{--bg:var(--accent);--fg:#fff;--bd:var(--accent)}
 .btn.small{padding:6px 8px;font-size:12px}
 
-/* Layout-split på admin */
+/* Layout-split på admin (bedre bredder) */
 .split{display:grid;grid-template-columns:320px 1fr;gap:12px}
+@media (min-width:1100px){ .split{ grid-template-columns:360px 1fr; gap:16px; } }
 @media (max-width:900px){ .split{grid-template-columns:1fr} }
 
 /* Små forbedringer for mobil */
@@ -129,7 +149,7 @@ input[type="checkbox"]{width:18px;height:18px}
 .toast.show{opacity:1;transform:translateY(0)}
 
 /* Rolleknapper (FS/NK/...) – tydeligere */
-.rolebar{display:flex;gap:12px;flex-wrap:wrap;margin:8px 0 14px}
+.rolebar{display:flex;gap:12px;flex-wrap:wrap;margin:8px 0 14px;justify-content:center}
 .rolebtn{
   border:1.5px solid var(--line); background:#fff; color:var(--text);
   border-radius:14px; padding:14px 16px; cursor:pointer;
@@ -144,7 +164,7 @@ input[type="checkbox"]{width:18px;height:18px}
 /* Dato + “avkrysset punkt” til høyre */
 .datecell{display:flex;gap:10px;align-items:center}
 
-/* Check-knapp – nå veldig tydelig når fullført */
+/* Check-knapp – veldig tydelig når fullført */
 .mini-check{
   --on:#2563eb; --off:#d1d5db;
   width:42px;height:42px;border-radius:12px;border:2px solid var(--off);
