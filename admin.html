@@ -3,11 +3,43 @@
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Mannskapsbok – Admin</title>
-  <link rel="stylesheet" href="./assets/styles.css?v=otp6">
+  <link rel="stylesheet" href="./assets/styles.css?v=otp7">
   <style>
-    /* kun små tillegg for denne siden */
+    /* Små side-spesifikke tillegg */
     .pill{padding:6px 10px;border:1px solid var(--line);border-radius:999px;background:#fff}
     .user-active{outline:3px solid rgba(37,99,235,.35); border-radius:12px; background:#f6fbff}
+
+    /* Modal – lokal CSS så den alltid er riktig */
+    .modal-backdrop{
+      position:fixed; inset:0; display:none; /* <- skjult fra start */
+      align-items:flex-start; justify-content:center;
+      background:rgba(2,6,23,.35); backdrop-filter:saturate(120%) blur(2px);
+      padding:24px; z-index:1000;
+    }
+    .modal-backdrop.open{ display:flex; }
+    .modal-card{
+      width:min(1100px,96vw); max-height:85vh; overflow:auto;
+      background:#fff; border:1px solid var(--line); border-radius:16px; box-shadow:var(--shadow);
+    }
+
+    /* Mini logg-dropdown */
+    .drop-wrap{position:relative}
+    .drop-btn{position:relative}
+    .drop-panel{
+      position:absolute; top:42px; right:0; z-index:30;
+      width:min(520px,90vw); max-height:220px; overflow:auto;
+      background:var(--card); border:1px solid var(--line);
+      border-radius:12px; box-shadow:var(--shadow); display:none;
+    }
+    .drop-panel.open{display:block; animation:fadeIn .12s ease-out}
+    .drop-hd{
+      position:sticky; top:0; z-index:1; display:flex; justify-content:space-between; align-items:center;
+      gap:8px; padding:8px 10px; font-weight:700; background:#f8fafc; border-bottom:1px solid var(--line)
+    }
+    .drop-bd{padding:8px 10px}
+    .log-row{display:flex; gap:8px; align-items:center; font-size:12px; color:var(--muted); padding:2px 0}
+    .log-row .msg{color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+    @keyframes fadeIn{from{opacity:0; transform:translateY(-2px)} to{opacity:1; transform:translateY(0)}}
   </style>
 </head>
 <body>
@@ -27,8 +59,8 @@
 
 <div class="wrap" id="app">Laster …</div>
 
-<!-- KATALOG-MODAL (HELT SKJULT TIL MAN TRYKKER "Katalog") -->
-<div id="catModal" class="modal-backdrop" aria-hidden="true">
+<!-- KATALOG-MODAL (helt skjult til man trykker "Katalog") -->
+<div id="catModal" class="modal-backdrop" aria-hidden="true" style="display:none">
   <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="catHdr">
     <div class="hd">
       <span id="catHdr">Katalog – rediger punkter og inndelinger</span>
@@ -54,7 +86,7 @@ import {
   upsertProgress, addComment,
   addSection, updateSectionTitle, moveSection, deleteSection,
   addItem, editItem, deleteItem, moveItem
-} from "./assets/common.js?v=otp6";
+} from "./assets/common.js?v=otp7";
 
 (function(){
   const $=(s,r=document)=>r.querySelector(s);
@@ -159,18 +191,24 @@ import {
       if(drop.classList.contains('open') && !wrap.contains(ev.target)){ toggleLog(false); }
     });
 
-    // Katalog-knapp -> åpne modal
-    $('#openCatalog').onclick = ()=>{
-      // fyll nedtrekksvalg for roller hver gang (i tilfelle endret konstant)
+    // Katalog-knapp -> åpen modal
+    const modal = $('#catModal');
+    function openCatModal(){
+      // fyll roller hver gang (i tilfelle endringer)
       $('#catRole').innerHTML = ROLES.map(r=>`<option value="${r}">${r}</option>`).join('');
-      $('#catModal').classList.add('open');
-      $('#catModal').setAttribute('aria-hidden','false');
+      modal.style.display = 'flex';
+      modal.classList.add('open');
+      modal.setAttribute('aria-hidden','false');
       drawCatalogEditor();
-    };
-    $('#catClose').onclick = ()=>{
-      $('#catModal').classList.remove('open');
-      $('#catModal').setAttribute('aria-hidden','true');
-    };
+    }
+    function closeCatModal(){
+      modal.classList.remove('open');
+      modal.style.display = 'none';
+      modal.setAttribute('aria-hidden','true');
+    }
+    $('#openCatalog').onclick = openCatModal;
+    $('#catClose').onclick    = closeCatModal;
+    modal.addEventListener('click', (e)=>{ if(e.target===modal) closeCatModal(); });
 
     $('#userSearch').oninput = drawUsers;
 
@@ -395,8 +433,16 @@ import {
   function bindRealtime(){
     if(rt){ sb.removeChannel(rt); rt=null; }
     rt = sb.channel('mb-live-admin')
-      .on('postgres_changes',{event:'*',schema:'public',table:'sections'}, async()=>{ catalog=await loadCatalog(); if($('#catModal').classList.contains('open')) drawCatalogEditor(); if(selUserId) renderUserBook(selUserId, $('#editToggle').checked); })
-      .on('postgres_changes',{event:'*',schema:'public',table:'items'},    async()=>{ catalog=await loadCatalog(); if($('#catModal').classList.contains('open')) drawCatalogEditor(); if(selUserId) renderUserBook(selUserId, $('#editToggle').checked); })
+      .on('postgres_changes',{event:'*',schema:'public',table:'sections'}, async()=>{
+        catalog=await loadCatalog();
+        if($('#catModal').classList.contains('open')) drawCatalogEditor();
+        if(selUserId) renderUserBook(selUserId, $('#editToggle').checked);
+      })
+      .on('postgres_changes',{event:'*',schema:'public',table:'items'}, async()=>{
+        catalog=await loadCatalog();
+        if($('#catModal').classList.contains('open')) drawCatalogEditor();
+        if(selUserId) renderUserBook(selUserId, $('#editToggle').checked);
+      })
       .on('postgres_changes',{event:'*',schema:'public',table:'progress'}, async(payload)=>{
         const row = payload.new || payload.old;
         if(selUserId && row?.user_id===selUserId){
