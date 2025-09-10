@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Mannskapsbok – Elev</title>
-  <link rel="stylesheet" href="./assets/styles.css?v=auth1">
+  <link rel="stylesheet" href="./assets/styles.css?v=otp3">
   <style>
     .rk-header{background:#fff;border-bottom:1px solid #eaeaea}
     .rk-head-inner{display:flex;align-items:center;gap:14px;padding:10px 0}
@@ -41,7 +41,7 @@ import {
   sb, ROLES,
   ensureUserOrRedirect, updateProfile,
   loadCatalog, loadMyProgress, upsertProgress
-} from "./assets/common.js?v=auth1";
+} from "./assets/common.js?v=otp3";
 
 (function(){
   const $=(s,r=document)=>r.querySelector(s);
@@ -62,13 +62,14 @@ import {
 
   async function init(){
     try{
-      me = await ensureUserOrRedirect();              // ← krever innlogging
+      me = await ensureUserOrRedirect();               // 🔐 ekte login
       const [cat, prog] = await Promise.all([loadCatalog(), loadMyProgress(me.id)]);
       catalog = cat; myProg = prog;
       render();
       bindRealtime();
     }catch(e){
-      // Redirecter til login hvis ikke innlogget
+      $("#app").innerHTML = `<div class="box"><div class="hd">Feil</div><div class="bd" style="color:#b00020">${esc(e.message||e)}</div></div>`;
+      console.error(e);
     }
   }
 
@@ -78,7 +79,7 @@ import {
 
       <div class="row" style="margin-bottom:10px">
         <button id="btnSave" class="btn">Lagre</button>
-        <a class="btn" href="./admin.html?v=auth1">Admin</a>
+        <a class="btn" href="./admin.html">Admin</a>
         <span class="note" style="margin-left:auto">Sist oppdatert: <b id="lastUpd">${lastUpdated()}</b></span>
       </div>
 
@@ -96,21 +97,18 @@ import {
       </div>
 
       <div id="roleBar" class="rolebar"></div>
-
       <div id="panel"></div>
     `;
 
     $('#btnSave').onclick=()=> toast('Lagret ✅');
     $('#saveOwner').onclick=async()=>{
-      const name=$('#ownerName').value.trim(), email=$('#ownerEmail').value.trim();
       try{
-        await updateProfile({ name, email });
+        const name=$('#ownerName').value.trim(), email=$('#ownerEmail').value.trim();
+        await updateProfile({ name, email });             // 🔄 lagres i profiles
         me = await ensureUserOrRedirect();
         $('#meName').textContent = me.name||me.email;
         toast('Oppdatert');
-      }catch(e){
-        alert('Kunne ikke oppdatere profil: ' + (e.message||e));
-      }
+      }catch(e){ alert('Kunne ikke oppdatere: ' + (e.message||e)); }
     };
 
     drawRoleBar();
@@ -150,9 +148,8 @@ import {
             </thead>
             <tbody>
               ${s.items.map((it,pi)=>{
-                const key = String(it.id||"");
-                const pr  = myProg.get(key)||{};
-                return `<tr data-id="${key}">
+                const pr=myProg.get(String(it.id))||{};
+                return `<tr data-id="${String(it.id)}">
                   <td>${si+1}.${pi+1}</td>
                   <td>${esc(it.text)}</td>
                   <td><input class="field" type="text" value="${esc(pr.signed_by||'')}" placeholder="Skriv inn navn"></td>
@@ -168,30 +165,22 @@ import {
       </div>
     `).join('');
 
-    // handlers
     $$('#panel tbody tr').forEach(tr=>{
-      const id = tr.getAttribute('data-id') || "";
+      const id = tr.getAttribute('data-id');
       const d  = tr.querySelector('input[type="date"]');
       const s  = tr.querySelector('input[type="text"]');
       const b  = tr.querySelector('.mini-check');
 
       async function commit(action=null){
-        if(!id){ alert("Dette punktet mangler item_id."); return; }
         let done = !!myProg.get(id)?.done;
         if(action==='toggle'){ done=!done; if(done && !d.value) d.value=today(); if(!done) d.value=''; }
-
-        // visuell feedback umiddelbart
-        b.setAttribute('data-done', done ? '1' : '0');
-
         try{
           await upsertProgress(id,{ date:d.value||null, signed_by:(s.value||null), done }, me.id);
           myProg.set(id,{ item_id:id, date:d.value||null, signed_by:s.value||null, done });
+          b.setAttribute('data-done', done ? '1' : '0');
           drawRoleBar();
           $('#lastUpd').textContent = lastUpdated();
-        }catch(e){
-          b.setAttribute('data-done', !done ? '1' : '0'); // rollback
-          alert('Kunne ikke lagre: ' + (e.message||e));
-        }
+        }catch(e){ alert('Kunne ikke lagre: ' + (e.message||e)); }
       }
       s.onchange=()=>commit();
       d.onchange=()=>commit();
