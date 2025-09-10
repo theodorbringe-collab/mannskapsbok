@@ -3,25 +3,17 @@
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Mannskapsbok – Elev</title>
-  <link rel="stylesheet" href="./assets/styles.css?v=otp3">
+  <link rel="stylesheet" href="./assets/styles.css?v=otp4">
   <style>
-    .rk-header{background:#fff;border-bottom:1px solid #eaeaea}
-    .rk-head-inner{display:flex;align-items:center;gap:14px;padding:10px 0}
-    .rk-logo{position:relative;width:42px;height:42px;flex:0 0 42px}
-    .rk-logo::before,.rk-logo::after{content:"";position:absolute;background:#ff1a1a;border-radius:2px}
-    .rk-logo::before{width:70%;height:26%;left:15%;top:37%}
-    .rk-logo::after{width:26%;height:70%;left:37%;top:15%}
-    .rk-title{font-size:28px;font-weight:800;letter-spacing:.2px;color:#000}
-    .rk-title .rk-sub{font-weight:600;margin-left:.25em}
-    .rk-nav{background:#ff1a1a}
-    .rk-nav .wrap{display:flex;gap:12px;padding:6px 0;font-weight:700}
-    .rk-nav a{color:#fff;text-decoration:none}
-    .rk-nav a:hover{text-decoration:underline}
-    .rk-header + .rk-nav + .wrap{margin-top:16px}
+    /* liten layout-justering spesifikt for elev */
+    .top-actions{display:flex;gap:8px;justify-content:center;margin:10px 0 6px}
+    .name-row{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+    .name-left{display:flex;gap:12px;align-items:baseline}
   </style>
 </head>
 <body>
 
+<!-- Isolert Røde-Kors header -->
 <div class="rk-header">
   <div class="wrap rk-head-inner">
     <div class="rk-logo"></div>
@@ -39,9 +31,9 @@
 <script type="module">
 import {
   sb, ROLES,
-  ensureUserOrRedirect, updateProfile,
+  ensureUserOrRedirect, updateProfile, signOut,
   loadCatalog, loadMyProgress, upsertProgress
-} from "./assets/common.js?v=otp3";
+} from "./assets/common.js?v=otp4";
 
 (function(){
   const $=(s,r=document)=>r.querySelector(s);
@@ -75,33 +67,43 @@ import {
 
   function render(){
     $("#app").innerHTML = `
-      <h1>Mannskapsbok</h1>
+      <div class="page page-narrow">
+        <h1 style="text-align:center;margin-bottom:6px">Mannskapsbok</h1>
 
-      <div class="row" style="margin-bottom:10px">
-        <button id="btnSave" class="btn">Lagre</button>
-        <a class="btn" href="./admin.html">Admin</a>
-        <span class="note" style="margin-left:auto">Sist oppdatert: <b id="lastUpd">${lastUpdated()}</b></span>
-      </div>
+        <div class="top-actions">
+          <button id="btnSave" class="btn">Lagre</button>
+          <a class="btn" href="./admin.html">Admin</a>
+          <button id="btnLogout" class="btn">Logg ut</button>
+        </div>
 
-      <div class="box" style="margin-bottom:12px">
-        <div class="bd">
-          <div class="row" style="gap:12px;flex-wrap:wrap">
-            <div><span class="note">Navn</span><div><b id="meName">${esc(me.name||me.email)}</b></div></div>
-            <div class="row" style="gap:8px">
+        <div class="box" style="margin-bottom:12px">
+          <div class="bd">
+            <div class="name-row">
+              <div class="name-left">
+                <span class="note">Navn</span>
+                <b id="meName">${esc(me.name||me.email)}</b>
+              </div>
+              <span class="note">Sist oppdatert: <b id="lastUpd">${lastUpdated()}</b></span>
+            </div>
+            <div class="row" style="gap:8px;justify-content:center;margin-top:10px;flex-wrap:wrap">
               <input id="ownerName"  class="field" placeholder="Endre navn"  value="${esc(me.name||'')}"  style="max-width:220px">
               <input id="ownerEmail" class="field" placeholder="Endre e-post" value="${esc(me.email||'')}" style="max-width:240px">
               <button id="saveOwner" class="btn">Oppdater</button>
             </div>
           </div>
         </div>
-      </div>
 
-      <div id="roleBar" class="rolebar"></div>
-      <div id="panel"></div>
+        <div id="roleBar" class="rolebar" style="justify-content:center"></div>
+
+        <div id="panel"></div>
+      </div>
     `;
 
-    $('#btnSave').onclick=()=> toast('Lagret ✅');
-    $('#saveOwner').onclick=async()=>{
+    $('#btnSave').onclick = ()=> toast('Lagret ✅');
+    $('#btnLogout').onclick = async ()=>{
+      await signOut(); location.replace('./login.html');
+    };
+    $('#saveOwner').onclick = async ()=>{
       try{
         const name=$('#ownerName').value.trim(), email=$('#ownerEmail').value.trim();
         await updateProfile({ name, email });             // 🔄 lagres i profiles
@@ -134,16 +136,17 @@ import {
     if(!secs.length){ panel.innerHTML='<div class="box"><div class="bd">Ingen punkter.</div></div>'; return; }
 
     panel.innerHTML = secs.map((s,si)=>`
-      <div class="box" style="margin-bottom:10px">
+      <div class="box" style="margin-bottom:12px">
         <div class="hd">${esc(s.title)}</div>
         <div class="bd">
           <table>
             <thead>
               <tr>
-                <th style="width:60px">#</th>
+                <th style="width:56px">#</th>
                 <th>Jeg kan dette</th>
-                <th style="width:220px">Sjekket ut av</th>
-                <th style="width:170px">Dato</th>
+                <th style="width:90px">Avkryss</th>
+                <th style="width:240px">Sjekket ut av</th>
+                <th style="width:160px">Dato</th>
               </tr>
             </thead>
             <tbody>
@@ -152,11 +155,11 @@ import {
                 return `<tr data-id="${String(it.id)}">
                   <td>${si+1}.${pi+1}</td>
                   <td>${esc(it.text)}</td>
-                  <td><input class="field" type="text" value="${esc(pr.signed_by||'')}" placeholder="Skriv inn navn"></td>
-                  <td class="datecell">
-                    <input class="field" type="date" value="${pr.date||''}">
-                    <button class="mini-check" data-done="${pr.done?1:0}" title="Avkrysset">✓</button>
+                  <td style="text-align:center">
+                    <button class="mini-check" data-done="${pr.done?1:0}" title="${pr.done?'Fullført':'Ikke fullført'}" aria-pressed="${pr.done?true:false}">✓</button>
                   </td>
+                  <td><input class="field" type="text" value="${esc(pr.signed_by||'')}" placeholder="Skriv inn navn" style="width:100%"></td>
+                  <td><input class="field" type="date" value="${pr.date||''}" style="min-width:140px"></td>
                 </tr>`;
               }).join('')}
             </tbody>
@@ -165,6 +168,7 @@ import {
       </div>
     `).join('');
 
+    // handlers
     $$('#panel tbody tr').forEach(tr=>{
       const id = tr.getAttribute('data-id');
       const d  = tr.querySelector('input[type="date"]');
@@ -177,10 +181,18 @@ import {
         try{
           await upsertProgress(id,{ date:d.value||null, signed_by:(s.value||null), done }, me.id);
           myProg.set(id,{ item_id:id, date:d.value||null, signed_by:s.value||null, done });
+
+          // visuell oppdatering
           b.setAttribute('data-done', done ? '1' : '0');
+          b.setAttribute('aria-pressed', done ? 'true' : 'false');
+          b.title = done ? 'Fullført' : 'Ikke fullført';
+          b.classList.add('flash'); setTimeout(()=>b.classList.remove('flash'), 220);
+
           drawRoleBar();
           $('#lastUpd').textContent = lastUpdated();
-        }catch(e){ alert('Kunne ikke lagre: ' + (e.message||e)); }
+        }catch(e){
+          alert('Kunne ikke lagre: ' + (e.message||e));
+        }
       }
       s.onchange=()=>commit();
       d.onchange=()=>commit();
@@ -188,6 +200,7 @@ import {
     });
   }
 
+  // liten toast
   function toast(msg){
     let t=document.getElementById('toast');
     if(!t){ t=document.createElement('div'); t.id='toast'; t.className='toast'; document.body.appendChild(t); }
