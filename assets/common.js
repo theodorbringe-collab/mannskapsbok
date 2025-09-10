@@ -6,10 +6,17 @@ export const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzd
 
 export const sb = createClient(SUPABASE_URL, SUPABASE_ANON);
 
-/* ---------- Roller i katalogen ---------- */
+/* ---------- Roller ---------- */
 export const ROLES = ["Fartøysjef","NK","Matros","Aspirant","Rescuerunner"];
 
-/* ---------- Auth helpers ---------- */
+/* ---------- Hjelpere ---------- */
+function pickKey(obj, keys){
+  for(const k of keys){ if(obj && obj[k] != null) return String(obj[k]); }
+  return "";
+}
+function err(msg){ console.error(msg); return new Error(msg); }
+
+/* ---------- Auth ---------- */
 export async function ensureUser(){
   const { data, error } = await sb.auth.getUser();
   const user = data?.user;
@@ -21,7 +28,7 @@ export async function ensureUser(){
   return { id, email, name };
 }
 
-/* ---------- Lokal identitet (fallback “elev”-modus) ---------- */
+/* ---------- Lokal identitet (fallback) ---------- */
 export function getLocalIdentity(){
   return {
     id:    localStorage.getItem("mb_uid"),
@@ -29,7 +36,6 @@ export function getLocalIdentity(){
     name:  localStorage.getItem("mb_name"),
   };
 }
-
 export async function ensureLocalUser(){
   let id = localStorage.getItem("mb_uid");
   if(!id){
@@ -46,7 +52,6 @@ export async function ensureLocalUser(){
   await sb.from("profiles").upsert({ id, email, name }, { onConflict:"id" });
   return { id, email, name };
 }
-
 export async function setLocalIdentity({ name, email }){
   const me = await ensureLocalUser();
   const patch = {};
@@ -68,24 +73,31 @@ export async function listUsers(){
 export async function loadCatalog(){
   const out = {};
   for(const role of ROLES){
-    const { data:secs } = await sb.from("sections")
-      .select("id,title,position").eq("role",role).order("position",{ascending:true});
+    // vi henter * for å støtte ulike skjemanavn
+    const { data:secsRaw, error:secErr } = await sb.from("sections")
+      .select("*").eq("role",role).order("position",{ascending:true});
+    if(secErr) throw secErr;
 
-    // normaliser IDs til string
-    const secsNorm = (secs||[]).map(s => ({ ...s, id: String(s.id) }));
+    const secs = (secsRaw||[]).map(s => ({
+      ...s,
+      id: pickKey(s, ["id","section_id","sid","uuid"]) // normaliser
+    }));
+
     const list=[];
+    if(secs.length){
+      const secIds = secs.map(s=>s.id);
+      const { data:itemsRaw, error:itErr } = await sb.from("items")
+        .select("*").in("section_id", secIds).order("position",{ascending:true});
+      if(itErr) throw itErr;
 
-    if(secsNorm.length){
-      const ids = secsNorm.map(s=>s.id);
-      const { data:items } = await sb.from("items")
-        .select("id,section_id,text,position")
-        .in("section_id", ids).order("position",{ascending:true});
+      const items = (itemsRaw||[]).map(i => ({
+        ...i,
+        id: pickKey(i, ["id","item_id","iid","uuid"]),
+        section_id: pickKey(i, ["section_id","sid","sectionId"])
+      }));
 
-      // normaliser item-id og section_id til string
-      const itemsNorm = (items||[]).map(i => ({ ...i, id:String(i.id), section_id:String(i.section_id) }));
-
-      for(const s of secsNorm){
-        list.push({ ...s, items: itemsNorm.filter(i=>i.section_id===s.id) });
+      for(const s of secs){
+        list.push({ ...s, items: items.filter(i=>i.section_id===s.id) });
       }
     }
     out[role]=list;
@@ -94,59 +106,56 @@ export async function loadCatalog(){
 }
 
 export async function loadMyProgress(uid){
-  const { data } = await sb.from("progress")
-    .select("item_id,done,date,signed_by")
-    .eq("user_id", uid);
+  const { data, error } = await sb.from("progress")
+    .select("item_id,done,date,signed_by").eq("user_id", uid);
+  if(error) throw error;
   const map = new Map();
-  (data||[]).forEach(r=>map.set(String(r.item_id), r)); // String-nøkler
+  (data||[]).forEach(r=>map.set(String(r.item_id), r));
   return map;
 }
-
 export async function loadProgressFor(uid){
-  const { data } = await sb.from("progress")
-    .select("item_id,done,date,signed_by")
-    .eq("user_id", uid);
+  const { data, error } = await sb.from("progress")
+    .select("item_id,done,date,signed_by").eq("user_id", uid);
+  if(error) throw error;
   const map = new Map();
-  (data||[]).forEach(r=>map.set(String(r.item_id), r)); // String-nøkler
+  (data||[]).forEach(r=>map.set(String(r.item_id), r));
   return map;
 }
 
 export async function loadComments(uid){
-  const { data } = await sb.from("comments").select("id,author_id,text,created_at").eq("user_id",uid).order("created_at",{ascending:false});
+  const { data, error } = await sb.from("comments").select("id,author_id,text,created_at").eq("user_id",uid).order("created_at",{ascending:false});
+  if(error) throw error;
   return data||[];
 }
-
 export async function loadLogs(limit=150){
-  const { data } = await sb.from("logs").select("actor_id,message,created_at").order("created_at",{ascending:false}).limit(limit);
+  const { data, error } = await sb.from("logs").select("actor_id,message,created_at").order("created_at",{ascending:false}).limit(limit);
+  if(error) throw error;
   return data||[];
 }
 
 /* ---------- Skriv / endre ---------- */
 export async function upsertProgress(itemId, patch, uid){
-  // aksepter både tall og uuid som id
-  const item_id = (itemId==null ? "" : String(itemId).trim());
-  if(!item_id) throw new Error("Mangler item_id");
+  const item_id = String(itemId ?? "").trim();      // støtter UUID/tekst
+  if(!item_id) throw err("Mangler item_id");
 
   const row = {
     user_id: uid,
-    item_id,                         // <-- ikke Number() !
+    item_id,
     done: !!patch.done,
     date: patch.date || null,
     signed_by: patch.signed_by || null
   };
-
   const { error } = await sb.from("progress").upsert(row, { onConflict:"user_id,item_id" });
   if(error) { console.error("upsertProgress error", error); throw error; }
   await sb.from("logs").insert({ actor_id: uid, message: `progress updated for user ${uid}` });
 }
 
-/* ---------- Katalog-endringer ---------- */
+/* ---------- Katalog-endringer (brukes i admin) ---------- */
 export async function addComment(uid, text, authorId){
   const { error } = await sb.from("comments").insert({ user_id: uid, author_id: authorId, text });
   if(error) throw error;
   await sb.from("logs").insert({ actor_id: authorId, message: `comment added for user ${uid}` });
 }
-
 export async function addSection(role){
   const { error } = await sb.from("sections").insert({ role, title:"Ny inndeling", position: Date.now() });
   if(error) throw error;
@@ -165,7 +174,6 @@ export async function moveSection(aId,aPos,bId,bPos){
   r = await sb.from("sections").update({ position:aPos }).eq("id", bId);
   if(r.error) throw r.error;
 }
-
 export async function addItem(section_id, text){
   const { error } = await sb.from("items").insert({ section_id, text, position: Date.now() });
   if(error) throw error;
