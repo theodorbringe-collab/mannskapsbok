@@ -3,46 +3,30 @@
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Logg inn – Mannskapsbok</title>
-  <link rel="stylesheet" href="./assets/styles.css?v=pw2">
+  <link rel="stylesheet" href="./assets/styles.css?v=otp2">
   <style>
     body{display:flex;align-items:center;justify-content:center;min-height:100vh;background:var(--bg)}
     .auth{max-width:440px;width:92%;background:#fff;border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow)}
     .auth .hd{padding:14px 16px;background:#f8fafc;border-bottom:1px solid var(--line);font-weight:800}
     .auth .bd{padding:16px}
-    .tabs{display:flex;gap:8px;margin-bottom:10px}
-    .tabs button{flex:1} .hint{font-size:12px;color:var(--muted);margin-top:6px}
+    .hint{font-size:12px;color:var(--muted);margin-top:6px}
   </style>
 </head>
 <body>
   <div class="auth">
-    <div class="hd">Mannskapsbok – Logg inn</div>
+    <div class="hd">Logg inn</div>
     <div class="bd">
-      <div class="tabs">
-        <button id="tabSignIn"  class="btn primary">Logg inn</button>
-        <button id="tabSignUp"  class="btn">Registrer</button>
-        <button id="tabForgot"  class="btn">Glemt passord</button>
+      <div id="step-email">
+        <label>E-post</label>
+        <input id="email" class="field" type="email" placeholder="navn@domene.no" style="width:100%;margin-top:6px">
+        <button id="send" class="btn primary" style="margin-top:10px;width:100%">Send kode</button>
+        <div class="hint">Du får en 6-sifret kode på e-post.</div>
       </div>
 
-      <div id="viewSignIn">
-        <label>E-post</label>
-        <input id="inEmail" class="field" type="email" placeholder="navn@domene.no" style="width:100%;margin-top:6px">
-        <label style="margin-top:10px">Passord</label>
-        <input id="inPass" class="field" type="password" placeholder="••••••••" style="width:100%;margin-top:6px">
-        <button id="btnSignIn" class="btn primary" style="margin-top:12px;width:100%">Logg inn</button>
-      </div>
-
-      <div id="viewSignUp" style="display:none">
-        <label>E-post</label>
-        <input id="upEmail" class="field" type="email" placeholder="navn@domene.no" style="width:100%;margin-top:6px">
-        <label style="margin-top:10px">Velg passord</label>
-        <input id="upPass" class="field" type="password" placeholder="minst 6 tegn" style="width:100%;margin-top:6px">
-        <button id="btnSignUp" class="btn primary" style="margin-top:12px;width:100%">Opprett konto</button>
-      </div>
-
-      <div id="viewForgot" style="display:none">
-        <label>E-post</label>
-        <input id="fgEmail" class="field" type="email" placeholder="navn@domene.no" style="width:100%;margin-top:6px">
-        <button id="btnForgot" class="btn primary" style="margin-top:12px;width:100%">Send reset-lenke</button>
+      <div id="step-code" style="display:none">
+        <label>Kode</label>
+        <input id="code" class="field" inputmode="numeric" maxlength="6" placeholder="123456" style="width:100%;margin-top:6px">
+        <button id="verify" class="btn primary" style="margin-top:10px;width:100%">Logg inn</button>
       </div>
 
       <p id="msg" class="hint" style="min-height:18px;margin-top:10px"></p>
@@ -50,29 +34,11 @@
   </div>
 
 <script type="module">
-import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
-
-/* <-- BYTT IKKE hvis du bruker samme prosjekt som i koden ellers */
-const SUPABASE_URL  = "https://yqiqvtuxwvgbcfpsoyno.supabase.co";
-const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlxaXF2dHV4d3ZnYmNmcHNveW5vIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY4NDI1NjcsImV4cCI6MjA3MjQxODU2N30.JKgTfWJ6HqJ96P_ghVYP5vasph12yuk36jlfEBN3PBA";
-const sb = createClient(SUPABASE_URL, SUPABASE_ANON);
+import { sb, signInEmailOtp, verifyEmailOtp } from "./assets/common.js?v=otp2";
 
 const $ = s => document.querySelector(s);
 const qs = new URLSearchParams(location.search);
 const returnTo = qs.get('returnTo') || './elev.html';
-
-function swap(view){
-  $('#viewSignIn').style.display = (view==='in')?'block':'none';
-  $('#viewSignUp').style.display = (view==='up')?'block':'none';
-  $('#viewForgot').style.display = (view==='fg')?'block':'none';
-  $('#tabSignIn').classList.toggle('primary', view==='in');
-  $('#tabSignUp').classList.toggle('primary', view==='up');
-  $('#tabForgot').classList.toggle('primary', view==='fg');
-  $('#msg').textContent='';
-}
-$('#tabSignIn').onclick = ()=>swap('in');
-$('#tabSignUp').onclick = ()=>swap('up');
-$('#tabForgot').onclick = ()=>swap('fg');
 
 async function already(){
   const { data:{ session } } = await sb.auth.getSession();
@@ -80,55 +46,37 @@ async function already(){
 }
 already();
 
-$('#btnSignIn').onclick = async ()=>{
-  const email=$('#inEmail').value.trim(), pass=$('#inPass').value.trim();
-  if(!email||!pass) return $('#msg').textContent='Skriv inn e-post og passord.';
-  $('#msg').textContent='Logger inn…';
+$('#send').onclick = async ()=>{
+  const email = $('#email').value.trim();
+  if(!email){ $('#msg').textContent='Skriv inn e-post.'; return; }
+  $('#msg').textContent='Sender kode…';
   try{
-    const { error } = await sb.auth.signInWithPassword({ email, password: pass });
-    if(error) throw error;
-    // sørg for profilrad:
-    const { data:{ user } } = await sb.auth.getUser();
-    await sb.from("profiles").upsert({ id:user.id, email:user.email, name:user.email }, { onConflict:"id" });
+    await signInEmailOtp(email);           // <- sender koden på e-post
+    $('#step-email').style.display='none';
+    $('#step-code').style.display='block';
+    $('#msg').textContent='Kode sendt! Sjekk e-posten.';
+    $('#code').focus();
+  }catch(e){
+    $('#msg').textContent='Kunne ikke sende kode: ' + (e.message||e);
+  }
+};
+
+$('#verify').onclick = async ()=>{
+  const email = $('#email').value.trim();
+  const code  = $('#code').value.trim();
+  if(!email || !code){ $('#msg').textContent='Skriv inn e-post og kode.'; return; }
+  $('#msg').textContent='Verifiserer…';
+  try{
+    await verifyEmailOtp(email, code);     // <- logger inn
     location.replace(returnTo);
   }catch(e){
-    $('#msg').textContent = (e.message||e);
+    $('#msg').textContent='Feil kode? ' + (e.message||e);
   }
 };
 
-$('#btnSignUp').onclick = async ()=>{
-  const email=$('#upEmail').value.trim(), pass=$('#upPass').value.trim();
-  if(!email||!pass) return $('#msg').textContent='Skriv inn e-post og passord.';
-  if(pass.length<6) return $('#msg').textContent='Passord må ha minst 6 tegn.';
-  $('#msg').textContent='Oppretter konto…';
-  try{
-    const { data, error } = await sb.auth.signUp({ email, password: pass });
-    if(error) throw error;
-    if(data.session){
-      const { user } = data.session;
-      await sb.from("profiles").upsert({ id:user.id, email:user.email, name:user.email }, { onConflict:"id" });
-      location.replace(returnTo);
-    }else{
-      $('#msg').textContent='Konto opprettet. Sjekk e-post for bekreftelse (skru AV Confirm email for auto-inn).';
-    }
-  }catch(e){
-    $('#msg').textContent = (e.message||e);
-  }
-};
-
-$('#btnForgot').onclick = async ()=>{
-  const email=$('#fgEmail').value.trim();
-  if(!email) return $('#msg').textContent='Skriv inn e-post.';
-  $('#msg').textContent='Sender reset-lenke…';
-  try{
-    const redirect = `${location.origin}/mannskapsbok/reset.html`;
-    const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: redirect });
-    if(error) throw error;
-    $('#msg').textContent='Sjekk e-posten din for lenke.';
-  }catch(e){
-    $('#msg').textContent = (e.message||e);
-  }
-};
+sb.auth.onAuthStateChange((_ev, sess)=>{
+  if(sess?.user) location.replace(returnTo);
+});
 </script>
 </body>
 </html>
