@@ -262,4 +262,31 @@ input[type="checkbox"]{width:18px;height:18px}
   border-color:var(--accent);
   box-shadow:0 0 0 3px rgba(37,99,235,.15);
 }
+/* ==== KNALLE STATUSFARGER ==== */
+
+/* Elev: roletab-tilstander */
+.roletab.state-yellow{
+  background:#fff3c4;          /* klar gul bakgrunn */
+  border-color:#f59e0b;        /* oransje kant */
+}
+.roletab.state-green{
+  background:#10b981;          /* knall grønn */
+  border-color:#059669;
+  color:#fff;                  /* hvit tekst for kontrast */
+}
+.roletab.state-green.active{   /* beholder grønn når valgt */
+  box-shadow:0 0 0 3px rgba(16,185,129,.35);
+}
+
+/* Admin: accordion-header i samme stil */
+.accordion.state-yellow .acc-hd{
+  background:#fff3c4;
+  border-bottom-color:#f59e0b;
+}
+.accordion.state-green .acc-hd{
+  background:#10b981;
+  color:#fff;
+}
+.accordion.state-green .acc-count{ color:#e6fffa; }
+
 
