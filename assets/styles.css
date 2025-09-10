@@ -280,3 +280,29 @@ import {
 </script>
 </body>
 </html>
+/* --- Horisontal rolle-stripe (FS, NK, Matros, Rescuerunner, Aspirant) --- */
+.roles-strip{
+  display:grid;
+  grid-template-columns:repeat(5,1fr);
+  gap:8px;
+  margin:8px 0 14px;
+}
+.roles-strip .rolebtn{
+  text-align:center;
+  min-width:0;
+  padding:12px 10px;
+  font-weight:800;
+  box-shadow:var(--shadow);
+}
+.roles-strip .rolebtn .sub{ display:none; } /* skjul “x/y fullført” */
+.rolebtn.active{
+  border-color:var(--accent);
+  box-shadow:0 0 0 3px rgba(37,99,235,.15);
+}
+@media (max-width: 900px){
+  .roles-strip{ grid-template-columns:repeat(3,1fr); }
+}
+@media (max-width: 560px){
+  .roles-strip{ grid-template-columns:repeat(2,1fr); }
+}
+
