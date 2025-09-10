@@ -217,3 +217,49 @@ input[type="checkbox"]{width:18px;height:18px}
 .rk-nav a:hover{ text-decoration:underline; }
 .rk-nav .sep{ opacity:.7; color:#fff; }
 .rk-header + .rk-nav + .wrap{ margin-top:16px; }
+/* --- Toppbjelke (lagre / admin / logg ut) --- */
+.topbar{
+  display:grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap:8px;
+  margin:10px 0 6px;
+}
+@media (max-width:640px){
+  .topbar{ grid-template-columns: 1fr; }
+}
+
+/* --- Navn / sist oppdatert linje --- */
+.name-row{
+  display:grid;
+  grid-template-columns: 1fr auto;
+  gap:12px;
+  align-items:center;
+}
+.name-left{ display:flex; gap:8px; align-items:baseline; flex-wrap:wrap; }
+
+/* --- Rolle-rad (FS, NK, Matros, Rescuerunner, Aspirant) --- */
+.roles-tabs{
+  display:grid;
+  grid-template-columns:repeat(5,1fr);
+  gap:10px;
+  margin:12px 0 14px;
+}
+@media (max-width:900px){ .roles-tabs{ grid-template-columns:repeat(3,1fr); } }
+@media (max-width:560px){ .roles-tabs{ grid-template-columns:repeat(2,1fr); } }
+
+.roletab{
+  border:1.5px solid var(--line);
+  background:#fff;
+  border-radius:12px;
+  padding:12px 10px;
+  font-weight:800;
+  text-align:center;
+  cursor:pointer;
+  box-shadow:var(--shadow);
+}
+.roletab:hover{ transform:translateY(-1px); transition:.15s; }
+.roletab.active{
+  border-color:var(--accent);
+  box-shadow:0 0 0 3px rgba(37,99,235,.15);
+}
+
