@@ -3,49 +3,40 @@
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Mannskapsbok – Admin</title>
-  <link rel="stylesheet" href="./assets/styles.css?v=layout1">
+  <link rel="stylesheet" href="./assets/styles.css?v=adminA1">
   <style>
-    /* header/nav (isolert) */
-    .rk-header{background:#fff;border-bottom:1px solid #eaeaea}
-    .rk-head-inner{display:flex;align-items:center;gap:14px;padding:10px 0}
-    .rk-logo{position:relative;width:42px;height:42px;flex:0 0 42px}
-    .rk-logo::before,.rk-logo::after{content:"";position:absolute;background:#ff1a1a;border-radius:2px}
-    .rk-logo::before{width:70%;height:26%;left:15%;top:37%}
-    .rk-logo::after{width:26%;height:70%;left:37%;top:15%}
-    .rk-title{font-size:28px;font-weight:800;letter-spacing:.2px;color:#000}
-    .rk-title .rk-sub{font-weight:600;margin-left:.25em}
-    .rk-nav{background:#ff1a1a}
-    .rk-nav .wrap{display:flex;gap:12px;padding:6px 0;font-weight:700}
-    .rk-nav a{color:#fff;text-decoration:none}
-    .rk-nav a:hover{text-decoration:underline}
-    .rk-header + .rk-nav + .wrap{margin-top:16px}
-
-    /* layout */
-    .shell{max-width:1100px;margin:0 auto}
-    .admin-grid{display:grid;grid-template-columns:320px 1fr;gap:16px}
-    @media (max-width:980px){ .admin-grid{grid-template-columns:1fr} }
-
-    /* modaler */
-    .modal{
-      position:fixed;inset:0;background:rgba(2,6,23,.48);
-      display:none;align-items:center;justify-content:center;z-index:60;
-    }
+    /* Små side-spesifikke tillegg */
+    .user-list li{cursor:pointer;border-left:3px solid transparent}
+    .user-list li.active{outline:3px solid rgba(37,99,235,.25); background:#f0f7ff; border-left-color:#2563eb}
+    .user-actions{display:flex;gap:6px;flex-wrap:wrap}
+    .accordion{border:1px solid var(--line);border-radius:12px;overflow:hidden;margin-bottom:10px;background:#fff}
+    .acc-hd{display:flex;justify-content:space-between;align-items:center;padding:12px 14px;font-weight:800;background:#f8fafc;cursor:pointer}
+    .acc-bd{display:none;padding:12px 14px}
+    .accordion.open .acc-bd{display:block}
+    .acc-count{font-weight:600;color:var(--muted)}
+    .pill{display:inline-block;padding:4px 8px;border:1px solid var(--line);border-radius:999px;font-size:12px;background:#fff}
+    .mini{font-size:12px}
+    /* Logg dropdown */
+    .drop-wrap{position:relative}
+    .drop-panel{position:absolute;top:42px;right:0;z-index:40;width:min(540px,92vw);max-height:260px;overflow:auto;background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);display:none}
+    .drop-panel.open{display:block;animation:fadeIn .12s ease-out}
+    .drop-hd{position:sticky;top:0;z-index:1;display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 10px;font-weight:700;background:#f8fafc;border-bottom:1px solid var(--line)}
+    .drop-bd{padding:8px 10px}
+    .log-row{display:flex;gap:8px;align-items:center;font-size:12px;color:var(--muted);padding:2px 0}
+    .log-row .msg{color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    @keyframes fadeIn{from{opacity:0;transform:translateY(-2px)} to{opacity:1;transform:translateY(0)}}
+    /* Katalog-modal (stort) */
+    .modal{position:fixed;inset:0;background:rgba(2,6,23,.48);display:none;align-items:center;justify-content:center;z-index:60}
     .modal.open{display:flex}
-    .modal-card{
-      width:min(1000px,92vw);max-height:90vh;overflow:auto;background:#fff;
-      border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow)
-    }
+    .modal-card{width:min(1100px,96vw);max-height:90vh;overflow:auto;background:#fff;border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow)}
     .modal-hd{padding:14px 16px;background:#f8fafc;border-bottom:1px solid var(--line);font-weight:800;display:flex;justify-content:space-between;align-items:center}
     .modal-bd{padding:14px 16px}
-
-    /* små indikatorer */
-    .pill{display:inline-flex;align-items:center;gap:6px;padding:4px 8px;border-radius:999px;border:1px solid var(--line);font-size:12px;background:#fff}
-    .dot{width:8px;height:8px;border-radius:50%;background:#d1d5db}
-    .dot.on{background:#2563eb}
+    .ex-flag{background:#eef2ff;color:#1e3a8a;border-color:#c7d2fe}
   </style>
 </head>
 <body>
 
+<!-- Røde-Kors header -->
 <div class="rk-header">
   <div class="wrap rk-head-inner">
     <div class="rk-logo"></div>
@@ -58,71 +49,20 @@
   </div>
 </nav>
 
-<div class="wrap shell">
-  <div class="row" style="justify-content:space-between;align-items:center">
-    <h1 style="margin:0">Admin</h1>
-    <div class="row">
-      <button id="btnOpenLog" class="btn small">Logg</button>
-      <button id="btnOpenCatalog" class="btn small primary">Katalog punkter</button>
-    </div>
-  </div>
+<div class="wrap" id="app">Laster …</div>
 
-  <div class="admin-grid" id="app">
-    <!-- venstre -->
-    <div>
-      <div class="box">
-        <div class="hd">Velg bruker</div>
-        <div class="bd">
-          <input id="userSearch" class="field" placeholder="Søk navn/epost …" style="width:100%;margin-bottom:10px">
-          <ul id="userList" class="list"></ul>
-        </div>
-      </div>
-
-      <div class="box" style="margin-top:12px">
-        <div class="hd">Handlinger for valgt bruker</div>
-        <div class="bd">
-          <div class="row" style="gap:8px;flex-wrap:wrap">
-            <button id="btnMakeAdmin" class="btn small">Gjør til admin</button>
-            <button id="btnRemoveAdmin" class="btn small">Fjern admin</button>
-            <button id="btnDeleteUser" class="btn small">Slett bruker</button>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- høyre -->
-    <div>
-      <div class="box">
-        <div class="hd"><span id="selHdr">Punkter til elev</span></div>
-        <div class="bd" id="userBook"><div class="note">Velg en bruker til venstre.</div></div>
-      </div>
-
-      <div class="box" style="margin-top:12px">
-        <div class="hd">Kommentar til eleven</div>
-        <div class="bd">
-          <div class="row" style="gap:8px">
-            <input id="commentTxt" class="field" placeholder="Skriv kommentar …" style="flex:1;min-width:240px">
-            <button id="addComment" class="btn small">Legg til</button>
-          </div>
-          <ul id="commentList" class="list" style="margin-top:8px;max-height:240px"></ul>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- KATALOG-MODAL -->
-<div class="modal" id="catModal" aria-hidden="true">
-  <div class="modal-card">
+<!-- Katalog-modal -->
+<div id="catModal" class="modal" aria-hidden="true">
+  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="catTitle">
     <div class="modal-hd">
-      <span>Katalog – rediger punkter</span>
-      <div class="row" style="gap:8px">
-        <select id="catRole" class="field" style="min-width:180px"></select>
-        <button id="catClose" class="btn small">Lukk</button>
-      </div>
+      <span id="catTitle">Katalog – rediger punkter og inndelinger</span>
+      <button id="catClose" class="btn small">Lukk</button>
     </div>
     <div class="modal-bd">
       <div class="row" style="gap:8px;align-items:center;margin-bottom:8px">
+        <label>Rolle:
+          <select id="catRole" class="field" style="min-width:160px"></select>
+        </label>
         <button id="addSec" class="btn small primary">+ Inndeling</button>
       </div>
       <div id="catWrap"></div>
@@ -130,196 +70,351 @@
   </div>
 </div>
 
-<!-- EKSEMPEL-EDITOR (for ett punkt) -->
-<div class="modal" id="exModal" aria-hidden="true">
-  <div class="modal-card" style="width:min(720px,92vw)">
-    <div class="modal-hd">
-      <span>Eksempel / forklaring</span>
-      <button id="exClose" class="btn small">Lukk</button>
-    </div>
-    <div class="modal-bd">
-      <div class="row" style="gap:10px;align-items:center;margin-bottom:8px">
-        <label class="pill"><span class="dot" id="exDot"></span> <input id="exToggle" type="checkbox" style="margin-left:6px"> Aktiver eksempel for dette punktet</label>
-      </div>
-      <textarea id="exText" class="field" style="width:100%;min-height:200px" placeholder="Skriv detaljert forklaring / eksempel …"></textarea>
-      <div class="row" style="justify-content:flex-end;margin-top:10px">
-        <button id="exSave" class="btn primary">Lagre</button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- LOGG-MODAL (liten) -->
-<div class="modal" id="logModal" aria-hidden="true">
-  <div class="modal-card" style="width:min(680px,92vw)">
-    <div class="modal-hd">
-      <span>Systemlogg</span>
-      <button id="logClose" class="btn small">Lukk</button>
-    </div>
-    <div class="modal-bd">
-      <div id="logList">Laster …</div>
-    </div>
-  </div>
-</div>
-
 <script type="module">
 import {
-  sb, ROLES,
+  sb,
   ensureUserOrRedirect,
   listUsers, loadCatalog, loadProgressFor, loadComments, loadLogs,
   upsertProgress, addComment,
   addSection, updateSectionTitle, moveSection, deleteSection,
-  addItem, editItem, deleteItem, moveItem,
-  setItemExample, setUserAdmin
-} from "./assets/common.js?v=layout1";
+  addItem, editItem, deleteItem, moveItem
+} from "./assets/common.js?v=adminA1";
 
 (function(){
   const $=(s,r=document)=>r.querySelector(s);
   const $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
-  const esc=s=>(s||"").replace(/[&<>"]/g,m=>({"&":"&amp;","<":"&lt;","&gt;":"&gt;"}[m]));
+  const esc=s=>(s||"").replace(/[&<>"]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[m]));
   const today=()=>new Date().toISOString().slice(0,10);
 
-  let me=null, users=[], catalog={}, selUserId=null, selUserProg=new Map();
-  let exItemId=null; // for eksempel-editor
+  const ROLE_ORDER=['Fartøysjef','NK','Matros','Rescuerunner','Aspirant'];
+
+  let me=null, catalog={}, users=[], selUserId=null, selUser=null, selUserProg=new Map(), rt=null;
 
   async function init(){
-    me = await ensureUserOrRedirect();
-    const { data:prof } = await sb.from("profiles").select("is_admin").eq("id", me.id).single();
-    if(!prof?.is_admin){
-      document.getElementById('app').innerHTML = '<div class="box"><div class="hd">Ingen tilgang</div><div class="bd">Denne siden er bare for administratorer.</div></div>';
-      return;
+    try{
+      me = await ensureUserOrRedirect();
+      const { data:prof, error:perr } = await sb.from("profiles").select("is_admin").eq("id", me.id).single();
+      if(perr) throw perr;
+      if(!prof?.is_admin){
+        $('#app').innerHTML = `<div class="box"><div class="hd">Ingen tilgang</div><div class="bd">Denne siden er bare for administratorer.</div></div>`;
+        return;
+      }
+
+      [users, catalog] = await Promise.all([loadUsersWithAdminFlag(), loadCatalog()]);
+      render(); bindRealtime();
+    }catch(e){
+      $('#app').innerHTML = `<div class="box"><div class="hd">Feil</div><div class="bd" style="color:#b00020">${esc(e.message||e)}</div></div>`;
+      console.error(e);
     }
-    [users, catalog] = await Promise.all([listUsers(), loadCatalog()]);
-    renderUsers();
-    fillRoleSelect();
-    bindTopButtons();
   }
 
-  /* ---------- Brukerlisten ---------- */
-  function renderUsers(){
+  async function loadUsersWithAdminFlag(){
+    const { data, error } = await sb.from("profiles").select("id,name,email,is_admin").order("email",{ascending:true});
+    if(error) throw error;
+    return data||[];
+  }
+
+  function render(){
+    $('#app').innerHTML = `
+      <div class="row" style="justify-content:space-between;align-items:center">
+        <h1>Admin</h1>
+        <div class="row drop-wrap">
+          <button id="btnLog" class="btn small">Logg</button>
+          <div id="logDrop" class="drop-panel" role="region" aria-hidden="true">
+            <div class="drop-hd">
+              <span>Systemlogg</span>
+              <div class="row" style="gap:6px">
+                <button id="logRefresh" class="btn small">Oppdater</button>
+                <button id="logClose" class="btn small">Lukk</button>
+              </div>
+            </div>
+            <div id="logList" class="drop-bd">—</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="split">
+        <!-- VENSTRE KOLONNE -->
+        <div>
+          <div class="box">
+            <div class="hd">Velg bruker</div>
+            <div class="bd">
+              <input id="userSearch" class="field" placeholder="Søk navn/e-post …" style="width:100%;margin-bottom:10px">
+              <ul id="userList" class="list user-list"></ul>
+            </div>
+          </div>
+
+          <div class="box">
+            <div class="hd">Katalog</div>
+            <div class="bd">
+              <div class="row" style="gap:8px">
+                <button id="openCatalog" class="btn primary">Åpne redigering</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- HØYRE KOLONNE -->
+        <div>
+          <div class="box">
+            <div class="hd" id="selHdr">Velg en bruker</div>
+            <div class="bd" id="userArea">
+              <div class="note">Ingen valgt.</div>
+            </div>
+          </div>
+
+          <div class="box">
+            <div class="hd">Kommentarer</div>
+            <div class="bd">
+              <div class="row" style="gap:8px">
+                <input id="commentTxt" class="field" placeholder="Skriv kommentar til elev" style="flex:1;min-width:240px">
+                <button id="addComment" class="btn small">Legg til</button>
+              </div>
+              <ul id="commentList" class="list" style="margin-top:8px;max-height:220px"></ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+
+    // Logg dropdown
+    $('#btnLog').onclick    = async (e)=>{ e.stopPropagation(); await toggleLog(true); };
+    $('#logRefresh').onclick= async (e)=>{ e.stopPropagation(); await fillLogList(); };
+    $('#logClose').onclick  = (e)=>{ e.stopPropagation(); toggleLog(false); };
+    document.addEventListener('click',(ev)=>{
+      const drop = $('#logDrop');
+      if(drop.classList.contains('open') && !$('.drop-wrap').contains(ev.target)){ toggleLog(false); }
+    });
+
+    $('#userSearch').oninput = drawUsers;
+    $('#openCatalog').onclick = openCatalogModal;
+    $('#catClose').onclick = closeCatalogModal;
+
+    // Fyll rolle-valg i katalog-modal
+    const sel = $('#catRole'); sel.innerHTML = ROLE_ORDER.map(r=>`<option value="${r}">${r}</option>`).join('');
+
+    drawUsers();
+  }
+
+  async function fillLogList(){
+    const entries = await loadLogs(200);
+    $('#logList').innerHTML = entries.map(l=>`
+      <div class="log-row">
+        <span class="note">${new Date(l.created_at).toLocaleTimeString('no-NO',{hour:'2-digit',minute:'2-digit'})}</span>
+        <span class="msg">${esc(l.message||'')}</span>
+      </div>
+    `).join('') || '<div class="note">Tom logg.</div>';
+  }
+  async function toggleLog(open){
+    const drop = $('#logDrop');
+    const willOpen = (open===true) ? true : (open===false ? false : !drop.classList.contains('open'));
+    if(willOpen){ await fillLogList(); }
+    drop.classList.toggle('open', willOpen);
+  }
+
+  /* ---------- Brukerliste ---------- */
+  function drawUsers(){
     const list = $('#userList');
     const q = ($('#userSearch').value||'').toLowerCase();
     const arr = users.filter(u => (u.name||'').toLowerCase().includes(q) || (u.email||'').toLowerCase().includes(q));
     if(!arr.length){ list.innerHTML='<li><span class="note">Ingen brukere</span></li>'; return; }
 
     list.innerHTML = arr.map(u=>`
-      <li data-id="${u.id}">
+      <li data-id="${u.id}" class="${u.id===selUserId?'active':''}">
         <div>
-          <div><b>${esc(u.name||u.email||u.id)}</b></div>
+          <div><b>${esc(u.name||u.email||u.id)}</b> ${u.is_admin ? '<span class="badge admin">Admin</span>' : ''}</div>
           <div class="note">${esc(u.email||'')}</div>
         </div>
-        <span class="badge" id="sum-${u.id}">…</span>
+        <span class="pill">${u.id===selUserId?'Åpen':'Klikk for å åpne'}</span>
       </li>
     `).join('');
 
     $$('#userList li').forEach(li => li.onclick = ()=> selectUser(li.getAttribute('data-id')));
-
-    // fyll små summer
-    arr.forEach(async u=>{
-      const map = await loadProgressFor(u.id);
-      const total = Object.values(catalog).flatMap(secs=>secs.flatMap(s=>s.items)).length;
-      let done=0; for(const v of map.values()) if(v?.done) done++;
-      const chip = $(`#sum-${u.id}`); if(chip) chip.textContent = `${done}/${total}`;
-    });
-
-    $('#userSearch').oninput = renderUsers;
   }
 
   async function selectUser(uid){
     selUserId = uid;
-    const u = users.find(x=>x.id===uid);
+    selUser = users.find(x=>x.id===uid)||null;
+    if(!selUser){ $('#userArea').innerHTML='<div class="note">Fant ikke bruker.</div>'; return; }
+
     selUserProg = await loadProgressFor(uid);
-    $('#selHdr').textContent = u?.name || u?.email || 'Punkter til elev';
-    await renderUserBook(uid);
+    $('#selHdr').innerHTML = `Mannskapsbok: <b>${esc(selUser.name||selUser.email||selUser.id)}</b>`;
+
+    // Tegn høyre side
+    renderUserArea();
+
+    // Kommentarfelt
     await drawComments(uid);
 
-    $('#btnDeleteUser').onclick = ()=> deleteUser(uid);
-    $('#btnMakeAdmin').onclick = async ()=>{ await setUserAdmin(uid,true); toast('Satt som admin'); };
-    $('#btnRemoveAdmin').onclick = async ()=>{ await setUserAdmin(uid,false); toast('Fjernet admin'); };
+    drawUsers(); // for å oppdatere "active"-stil i lista
   }
 
-  async function renderUserBook(uid){
-    const html = ROLES.map(role=>{
-      const secs=catalog[role]||[];
-      if(!secs.length) return '';
+  async function drawComments(uid){
+    const arr = await loadComments(uid);
+    $('#commentList').innerHTML = arr.map(c=>`
+      <li><span>${esc(c.text)}</span><span class="note">${new Date(c.created_at).toLocaleString('no-NO')}</span></li>
+    `).join('') || '<li><span class="note">Ingen kommentarer.</span></li>';
+
+    $('#addComment').onclick = async ()=>{
+      const t=($('#commentTxt').value||'').trim(); if(!t) return;
+      await addComment(uid, t, me.id); $('#commentTxt').value=''; await drawComments(uid);
+    };
+  }
+
+  function renderUserArea(){
+    const el = $('#userArea');
+
+    const headerControls = `
+      <div class="user-actions" style="margin-bottom:10px">
+        <input id="uName" class="field" placeholder="Navn"  value="${esc(selUser.name||'')}"  style="min-width:220px">
+        <input id="uMail" class="field" placeholder="E-post" value="${esc(selUser.email||'')}" style="min-width:240px">
+        <button id="btnSaveProfile" class="btn">Lagre profil</button>
+        ${selUser.is_admin
+          ? '<button id="btnUnsetAdmin" class="btn">Fjern admin</button>'
+          : '<button id="btnSetAdmin" class="btn">Gjør til admin</button>'}
+        <button id="btnDeleteUser" class="btn">Slett bruker</button>
+      </div>
+    `;
+
+    const accHtml = ROLE_ORDER.map(role=>{
+      const secs = catalog[role]||[];
+      const countAll = secs.reduce((n,s)=> n + (s.items?.length||0), 0);
+      let done=0; secs.forEach(s=> (s.items||[]).forEach(it=>{ if(selUserProg.get(String(it.id))?.done) done++; }));
       return `
-        <div class="box" style="margin-bottom:12px">
-          <div class="hd">${role}</div>
-          <div class="bd">
-            <table>
-              <thead><tr><th style="width:56px">#</th><th>Beskrivelse</th><th style="width:90px">Avkryss</th><th style="width:240px">Sjekket ut av</th><th style="width:160px">Dato</th></tr></thead>
-              <tbody>
-                ${secs.map((s,si)=> s.items.map((it,ii)=>{
-                  const key = String(it.id);
-                  const pr  = selUserProg.get(key)||{};
-                  return `
-                    <tr data-id="${key}">
-                      <td>${si+1}.${ii+1}</td>
-                      <td>
-                        ${esc(it.text)}
-                        ${it.has_example ? `<span class="pill" style="margin-left:6px"><span class="dot on"></span> Eksempel</span>`:''}
-                      </td>
-                      <td style="text-align:center">
-                        <button class="mini-check" data-done="${pr.done?1:0}" title="${pr.done?'Fullført':'Ikke fullført'}" aria-pressed="${pr.done?true:false}">✓</button>
-                      </td>
-                      <td><input class="field" type="text" value="${esc(pr.signed_by||'')}" placeholder="Skriv inn navn" style="width:100%"></td>
-                      <td><input class="field" type="date" value="${pr.date||''}" style="min-width:140px"></td>
-                    </tr>`;
-                }).join('')).join('')}
-              </tbody>
-            </table>
+        <div class="accordion" data-role="${role}">
+          <div class="acc-hd">
+            <span>${role}</span>
+            <span class="acc-count">${done}/${countAll} fullført</span>
           </div>
-        </div>`;
-    }).join('') || '<div class="note">Ingen punkter i katalogen.</div>';
+          <div class="acc-bd">
+            ${secs.length? secs.map((s,si)=>`
+              <div class="box" style="margin-bottom:12px">
+                <div class="hd">${esc(s.title)}</div>
+                <div class="bd">
+                  <table>
+                    <thead><tr><th style="width:56px">#</th><th>Beskrivelse</th><th style="width:260px">Sjekket ut av</th><th style="width:160px">Dato</th><th style="width:90px">Avkryss</th></tr></thead>
+                    <tbody>
+                      ${(s.items||[]).map((it,ii)=>{
+                        const key=String(it.id), pr=selUserProg.get(key)||{};
+                        const exBtn = it.has_example ? `<button class="btn small" data-ex="1">Eksempel</button>` : '';
+                        return `<tr data-id="${key}">
+                          <td>${si+1}.${ii+1}</td>
+                          <td>${esc(it.text)} ${it.has_example?'<span class="badge ex-flag mini">har eksempel</span>':''}</td>
+                          <td>
+                            <div class="row" style="gap:8px;align-items:center">
+                              <input class="field" type="text" value="${esc(pr.signed_by||'')}" placeholder="Skriv inn navn" style="width:100%">
+                              ${exBtn}
+                            </div>
+                          </td>
+                          <td><input class="field" type="date" value="${pr.date||''}" style="min-width:140px"></td>
+                          <td style="text-align:center"><button class="mini-check" data-done="${pr.done?1:0}" aria-pressed="${pr.done?true:false}">✓</button></td>
+                        </tr>`;
+                      }).join('')}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            `).join('') : '<div class="note">Ingen punkter.</div>'}
+          </div>
+        </div>
+      `;
+    }).join('');
 
-    $('#userBook').innerHTML = html;
+    el.innerHTML = headerControls + accHtml;
 
-    // lagre on-change
-    $$('#userBook tbody tr').forEach(tr=>{
+    // profilknapper
+    $('#btnSaveProfile').onclick = async ()=>{
+      const name=$('#uName').value.trim(), email=$('#uMail').value.trim();
+      await sb.from('profiles').update({ name, email }).eq('id', selUserId);
+      users = await loadUsersWithAdminFlag();
+      selUser = users.find(x=>x.id===selUserId);
+      $('#selHdr').innerHTML = `Mannskapsbok: <b>${esc(selUser.name||selUser.email||selUser.id)}</b>`;
+      drawUsers();
+    };
+    const setAdmin = async (v)=>{ await sb.from('profiles').update({ is_admin: v }).eq('id', selUserId); users=await loadUsersWithAdminFlag(); selUser=users.find(x=>x.id===selUserId); renderUserArea(); drawUsers(); };
+    const delUser = async ()=>{
+      if(!confirm(`Slette bruker "${selUser?.name||selUser?.email||selUserId}"? Dette sletter progresjon, kommentarer, logger og profil.`)) return;
+      await sb.from('progress').delete().eq('user_id', selUserId);
+      await sb.from('comments').delete().or(`user_id.eq.${selUserId},author_id.eq.${selUserId}`);
+      await sb.from('logs').delete().eq('actor_id', selUserId);
+      await sb.from('profiles').delete().eq('id', selUserId);
+      users = users.filter(x=>x.id!==selUserId);
+      selUserId=null; selUser=null; selUserProg=new Map();
+      render();
+    };
+    $('#btnDeleteUser').onclick = delUser;
+    const bSet=$('#btnSetAdmin'), bUnset=$('#btnUnsetAdmin');
+    if(bSet) bSet.onclick=()=>setAdmin(true);
+    if(bUnset) bUnset.onclick=()=>setAdmin(false);
+
+    // accordion åpne/lukke
+    $$('.acc-hd', el).forEach(h=> h.onclick = ()=> h.parentElement.classList.toggle('open'));
+
+    // progress-handlers
+    $$('#userArea tbody tr').forEach(tr=>{
       const id = tr.getAttribute('data-id');
       const d  = tr.querySelector('input[type="date"]');
       const s  = tr.querySelector('input[type="text"]');
       const b  = tr.querySelector('.mini-check');
+      const ex = tr.querySelector('button[data-ex]');
 
       async function commit(action=null){
         let done = !!selUserProg.get(id)?.done;
         if(action==='toggle'){ done=!done; if(done && !d.value) d.value=today(); if(!done) d.value=''; }
         await upsertProgress(id,{ date:d.value||null, signed_by:(s.value||null), done }, selUserId);
         selUserProg.set(id,{ item_id:id, date:d.value||null, signed_by:s.value||null, done });
-
-        b.setAttribute('data-done', done ? '1' : '0');
-        b.setAttribute('aria-pressed', done ? 'true' : 'false');
-        b.title = done ? 'Fullført' : 'Ikke fullført';
-        b.classList.add('flash'); setTimeout(()=>b.classList.remove('flash'), 220);
+        b.setAttribute('data-done', done ? '1':'0');
+        b.setAttribute('aria-pressed', done ? 'true':'false');
+        // oppdater teller i headeren
+        renderUserArea(); // enkel refresh av seksjonene for å oppdatere summer
       }
       s.onchange=()=>commit();
       d.onchange=()=>commit();
       b.onclick =()=>commit('toggle');
+
+      if(ex){
+        ex.onclick = ()=>{
+          // vis eksempel i enkel alert/modal
+          // Vi gjenbruker samme modal som elev? Vi kan bare alert’e eller lage liten modal.
+          const roleAcc = tr.closest('.accordion');
+          const role = roleAcc?.getAttribute('data-role');
+          // slå opp example_text fra catalog
+          let exText = '';
+          for(const sec of (catalog[role]||[])){
+            const it = (sec.items||[]).find(i=> String(i.id)===id);
+            if(it){ exText = it.example_text||''; break; }
+          }
+          if(exText){ alert(exText); } else { alert('Ingen eksempeltekst.'); }
+        };
+      }
     });
   }
 
   /* ---------- Katalog-modal ---------- */
-  function fillRoleSelect(){
-    $('#catRole').innerHTML = ROLES.map(r=>`<option value="${r}">${r}</option>`).join('');
+  function openCatalogModal(){
+    $('#catModal').classList.add('open');
+    $('#catRole').value = ROLE_ORDER[0];
+    drawCatalogEditor();
   }
-  function openCatalog(){ $('#catModal').classList.add('open'); drawCatalogEditor(); }
-  function closeCatalog(){ $('#catModal').classList.remove('open'); }
+  function closeCatalogModal(){ $('#catModal').classList.remove('open'); }
+
+  $('#addSec')?.addEventListener('click', async()=>{
+    await addSection($('#catRole').value);
+    catalog = await loadCatalog();
+    drawCatalogEditor();
+  });
+  $('#catRole')?.addEventListener('change', drawCatalogEditor);
 
   async function drawCatalogEditor(){
-    const role=$('#catRole').value;
-    const secs=catalog[role]||[];
-    const wrap=$('#catWrap');
-
-    if(!secs.length){
-      wrap.innerHTML='<div class="note">Ingen inndelinger. Trykk “+ Inndeling”.</div>'; return;
-    }
+    const role=$('#catRole').value; const secs=catalog[role]||[]; const wrap=$('#catWrap');
+    if(!secs.length){ wrap.innerHTML='<div class="note">Ingen inndelinger. Trykk “+ Inndeling”.</div>'; return; }
 
     wrap.innerHTML = secs.map((s,si)=>`
       <div class="box" style="margin-bottom:10px">
         <div class="hd">
           <div class="row" style="gap:8px;align-items:center">
             <span class="note">${si+1}</span>
-            <input class="field secTitle" data-si="${si}" value="${esc(s.title)}" style="min-width:240px">
+            <input class="field secTitle" data-si="${si}" value="${esc(s.title)}" style="min-width:220px">
             <button class="btn small" data-act="secUp" data-si="${si}">↑</button>
             <button class="btn small" data-act="secDown" data-si="${si}">↓</button>
             <button class="btn small" data-act="secDel" data-si="${si}">Slett</button>
@@ -334,10 +429,11 @@ import {
               <li data-si="${si}" data-ii="${ii}">
                 <span class="muted">${esc(it.text)}</span>
                 <div class="row" style="gap:6px">
+                  <button class="btn small" data-act="exToggle">${it.has_example?'Skru av eksempel':'Skru på eksempel'}</button>
+                  <button class="btn small" data-act="exEdit">Rediger eksempel</button>
                   <button class="btn small" data-act="itUp">↑</button>
                   <button class="btn small" data-act="itDown">↓</button>
                   <button class="btn small" data-act="itEdit">Rediger</button>
-                  <button class="btn small" data-act="itEx">Eksempel ${it.has_example? '✓':''}</button>
                   <button class="btn small" data-act="itDel">Slett</button>
                 </div>
               </li>`).join('')}
@@ -346,104 +442,42 @@ import {
       </div>
     `).join('');
 
-    // titteloppdatering
     $$('#catWrap .secTitle').forEach(inp=>{
       inp.onchange=async()=>{ const si=+inp.dataset.si; await updateSectionTitle(secs[si].id, inp.value.trim()||secs[si].title); catalog=await loadCatalog(); drawCatalogEditor(); };
     });
-
-    // seksjonsknapper
     $$('#catWrap [data-act]').forEach(btn=>{
       btn.onclick=async()=>{
-        const act=btn.dataset.act; const si=+btn.dataset.si;
-        if(act==='secDel'){ if(!confirm('Slette inndeling?')) return; await deleteSection(secs[si].id); catalog=await loadCatalog(); drawCatalogEditor(); return; }
-        if(act==='secUp'){  if(si>0){ await moveSection(secs[si].id, secs[si].position, secs[si-1].id, secs[si-1].position); catalog=await loadCatalog(); drawCatalogEditor(); } return; }
-        if(act==='secDown'){ if(si<secs.length-1){ await moveSection(secs[si].id, secs[si].position, secs[si+1].id, secs[si+1].position); catalog=await loadCatalog(); drawCatalogEditor(); } return; }
-        if(act==='addItem'){ const inp=$(`#catWrap .newItem[data-si="${si}"]`); const txt=(inp.value||'').trim(); if(!txt) return; await addItem(secs[si].id, txt); inp.value=''; catalog=await loadCatalog(); drawCatalogEditor(); return; }
+        const act=btn.dataset.act; const li=btn.closest('li'); const si=li?+li.dataset.si:+btn.dataset.si;
+        if(!isNaN(si) && !li){
+          if(act==='secDel'){ if(!confirm('Slette inndeling?')) return; await deleteSection(secs[si].id); catalog=await loadCatalog(); drawCatalogEditor(); return; }
+          if(act==='secUp'){ if(si>0){ await moveSection(secs[si].id, secs[si].position, secs[si-1].id, secs[si-1].position); catalog=await loadCatalog(); drawCatalogEditor(); } return; }
+          if(act==='secDown'){ if(si<secs.length-1){ await moveSection(secs[si].id, secs[si].position, secs[si+1].id, secs[si+1].position); catalog=await loadCatalog(); drawCatalogEditor(); } return; }
+          if(act==='addItem'){ const inp=$(`#catWrap .newItem[data-si="${si}"]`); const txt=(inp.value||'').trim(); if(!txt) return; await addItem(secs[si].id, txt); inp.value=''; catalog=await loadCatalog(); drawCatalogEditor(); return; }
+        }
+        if(li){
+          const ii = +li.dataset.ii; const s=catalog[role][si]; const it=s.items[ii];
+          if(act==='itUp'){ if(ii>0){ await moveItem(it.id, it.position, s.items[ii-1].id, s.items[ii-1].position); catalog=await loadCatalog(); drawCatalogEditor(); } }
+          if(act==='itDown'){ if(ii<s.items.length-1){ await moveItem(it.id, it.position, s.items[ii+1].id, s.items[ii+1].position); catalog=await loadCatalog(); drawCatalogEditor(); } }
+          if(act==='itEdit'){ const nt=prompt('Rediger beskrivelse:', it.text); if(nt!=null){ await editItem(it.id, nt.trim()); catalog=await loadCatalog(); drawCatalogEditor(); } }
+          if(act==='itDel'){ if(!confirm('Slette punkt?')) return; await deleteItem(it.id); catalog=await loadCatalog(); drawCatalogEditor(); }
+          if(act==='exToggle'){ await sb.from('items').update({ has_example: !it.has_example }).eq('id', it.id); catalog=await loadCatalog(); drawCatalogEditor(); }
+          if(act==='exEdit'){ const nx=prompt('Eksempel / forklaring (lagres i punktet):', it.example_text||''); if(nx!==null){ await sb.from('items').update({ example_text:nx }).eq('id', it.id); catalog=await loadCatalog(); drawCatalogEditor(); } }
+        }
       };
     });
-
-    // item-aksjoner
-    $$('#catWrap li [data-act]').forEach(btn=>{
-      btn.onclick=async()=>{
-        const li=btn.closest('li'); const si=+li.dataset.si; const ii=+li.dataset.ii; const s=catalog[$('#catRole').value][si]; const it=s.items[ii];
-        if(btn.dataset.act==='itUp'){ if(ii>0){ await moveItem(it.id, it.position, s.items[ii-1].id, s.items[ii-1].position); catalog=await loadCatalog(); drawCatalogEditor(); } }
-        if(btn.dataset.act==='itDown'){ if(ii<s.items.length-1){ await moveItem(it.id, it.position, s.items[ii+1].id, s.items[ii+1].position); catalog=await loadCatalog(); drawCatalogEditor(); } }
-        if(btn.dataset.act==='itEdit'){ const nt=prompt('Rediger beskrivelse:', it.text); if(nt!=null){ await editItem(it.id, nt.trim()); catalog=await loadCatalog(); drawCatalogEditor(); } }
-        if(btn.dataset.act==='itDel'){ if(!confirm('Slette punkt?')) return; await deleteItem(it.id); catalog=await loadCatalog(); drawCatalogEditor(); }
-        if(btn.dataset.act==='itEx'){ openExampleEditor(it); }
-      };
-    });
-
-    $('#catRole').onchange = drawCatalogEditor;
-    $('#addSec').onclick = async()=>{ await addSection($('#catRole').value); catalog=await loadCatalog(); drawCatalogEditor(); };
   }
 
-  /* ---------- Eksempel-editor ---------- */
-  function openExampleEditor(item){
-    exItemId = item.id;
-    $('#exToggle').checked = !!item.has_example;
-    $('#exText').value = item.example_text || '';
-    $('#exDot').classList.toggle('on', !!item.has_example);
-    $('#exModal').classList.add('open');
-  }
-  async function saveExample(){
-    const enabled = $('#exToggle').checked;
-    const text = $('#exText').value;
-    await setItemExample(exItemId, enabled, text);
-    catalog = await loadCatalog();
-    drawCatalogEditor();
-    $('#exModal').classList.remove('open');
-  }
-
-  /* ---------- Kommentarer ---------- */
-  async function drawComments(uid){
-    const arr = await loadComments(uid);
-    $('#commentList').innerHTML = arr.map(c=>`
-      <li><span>${esc(c.text)}</span><span class="note">${new Date(c.created_at).toLocaleString('no-NO')}</span></li>
-    `).join('') || '<li><span class="note">Ingen kommentarer.</span></li>';
-  }
-
-  /* ---------- Slett bruker ---------- */
-  async function deleteUser(uid){
-    const u = users.find(x=>x.id===uid);
-    if(!confirm(`Slette bruker "${u?.name||u?.email||uid}"?`)) return;
-    await sb.from('progress').delete().eq('user_id', uid);
-    await sb.from('comments').delete().or(`user_id.eq.${uid},author_id.eq.${uid}`);
-    await sb.from('logs').delete().eq('actor_id', uid);
-    await sb.from('profiles').delete().eq('id', uid);
-    users = users.filter(x=>x.id!==uid);
-    selUserId=null; selUserProg=new Map();
-    renderUsers();
-    $('#userBook').innerHTML='<div class="note">Velg en bruker til venstre.</div>';
-  }
-
-  /* ---------- Logg-modal ---------- */
-  async function openLog(){
-    $('#logModal').classList.add('open');
-    const entries = await loadLogs(150);
-    $('#logList').innerHTML = entries.map(l=>`
-      <div class="row" style="gap:8px;font-size:12px;padding:2px 0">
-        <span class="note">${new Date(l.created_at).toLocaleTimeString('no-NO',{hour:'2-digit',minute:'2-digit'})}</span>
-        <span>${esc(l.message||'')}</span>
-      </div>
-    `).join('') || '<div class="note">Tom logg.</div>';
-  }
-
-  /* ---------- UI helpers ---------- */
-  function bindTopButtons(){
-    $('#btnOpenCatalog').onclick = openCatalog;
-    $('#catClose').onclick = closeCatalog;
-    $('#btnOpenLog').onclick = openLog;
-    $('#logClose').onclick = ()=> $('#logModal').classList.remove('open');
-    $('#exClose').onclick = ()=> $('#exModal').classList.remove('open');
-    $('#exToggle').onchange = ()=> $('#exDot').classList.toggle('on', $('#exToggle').checked);
-    $('#exSave').onclick = saveExample;
-  }
-
-  function toast(msg){
-    let t=document.getElementById('toast');
-    if(!t){ t=document.createElement('div'); t.id='toast'; t.className='toast'; document.body.appendChild(t); }
-    t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),1200);
+  /* ---------- Realtime ---------- */
+  function bindRealtime(){
+    if(rt){ sb.removeChannel(rt); rt=null; }
+    rt = sb.channel('mb-live-admin')
+      .on('postgres_changes',{event:'*',schema:'public',table:'sections'}, async()=>{ catalog=await loadCatalog(); if(selUserId){ selUserProg = await loadProgressFor(selUserId); renderUserArea(); } })
+      .on('postgres_changes',{event:'*',schema:'public',table:'items'},    async()=>{ catalog=await loadCatalog(); if(selUserId){ selUserProg = await loadProgressFor(selUserId); renderUserArea(); } })
+      .on('postgres_changes',{event:'*',schema:'public',table:'progress'}, async(payload)=>{
+        const row = payload.new || payload.old;
+        if(selUserId && row?.user_id===selUserId){ selUserProg = await loadProgressFor(selUserId); renderUserArea(); }
+      })
+      .subscribe();
   }
 
   init();
