@@ -155,3 +155,4 @@ input[type="checkbox"]{width:18px;height:18px}
 .rk-nav .sep{ opacity:.7; color:#fff; }
 /* litt luft etter header+nav */
 .rk-header + .rk-nav + .wrap{ margin-top:16px; }
+
