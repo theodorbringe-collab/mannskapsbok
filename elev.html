@@ -3,12 +3,12 @@
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Mannskapsbok – Elev</title>
-  <link rel="stylesheet" href="./assets/styles.css?v=otp6">
+  <link rel="stylesheet" href="./assets/styles.css?v=otp9">
   <style>
     /* side-spesifikt */
     .top-actions{display:flex;gap:8px;justify-content:center;margin:10px 0 6px}
     .name-row{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap}
-    .name-left{display:flex;gap:12px;align-items:baseline}
+    .name-left{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}
 
     /* enkel modal for eksempel-tekst */
     .modal{position:fixed;inset:0;background:rgba(2,6,23,.48);display:none;align-items:center;justify-content:center;z-index:60}
@@ -51,16 +51,19 @@ import {
   sb, ROLES,
   ensureUserOrRedirect, updateProfile, signOut,
   loadCatalog, loadMyProgress, upsertProgress
-} from "./assets/common.js?v=otp6";
+} from "./assets/common.js?v=otp7";
 
 (function(){
   const $=(s,r=document)=>r.querySelector(s);
   const $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
   const esc=s=>(s||'').replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[m]));
   const today=()=>new Date().toISOString().slice(0,10);
-  const clsFor=(done,total)=> total===0||done===0?'gray':(done<total?'yellow':'green');
 
-  let me=null, catalog={}, myProg=new Map(), activeRole=ROLES[0], rt=null;
+  // ønsket rekkefølge + korte etiketter
+  const ROLE_ORDER = ['Fartøysjef','NK','Matros','Rescuerunner','Aspirant'];
+  const SHORT = { Fartøysjef:'FS', NK:'NK', Matros:'Matros', Rescuerunner:'Rescuerunner', Aspirant:'Aspirant' };
+
+  let me=null, catalog={}, myProg=new Map(), activeRole=ROLE_ORDER[0], rt=null;
 
   function lastUpdated(){
     let d=null;
@@ -100,19 +103,22 @@ import {
             <div class="name-row">
               <div class="name-left">
                 <span class="note">Navn</span>
-                <b id="meName">${esc(me.name||me.email)}</b>
+                <b id="meName">${esc(me.name || '(sett navn)')}</b>
+                <span class="note">• ${esc(me.email||'')}</span>
               </div>
               <span class="note">Sist oppdatert: <b id="lastUpd">${lastUpdated()}</b></span>
             </div>
             <div class="row" style="gap:8px;justify-content:center;margin-top:10px;flex-wrap:wrap">
-              <input id="ownerName"  class="field" placeholder="Endre navn"  value="${esc(me.name||'')}"  style="max-width:220px">
-              <input id="ownerEmail" class="field" placeholder="Endre e-post" value="${esc(me.email||'')}" style="max-width:240px">
+              <input id="ownerName"  class="field" placeholder="Fullt navn" value="${esc(me.name||'')}"  style="max-width:240px">
+              <input id="ownerEmail" class="field" placeholder="E-post"     value="${esc(me.email||'')}" style="max-width:260px">
               <button id="saveOwner" class="btn">Oppdater</button>
             </div>
+            <div class="note" style="text-align:center;margin-top:6px">Skriv inn fullt navn. E-post kan også endres ved behov.</div>
           </div>
         </div>
 
-        <div id="roleBar" class="rolebar" style="justify-content:center"></div>
+        <!-- ROLLE-STRIPE (horisontal) -->
+        <div id="roleBar" class="rolebar roles-strip"></div>
 
         <div id="panel"></div>
       </div>
@@ -124,10 +130,12 @@ import {
     };
     $('#saveOwner').onclick = async ()=>{
       try{
-        const name=$('#ownerName').value.trim(), email=$('#ownerEmail').value.trim();
-        await updateProfile({ name, email });             // 🔄 lagres i profiles
+        const name = $('#ownerName').value.trim();
+        const email = $('#ownerEmail').value.trim();
+        if(!name){ alert('Skriv inn fullt navn.'); return; }
+        await updateProfile({ name, email });
         me = await ensureUserOrRedirect();
-        $('#meName').textContent = me.name||me.email;
+        $('#meName').textContent = me.name || '(sett navn)';
         toast('Oppdatert');
       }catch(e){ alert('Kunne ikke oppdatere: ' + (e.message||e)); }
     };
@@ -138,14 +146,12 @@ import {
 
   function drawRoleBar(){
     const host=$('#roleBar'); host.innerHTML='';
-    ROLES.forEach(role=>{
-      const its=(catalog[role]||[]).flatMap(s=>s.items);
-      const total=its.length;
-      const done=its.filter(it=>myProg.get(String(it.id))?.done).length;
+    const roles = ROLE_ORDER.filter(r=>ROLES.includes(r));
+    roles.forEach(role=>{
       const b=document.createElement('button');
-      b.className=`rolebtn ${clsFor(done,total)}`;
-      b.innerHTML = `${role}<span class="sub">${done}/${total} fullført</span>`;
-      b.onclick=()=>{ activeRole=role; drawRole(activeRole); };
+      b.className=`rolebtn ${role===activeRole?'active':''}`;
+      b.textContent = SHORT[role] || role;
+      b.onclick=()=>{ activeRole=role; drawRoleBar(); drawRole(activeRole); };
       host.appendChild(b);
     });
   }
@@ -162,7 +168,7 @@ import {
       <div class="box" style="margin-bottom:12px">
         <div class="hd">${esc(s.title)}</div>
         <div class="bd">
-          <table>
+          <table class="mb-table">
             <thead>
               <tr>
                 <th style="width:56px">#</th>
@@ -218,7 +224,6 @@ import {
           b.title = done ? 'Fullført' : 'Ikke fullført';
           b.classList.add('flash'); setTimeout(()=>b.classList.remove('flash'), 220);
 
-          drawRoleBar();
           $('#lastUpd').textContent = lastUpdated();
         }catch(e){
           alert('Kunne ikke lagre: ' + (e.message||e));
@@ -267,11 +272,11 @@ import {
     if(rt){ sb.removeChannel(rt); rt=null; }
     rt = sb.channel('mb-live-elev')
       .on('postgres_changes',{event:'*',schema:'public',table:'progress',filter:`user_id=eq.${me.id}`},
-        async()=>{ myProg=await loadMyProgress(me.id); drawRoleBar(); drawRole(activeRole); $('#lastUpd').textContent=lastUpdated(); })
+        async()=>{ myProg=await loadMyProgress(me.id); drawRole(activeRole); $('#lastUpd').textContent=lastUpdated(); })
       .on('postgres_changes',{event:'*',schema:'public',table:'sections'},
-        async()=>{ catalog=await loadCatalog(); drawRoleBar(); drawRole(activeRole); })
+        async()=>{ catalog=await loadCatalog(); drawRole(activeRole); })
       .on('postgres_changes',{event:'*',schema:'public',table:'items'},
-        async()=>{ catalog=await loadCatalog(); drawRoleBar(); drawRole(activeRole); })
+        async()=>{ catalog=await loadCatalog(); drawRole(activeRole); })
       .subscribe();
   }
 
