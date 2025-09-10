@@ -11,7 +11,6 @@ export const ROLES = ["Fartøysjef","NK","Matros","Aspirant","Rescuerunner"];
 
 /* ---------- Auth helpers ---------- */
 export async function ensureUser(){
-  // Krever at brukeren er innlogget i Supabase Auth (hvis ikke, kaster den)
   const { data, error } = await sb.auth.getUser();
   const user = data?.user;
   if (error || !user) throw new Error("Not signed in");
@@ -121,50 +120,6 @@ export async function upsertProgress(itemId, patch, uid){
     signed_by: patch.signed_by || null
   };
   const { error } = await sb.from("progress").upsert(row, { onConflict:"user_id,item_id" });
-  if(error) throw error;
+  if(error) { console.error("upsertProgress error", error); throw error; }
   await sb.from("logs").insert({ actor_id: uid, message: `progress updated for user ${uid}` });
-}
-
-export async function addComment(uid, text, authorId){
-  const { error } = await sb.from("comments").insert({ user_id: uid, author_id: authorId, text });
-  if(error) throw error;
-  await sb.from("logs").insert({ actor_id: authorId, message: `comment added for user ${uid}` });
-}
-
-export async function addSection(role){
-  const { error } = await sb.from("sections").insert({ role, title:"Ny inndeling", position: Date.now() });
-  if(error) throw error;
-}
-export async function updateSectionTitle(id, title){
-  const { error } = await sb.from("sections").update({ title }).eq("id", id);
-  if(error) throw error;
-}
-export async function deleteSection(id){
-  const { error } = await sb.from("sections").delete().eq("id", id);
-  if(error) throw error;
-}
-export async function moveSection(aId,aPos,bId,bPos){
-  let r = await sb.from("sections").update({ position:bPos }).eq("id", aId);
-  if(r.error) throw r.error;
-  r = await sb.from("sections").update({ position:aPos }).eq("id", bId);
-  if(r.error) throw r.error;
-}
-
-export async function addItem(section_id, text){
-  const { error } = await sb.from("items").insert({ section_id, text, position: Date.now() });
-  if(error) throw error;
-}
-export async function editItem(id, text){
-  const { error } = await sb.from("items").update({ text }).eq("id", id);
-  if(error) throw error;
-}
-export async function deleteItem(id){
-  const { error } = await sb.from("items").delete().eq("id", id);
-  if(error) throw error;
-}
-export async function moveItem(aId,aPos,bId,bPos){
-  let r = await sb.from("items").update({ position:bPos }).eq("id", aId);
-  if(r.error) throw r.error;
-  r = await sb.from("items").update({ position:aPos }).eq("id", bId);
-  if(r.error) throw r.error;
 }
