@@ -70,13 +70,22 @@ export async function loadCatalog(){
   for(const role of ROLES){
     const { data:secs } = await sb.from("sections")
       .select("id,title,position").eq("role",role).order("position",{ascending:true});
+
+    // normaliser IDs til string
+    const secsNorm = (secs||[]).map(s => ({ ...s, id: String(s.id) }));
     const list=[];
-    if(secs?.length){
-      const ids = secs.map(s=>s.id);
+
+    if(secsNorm.length){
+      const ids = secsNorm.map(s=>s.id);
       const { data:items } = await sb.from("items")
-        .select("id,section_id,text,position").in("section_id", ids).order("position",{ascending:true});
-      for(const s of secs){
-        list.push({ ...s, items:(items||[]).filter(i=>i.section_id===s.id) });
+        .select("id,section_id,text,position")
+        .in("section_id", ids).order("position",{ascending:true});
+
+      // normaliser item-id og section_id til string
+      const itemsNorm = (items||[]).map(i => ({ ...i, id:String(i.id), section_id:String(i.section_id) }));
+
+      for(const s of secsNorm){
+        list.push({ ...s, items: itemsNorm.filter(i=>i.section_id===s.id) });
       }
     }
     out[role]=list;
@@ -85,14 +94,18 @@ export async function loadCatalog(){
 }
 
 export async function loadMyProgress(uid){
-  const { data } = await sb.from("progress").select("item_id,done,date,signed_by").eq("user_id", uid);
+  const { data } = await sb.from("progress")
+    .select("item_id,done,date,signed_by")
+    .eq("user_id", uid);
   const map = new Map();
   (data||[]).forEach(r=>map.set(String(r.item_id), r)); // String-nøkler
   return map;
 }
 
 export async function loadProgressFor(uid){
-  const { data } = await sb.from("progress").select("item_id,done,date,signed_by").eq("user_id", uid);
+  const { data } = await sb.from("progress")
+    .select("item_id,done,date,signed_by")
+    .eq("user_id", uid);
   const map = new Map();
   (data||[]).forEach(r=>map.set(String(r.item_id), r)); // String-nøkler
   return map;
@@ -110,16 +123,64 @@ export async function loadLogs(limit=150){
 
 /* ---------- Skriv / endre ---------- */
 export async function upsertProgress(itemId, patch, uid){
-  const item_id = Number(itemId);
+  // aksepter både tall og uuid som id
+  const item_id = (itemId==null ? "" : String(itemId).trim());
   if(!item_id) throw new Error("Mangler item_id");
+
   const row = {
     user_id: uid,
-    item_id,
+    item_id,                         // <-- ikke Number() !
     done: !!patch.done,
     date: patch.date || null,
     signed_by: patch.signed_by || null
   };
+
   const { error } = await sb.from("progress").upsert(row, { onConflict:"user_id,item_id" });
   if(error) { console.error("upsertProgress error", error); throw error; }
   await sb.from("logs").insert({ actor_id: uid, message: `progress updated for user ${uid}` });
+}
+
+/* ---------- Katalog-endringer ---------- */
+export async function addComment(uid, text, authorId){
+  const { error } = await sb.from("comments").insert({ user_id: uid, author_id: authorId, text });
+  if(error) throw error;
+  await sb.from("logs").insert({ actor_id: authorId, message: `comment added for user ${uid}` });
+}
+
+export async function addSection(role){
+  const { error } = await sb.from("sections").insert({ role, title:"Ny inndeling", position: Date.now() });
+  if(error) throw error;
+}
+export async function updateSectionTitle(id, title){
+  const { error } = await sb.from("sections").update({ title }).eq("id", id);
+  if(error) throw error;
+}
+export async function deleteSection(id){
+  const { error } = await sb.from("sections").delete().eq("id", id);
+  if(error) throw error;
+}
+export async function moveSection(aId,aPos,bId,bPos){
+  let r = await sb.from("sections").update({ position:bPos }).eq("id", aId);
+  if(r.error) throw r.error;
+  r = await sb.from("sections").update({ position:aPos }).eq("id", bId);
+  if(r.error) throw r.error;
+}
+
+export async function addItem(section_id, text){
+  const { error } = await sb.from("items").insert({ section_id, text, position: Date.now() });
+  if(error) throw error;
+}
+export async function editItem(id, text){
+  const { error } = await sb.from("items").update({ text }).eq("id", id);
+  if(error) throw error;
+}
+export async function deleteItem(id){
+  const { error } = await sb.from("items").delete().eq("id", id);
+  if(error) throw error;
+}
+export async function moveItem(aId,aPos,bId,bPos){
+  let r = await sb.from("items").update({ position:bPos }).eq("id", aId);
+  if(r.error) throw r.error;
+  r = await sb.from("items").update({ position:aPos }).eq("id", bId);
+  if(r.error) throw r.error;
 }
