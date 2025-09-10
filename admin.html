@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Mannskapsbok – Admin</title>
-  <link rel="stylesheet" href="./assets/styles.css?v=3">
+  <link rel="stylesheet" href="./assets/styles.css?v=auth1">
   <style>
     .rk-header{background:#fff;border-bottom:1px solid #eaeaea}
     .rk-head-inner{display:flex;align-items:center;gap:14px;padding:10px 0}
@@ -17,10 +17,8 @@
     .rk-nav .wrap{display:flex;gap:12px;padding:6px 0;font-weight:700}
     .rk-nav a{color:#fff;text-decoration:none}
     .rk-nav a:hover{text-decoration:underline}
-    .rk-nav .sep{opacity:.7;color:#fff}
     .rk-header + .rk-nav + .wrap{margin-top:16px}
 
-    /* Mini logg-dropdown (som i forrige versjon) */
     .drop-wrap{position:relative}
     .drop-btn{position:relative}
     .drop-panel{
@@ -42,7 +40,6 @@
 </head>
 <body>
 
-<!-- Header + rød meny -->
 <div class="rk-header">
   <div class="wrap rk-head-inner">
     <div class="rk-logo"></div>
@@ -51,7 +48,7 @@
 </div>
 <nav class="rk-nav">
   <div class="wrap">
-    <a href="./elev.html?v=3">Hovedmeny</a>
+    <a href="./elev.html?v=auth1">Hovedmeny</a>
   </div>
 </nav>
 
@@ -60,12 +57,12 @@
 <script type="module">
 import {
   sb, ROLES,
-  ensureUser, ensureLocalUser,
+  ensureUserOrRedirect,
   listUsers, loadCatalog, loadProgressFor, loadComments, loadLogs,
   upsertProgress, addComment,
   addSection, updateSectionTitle, moveSection, deleteSection,
   addItem, editItem, deleteItem, moveItem
-} from "./assets/common.js?v=3";
+} from "./assets/common.js?v=auth1";
 
 (function(){
   const $=(s,r=document)=>r.querySelector(s);
@@ -76,20 +73,11 @@ import {
 
   async function init(){
     try{
-      // Prøv ekte auth først, ellers lokal bruker
-      try { me = await ensureUser(); }
-      catch { me = await ensureLocalUser(); }
-
-      const res = await Promise.allSettled([listUsers(), loadCatalog()]);
-      const ru  = res[0].status==="fulfilled" ? res[0].value : [];
-      const rc  = res[1].status==="fulfilled" ? res[1].value : {};
-      users = ru; catalog = rc;
-
-      render();
-      bindRealtime();
+      me = await ensureUserOrRedirect();               // ← krever innlogging
+      [users, catalog] = await Promise.all([listUsers(), loadCatalog()]);
+      render(); bindRealtime();
     }catch(e){
-      $('#app').innerHTML = `<div class="box"><div class="hd">Feil</div><div class="bd" style="color:#b00020;white-space:pre-wrap">${esc(e.stack||e.message||e)}</div></div>`;
-      console.error(e);
+      // redirect til login om ikke innlogget
     }
   }
 
@@ -109,7 +97,7 @@ import {
             </div>
             <div id="logList" class="drop-bd">—</div>
           </div>
-          <a class="btn" href="./elev.html?v=3">← Til elev-siden</a>
+          <a class="btn" href="./elev.html?v=auth1">← Til elev-siden</a>
         </div>
       </div>
 
@@ -119,7 +107,7 @@ import {
             <div class="hd">Brukere</div>
             <div class="bd">
               <input id="userSearch" class="field" placeholder="Søk navn/epost …" style="width:100%;margin-bottom:10px">
-              <ul id="userList" class="list"><li><span class="note">Laster …</span></li></ul>
+              <ul id="userList" class="list"></ul>
             </div>
           </div>
 
@@ -134,7 +122,7 @@ import {
                 </label>
                 <button id="addSec" class="btn small primary">+ Inndeling</button>
               </div>
-              <div id="catWrap"><div class="note">Laster …</div></div>
+              <div id="catWrap"></div>
             </div>
           </div>
         </div>
@@ -158,7 +146,7 @@ import {
                 <input id="commentTxt" class="field" placeholder="Skriv kommentar til elev" style="flex:1;min-width:240px">
                 <button id="addComment" class="btn small">Legg til</button>
               </div>
-              <ul id="commentList" class="list" style="margin-top:8px;max-height:220px"><li><span class="note">Ingen kommentarer.</span></li></ul>
+              <ul id="commentList" class="list" style="margin-top:8px;max-height:220px"></ul>
             </div>
           </div>
         </div>
