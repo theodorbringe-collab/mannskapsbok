@@ -3,31 +3,52 @@
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Logg inn – Mannskapsbok</title>
-  <link rel="stylesheet" href="./assets/styles.css?v=auth1">
+  <link rel="stylesheet" href="./assets/styles.css?v=pw1">
   <style>
-    body{display:flex;align-items:center;justify-content:center;height:100vh}
-    .auth{max-width:420px;width:92%;background:#fff;border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow)}
+    body{display:flex;align-items:center;justify-content:center;min-height:100vh;background:var(--bg)}
+    .auth{max-width:440px;width:92%;background:#fff;border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow)}
     .auth .hd{padding:14px 16px;background:#f8fafc;border-bottom:1px solid var(--line);font-weight:800}
     .auth .bd{padding:16px}
-    .auth .hint{font-size:12px;color:var(--muted);margin-top:6px}
+    .tabs{display:flex;gap:8px;margin-bottom:10px}
+    .tabs button{flex:1} .hint{font-size:12px;color:var(--muted);margin-top:6px}
+    .link{font-weight:700;cursor:pointer}
   </style>
 </head>
 <body>
   <div class="auth">
-    <div class="hd">Logg inn</div>
+    <div class="hd">Mannskapsbok – Logg inn</div>
     <div class="bd">
-      <div id="step-email">
-        <label>E-post</label>
-        <input id="email" class="field" type="email" placeholder="navn@domene.no" style="width:100%;margin-top:6px">
-        <button id="send" class="btn primary" style="margin-top:10px;width:100%">Send kode</button>
-        <div class="hint">Du får en 6-sifret kode på e-post (eller en magisk lenke).</div>
+      <div class="tabs">
+        <button id="tabSignIn"  class="btn primary">Logg inn</button>
+        <button id="tabSignUp"  class="btn">Registrer</button>
+        <button id="tabForgot"  class="btn">Glemt passord</button>
       </div>
 
-      <div id="step-code" style="display:none">
-        <label>Skriv inn koden fra e-posten</label>
-        <input id="code" class="field" inputmode="numeric" maxlength="6" placeholder="123456" style="width:100%;margin-top:6px">
-        <button id="verify" class="btn primary" style="margin-top:10px;width:100%">Logg inn</button>
-        <div class="hint">Funker ikke koden? Klikk “magisk lenke” i e-posten i stedet.</div>
+      <!-- Sign in -->
+      <div id="viewSignIn">
+        <label>E-post</label>
+        <input id="inEmail" class="field" type="email" placeholder="navn@domene.no" style="width:100%;margin-top:6px">
+        <label style="margin-top:10px">Passord</label>
+        <input id="inPass" class="field" type="password" placeholder="••••••••" style="width:100%;margin-top:6px">
+        <button id="btnSignIn" class="btn primary" style="margin-top:12px;width:100%">Logg inn</button>
+      </div>
+
+      <!-- Sign up -->
+      <div id="viewSignUp" style="display:none">
+        <label>E-post</label>
+        <input id="upEmail" class="field" type="email" placeholder="navn@domene.no" style="width:100%;margin-top:6px">
+        <label style="margin-top:10px">Velg passord</label>
+        <input id="upPass" class="field" type="password" placeholder="minst 6 tegn" style="width:100%;margin-top:6px">
+        <button id="btnSignUp" class="btn primary" style="margin-top:12px;width:100%">Opprett konto</button>
+        <div class="hint" id="signupHint" style="display:none;margin-top:8px"></div>
+      </div>
+
+      <!-- Forgot -->
+      <div id="viewForgot" style="display:none">
+        <label>E-post</label>
+        <input id="fgEmail" class="field" type="email" placeholder="navn@domene.no" style="width:100%;margin-top:6px">
+        <button id="btnForgot" class="btn primary" style="margin-top:12px;width:100%">Send reset-lenke</button>
+        <div class="hint">Du får en e-post med lenke. Etter klikk lander du på en side hvor du setter nytt passord.</div>
       </div>
 
       <p id="msg" class="hint" style="min-height:18px;margin-top:10px"></p>
@@ -35,53 +56,87 @@
   </div>
 
 <script type="module">
-import { sb, signInEmailOtp, verifyEmailOtp } from "./assets/common.js?v=auth1";
+import {
+  sb,
+  signUpWithPassword, signInWithPassword,
+  sendPasswordReset
+} from "./assets/common.js?v=pw1";
 
 const $ = s => document.querySelector(s);
 const qs = new URLSearchParams(location.search);
 const returnTo = qs.get('returnTo') || './elev.html';
 
-async function already() {
-  const { data: { session } } = await sb.auth.getSession();
-  if (session?.user) location.replace(returnTo);
+function swap(view){
+  $('#viewSignIn').style.display = (view==='in')?'block':'none';
+  $('#viewSignUp').style.display = (view==='up')?'block':'none';
+  $('#viewForgot').style.display = (view==='fg')?'block':'none';
+  $('#tabSignIn').classList.toggle('primary', view==='in');
+  $('#tabSignUp').classList.toggle('primary', view==='up');
+  $('#tabForgot').classList.toggle('primary', view==='fg');
+  $('#msg').textContent='';
+}
+$('#tabSignIn').onclick = ()=>swap('in');
+$('#tabSignUp').onclick = ()=>swap('up');
+$('#tabForgot').onclick = ()=>swap('fg');
+
+async function already(){
+  const { data:{ session } } = await sb.auth.getSession();
+  if(session?.user) location.replace(returnTo);
 }
 already();
 
-// Send kode
-$('#send').onclick = async () => {
-  const email = $('#email').value.trim();
-  if(!email) return ($('#msg').textContent='Skriv inn e-post.');
-  $('#msg').textContent = 'Sender kode…';
+// Sign in
+$('#btnSignIn').onclick = async ()=>{
+  const email = $('#inEmail').value.trim();
+  const pass  = $('#inPass').value.trim();
+  if(!email || !pass) return $('#msg').textContent='Skriv inn e-post og passord.';
+  $('#msg').textContent='Logger inn…';
   try{
-    await signInEmailOtp(email);
-    $('#step-email').style.display='none';
-    $('#step-code').style.display='block';
-    $('#msg').textContent = 'Kode sendt! Sjekk innboksen.';
-    $('#code').focus();
-  }catch(e){
-    $('#msg').textContent = 'Kunne ikke sende kode: ' + (e.message||e);
-  }
-};
-
-// Verifiser kode
-$('#verify').onclick = async () => {
-  const email = $('#email').value.trim();
-  const code  = $('#code').value.trim();
-  if(!email||!code) return ($('#msg').textContent='Skriv inn e-post og kode.');
-  $('#msg').textContent = 'Verifiserer…';
-  try{
-    await verifyEmailOtp(email, code);
+    await signInWithPassword(email, pass);
     location.replace(returnTo);
   }catch(e){
-    $('#msg').textContent = 'Feil kode? ' + (e.message||e);
+    $('#msg').textContent = (e.message||e);
   }
 };
 
-// Om bruker klikker magisk lenke i mailen
-sb.auth.onAuthStateChange(async (ev, sess)=>{
+// Sign up
+$('#btnSignUp').onclick = async ()=>{
+  const email = $('#upEmail').value.trim();
+  const pass  = $('#upPass').value.trim();
+  if(!email || !pass) return $('#msg').textContent='Skriv inn e-post og valgt passord.';
+  if(pass.length < 6) return $('#msg').textContent='Passord må ha minst 6 tegn.';
+  $('#msg').textContent='Oppretter konto…';
+  try{
+    const { session } = await signUpWithPassword(email, pass);
+    if(session){ location.replace(returnTo); }
+    else{
+      // når "Confirm email" er PÅ
+      $('#signupHint').style.display='block';
+      $('#signupHint').textContent='Vi har sendt deg en bekreftelsesmail. Åpne den for å aktivere kontoen.';
+      $('#msg').textContent='Venter på bekreftelse…';
+    }
+  }catch(e){
+    $('#msg').textContent = (e.message||e);
+  }
+};
+
+// Forgot
+$('#btnForgot').onclick = async ()=>{
+  const email = $('#fgEmail').value.trim();
+  if(!email) return $('#msg').textContent='Skriv inn e-post.';
+  $('#msg').textContent='Sender lenke…';
+  try{
+    await sendPasswordReset(email);
+    $('#msg').textContent='Sjekk e-posten din for reset-lenke.';
+  }catch(e){
+    $('#msg').textContent = (e.message||e);
+  }
+};
+
+// Omgå blank side hvis man kommer inn med aktiv sesjon
+sb.auth.onAuthStateChange((_ev, sess)=>{
   if(sess?.user) location.replace(returnTo);
 });
 </script>
 </body>
 </html>
-
