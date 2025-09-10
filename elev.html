@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Mannskapsbok – Elev</title>
-  <link rel="stylesheet" href="./assets/styles.css?v=2">
+  <link rel="stylesheet" href="./assets/styles.css?v=3">
   <style>
     .rk-header{background:#fff;border-bottom:1px solid #eaeaea}
     .rk-head-inner{display:flex;align-items:center;gap:14px;padding:10px 0}
@@ -42,7 +42,7 @@ import {
   sb, ROLES,
   ensureLocalUser, setLocalIdentity,
   loadCatalog, loadMyProgress, upsertProgress
-} from "./assets/common.js?v=2";
+} from "./assets/common.js?v=3";
 
 (function(){
   const $=(s,r=document)=>r.querySelector(s);
@@ -147,8 +147,9 @@ import {
             </thead>
             <tbody>
               ${s.items.map((it,pi)=>{
-                const pr=myProg.get(String(it.id))||{};
-                return `<tr data-id="${String(it.id)}">
+                const key = String(it.id||"");
+                const pr  = myProg.get(key)||{};
+                return `<tr data-id="${key}">
                   <td>${si+1}.${pi+1}</td>
                   <td>${esc(it.text)}</td>
                   <td><input class="field" type="text" value="${esc(pr.signed_by||'')}" placeholder="Skriv inn navn"></td>
@@ -166,23 +167,23 @@ import {
 
     // handlers
     $$('#panel tbody tr').forEach(tr=>{
-      const id = tr.getAttribute('data-id');
+      const id = tr.getAttribute('data-id') || "";
       const d  = tr.querySelector('input[type="date"]');
       const s  = tr.querySelector('input[type="text"]');
       const b  = tr.querySelector('.mini-check');
 
       async function commit(action=null){
+        if(!id){ alert("Dette punktet mangler item_id – sjekk at 'items' har primærnøkkel (id / item_id)."); return; }
         let done = !!myProg.get(id)?.done;
         if(action==='toggle'){ done=!done; if(done && !d.value) d.value=today(); if(!done) d.value=''; }
 
-        // Umiddelbar visuell feedback:
-        b.setAttribute('data-done', done ? '1' : '0');
+        b.setAttribute('data-done', done ? '1' : '0'); // visuell feedback
 
         try{
           await upsertProgress(id,{ date:d.value||null, signed_by:(s.value||null), done }, me.id);
           myProg.set(id,{ item_id:id, date:d.value||null, signed_by:s.value||null, done });
           drawRoleBar();
-          $('#lastUpd').textContent = lastUpdated();
+          const upd = document.getElementById('lastUpd'); if(upd) upd.textContent = lastUpdated();
         }catch(e){
           b.setAttribute('data-done', !done ? '1' : '0'); // rollback
           alert('Kunne ikke lagre: ' + (e.message||e));
@@ -205,7 +206,7 @@ import {
     if(rt){ sb.removeChannel(rt); rt=null; }
     rt = sb.channel('mb-live-elev')
       .on('postgres_changes',{event:'*',schema:'public',table:'progress',filter:`user_id=eq.${me.id}`},
-        async()=>{ myProg=await loadMyProgress(me.id); drawRoleBar(); drawRole(activeRole); $('#lastUpd').textContent=lastUpdated(); })
+        async()=>{ myProg=await loadMyProgress(me.id); drawRoleBar(); drawRole(activeRole); const upd=document.getElementById('lastUpd'); if(upd) upd.textContent=lastUpdated(); })
       .on('postgres_changes',{event:'*',schema:'public',table:'sections'},
         async()=>{ catalog=await loadCatalog(); drawRoleBar(); drawRole(activeRole); })
       .on('postgres_changes',{event:'*',schema:'public',table:'items'},
