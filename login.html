@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Logg inn – Mannskapsbok</title>
-  <link rel="stylesheet" href="./assets/styles.css?v=pw1">
+  <link rel="stylesheet" href="./assets/styles.css?v=pw2">
   <style>
     body{display:flex;align-items:center;justify-content:center;min-height:100vh;background:var(--bg)}
     .auth{max-width:440px;width:92%;background:#fff;border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow)}
@@ -11,7 +11,6 @@
     .auth .bd{padding:16px}
     .tabs{display:flex;gap:8px;margin-bottom:10px}
     .tabs button{flex:1} .hint{font-size:12px;color:var(--muted);margin-top:6px}
-    .link{font-weight:700;cursor:pointer}
   </style>
 </head>
 <body>
@@ -24,7 +23,6 @@
         <button id="tabForgot"  class="btn">Glemt passord</button>
       </div>
 
-      <!-- Sign in -->
       <div id="viewSignIn">
         <label>E-post</label>
         <input id="inEmail" class="field" type="email" placeholder="navn@domene.no" style="width:100%;margin-top:6px">
@@ -33,22 +31,18 @@
         <button id="btnSignIn" class="btn primary" style="margin-top:12px;width:100%">Logg inn</button>
       </div>
 
-      <!-- Sign up -->
       <div id="viewSignUp" style="display:none">
         <label>E-post</label>
         <input id="upEmail" class="field" type="email" placeholder="navn@domene.no" style="width:100%;margin-top:6px">
         <label style="margin-top:10px">Velg passord</label>
         <input id="upPass" class="field" type="password" placeholder="minst 6 tegn" style="width:100%;margin-top:6px">
         <button id="btnSignUp" class="btn primary" style="margin-top:12px;width:100%">Opprett konto</button>
-        <div class="hint" id="signupHint" style="display:none;margin-top:8px"></div>
       </div>
 
-      <!-- Forgot -->
       <div id="viewForgot" style="display:none">
         <label>E-post</label>
         <input id="fgEmail" class="field" type="email" placeholder="navn@domene.no" style="width:100%;margin-top:6px">
         <button id="btnForgot" class="btn primary" style="margin-top:12px;width:100%">Send reset-lenke</button>
-        <div class="hint">Du får en e-post med lenke. Etter klikk lander du på en side hvor du setter nytt passord.</div>
       </div>
 
       <p id="msg" class="hint" style="min-height:18px;margin-top:10px"></p>
@@ -56,11 +50,12 @@
   </div>
 
 <script type="module">
-import {
-  sb,
-  signUpWithPassword, signInWithPassword,
-  sendPasswordReset
-} from "./assets/common.js?v=pw1";
+import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
+
+/* <-- BYTT IKKE hvis du bruker samme prosjekt som i koden ellers */
+const SUPABASE_URL  = "https://yqiqvtuxwvgbcfpsoyno.supabase.co";
+const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlxaXF2dHV4d3ZnYmNmcHNveW5vIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY4NDI1NjcsImV4cCI6MjA3MjQxODU2N30.JKgTfWJ6HqJ96P_ghVYP5vasph12yuk36jlfEBN3PBA";
+const sb = createClient(SUPABASE_URL, SUPABASE_ANON);
 
 const $ = s => document.querySelector(s);
 const qs = new URLSearchParams(location.search);
@@ -85,58 +80,55 @@ async function already(){
 }
 already();
 
-// Sign in
 $('#btnSignIn').onclick = async ()=>{
-  const email = $('#inEmail').value.trim();
-  const pass  = $('#inPass').value.trim();
-  if(!email || !pass) return $('#msg').textContent='Skriv inn e-post og passord.';
+  const email=$('#inEmail').value.trim(), pass=$('#inPass').value.trim();
+  if(!email||!pass) return $('#msg').textContent='Skriv inn e-post og passord.';
   $('#msg').textContent='Logger inn…';
   try{
-    await signInWithPassword(email, pass);
+    const { error } = await sb.auth.signInWithPassword({ email, password: pass });
+    if(error) throw error;
+    // sørg for profilrad:
+    const { data:{ user } } = await sb.auth.getUser();
+    await sb.from("profiles").upsert({ id:user.id, email:user.email, name:user.email }, { onConflict:"id" });
     location.replace(returnTo);
   }catch(e){
     $('#msg').textContent = (e.message||e);
   }
 };
 
-// Sign up
 $('#btnSignUp').onclick = async ()=>{
-  const email = $('#upEmail').value.trim();
-  const pass  = $('#upPass').value.trim();
-  if(!email || !pass) return $('#msg').textContent='Skriv inn e-post og valgt passord.';
-  if(pass.length < 6) return $('#msg').textContent='Passord må ha minst 6 tegn.';
+  const email=$('#upEmail').value.trim(), pass=$('#upPass').value.trim();
+  if(!email||!pass) return $('#msg').textContent='Skriv inn e-post og passord.';
+  if(pass.length<6) return $('#msg').textContent='Passord må ha minst 6 tegn.';
   $('#msg').textContent='Oppretter konto…';
   try{
-    const { session } = await signUpWithPassword(email, pass);
-    if(session){ location.replace(returnTo); }
-    else{
-      // når "Confirm email" er PÅ
-      $('#signupHint').style.display='block';
-      $('#signupHint').textContent='Vi har sendt deg en bekreftelsesmail. Åpne den for å aktivere kontoen.';
-      $('#msg').textContent='Venter på bekreftelse…';
+    const { data, error } = await sb.auth.signUp({ email, password: pass });
+    if(error) throw error;
+    if(data.session){
+      const { user } = data.session;
+      await sb.from("profiles").upsert({ id:user.id, email:user.email, name:user.email }, { onConflict:"id" });
+      location.replace(returnTo);
+    }else{
+      $('#msg').textContent='Konto opprettet. Sjekk e-post for bekreftelse (skru AV Confirm email for auto-inn).';
     }
   }catch(e){
     $('#msg').textContent = (e.message||e);
   }
 };
 
-// Forgot
 $('#btnForgot').onclick = async ()=>{
-  const email = $('#fgEmail').value.trim();
+  const email=$('#fgEmail').value.trim();
   if(!email) return $('#msg').textContent='Skriv inn e-post.';
-  $('#msg').textContent='Sender lenke…';
+  $('#msg').textContent='Sender reset-lenke…';
   try{
-    await sendPasswordReset(email);
-    $('#msg').textContent='Sjekk e-posten din for reset-lenke.';
+    const redirect = `${location.origin}/mannskapsbok/reset.html`;
+    const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: redirect });
+    if(error) throw error;
+    $('#msg').textContent='Sjekk e-posten din for lenke.';
   }catch(e){
     $('#msg').textContent = (e.message||e);
   }
 };
-
-// Omgå blank side hvis man kommer inn med aktiv sesjon
-sb.auth.onAuthStateChange((_ev, sess)=>{
-  if(sess?.user) location.replace(returnTo);
-});
 </script>
 </body>
 </html>
