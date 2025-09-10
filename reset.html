@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="no">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Nytt passord – Mannskapsbok</title>
+  <link rel="stylesheet" href="./assets/styles.css?v=pw1">
+  <style>
+    body{display:flex;align-items:center;justify-content:center;min-height:100vh;background:var(--bg)}
+    .auth{max-width:440px;width:92%;background:#fff;border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow)}
+    .auth .hd{padding:14px 16px;background:#f8fafc;border-bottom:1px solid var(--line);font-weight:800}
+    .auth .bd{padding:16px}
+    .hint{font-size:12px;color:var(--muted);margin-top:6px}
+  </style>
+</head>
+<body>
+  <div class="auth">
+    <div class="hd">Sett nytt passord</div>
+    <div class="bd">
+      <label>Nytt passord</label>
+      <input id="p1" class="field" type="password" placeholder="minst 6 tegn" style="width:100%;margin-top:6px">
+      <label style="margin-top:10px">Gjenta passord</label>
+      <input id="p2" class="field" type="password" placeholder="samme som over" style="width:100%;margin-top:6px">
+      <button id="save" class="btn primary" style="margin-top:12px;width:100%">Lagre nytt passord</button>
+      <p id="msg" class="hint" style="min-height:18px;margin-top:10px"></p>
+    </div>
+  </div>
+
+<script type="module">
+import { sb, updatePassword } from "./assets/common.js?v=pw1";
+const $ = s => document.querySelector(s);
+
+$('#save').onclick = async ()=>{
+  const a=$('#p1').value.trim(), b=$('#p2').value.trim();
+  if(!a || a.length<6) return $('#msg').textContent='Passord må ha minst 6 tegn.';
+  if(a!==b) return $('#msg').textContent='Passordene er ikke like.';
+  $('#msg').textContent='Lagrer…';
+  try{
+    await updatePassword(a);
+    $('#msg').textContent='Ferdig! Du kan nå gå videre.';
+    setTimeout(()=>location.replace('./elev.html'), 500);
+  }catch(e){
+    $('#msg').textContent=(e.message||e);
+  }
+};
+
+// Sikre at vi faktisk er i "recovery"-sesjon etter lenka
+sb.auth.onAuthStateChange((_ev, sess)=>{
+  if(!sess?.user){
+    // Hvis noen åpner reset.html direkte, send til login
+    location.replace('./login.html');
+  }
+});
+</script>
+</body>
+</html>
