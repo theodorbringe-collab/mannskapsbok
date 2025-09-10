@@ -3,19 +3,11 @@
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Mannskapsbok – Elev</title>
-  <link rel="stylesheet" href="./assets/styles.css?v=layout1">
-  <style>
-    /* Kun små side-spesifikke ting */
-    .modal{position:fixed;inset:0;background:rgba(2,6,23,.48);display:none;align-items:center;justify-content:center;z-index:60}
-    .modal.open{display:flex}
-    .modal-card{width:min(720px,92%);max-height:90vh;overflow:auto;background:#fff;border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow)}
-    .modal-hd{padding:14px 16px;background:#f8fafc;border-bottom:1px solid var(--line);font-weight:800;display:flex;justify-content:space-between;align-items:center}
-    .modal-bd{padding:14px 16px;white-space:pre-wrap}
-  </style>
+  <link rel="stylesheet" href="./assets/styles.css?v=elevA3">
 </head>
 <body>
 
-<!-- Røde-Kors header som før -->
+<!-- Header + rød meny -->
 <div class="rk-header">
   <div class="wrap rk-head-inner">
     <div class="rk-logo"></div>
@@ -23,28 +15,19 @@
   </div>
 </div>
 <nav class="rk-nav">
-  <div class="wrap"><a href="./elev.html">Hovedmeny</a></div>
+  <div class="wrap">
+    <a href="./elev.html">Hovedmeny</a>
+  </div>
 </nav>
 
 <div class="wrap" id="app">Laster …</div>
 
-<!-- Eksempel-modal -->
-<div class="modal" id="exModal" aria-hidden="true">
-  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="exTitle">
-    <div class="modal-hd">
-      <span id="exTitle">Eksempel / forklaring</span>
-      <button id="exClose" class="btn small">Lukk</button>
-    </div>
-    <div id="exBody" class="modal-bd"></div>
-  </div>
-</div>
-
 <script type="module">
 import {
   sb,
-  ensureUserOrRedirect, updateProfile, signOut,
+  ensureUserOrRedirect, updateProfile,
   loadCatalog, loadMyProgress, upsertProgress
-} from "./assets/common.js?v=otp7";
+} from "./assets/common.js?v=elevA3";
 
 (function(){
   const $=(s,r=document)=>r.querySelector(s);
@@ -52,9 +35,8 @@ import {
   const esc=s=>(s||'').replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[m]));
   const today=()=>new Date().toISOString().slice(0,10);
 
-  // ønsket rekkefølge + kortnavn for fanene
-  const ROLE_ORDER = ['Fartøysjef','NK','Matros','Rescuerunner','Aspirant'];
-  const SHORT = { Fartøysjef:'FS', NK:'NK', Matros:'Matros', Rescuerunner:'Rescuerunner', Aspirant:'Aspirant' };
+  const ROLE_ORDER=['Fartøysjef','NK','Matros','Rescuerunner','Aspirant'];
+  const SHORT={Fartøysjef:'FS', NK:'NK', Matros:'Matros', Rescuerunner:'Rescuerunner', Aspirant:'Aspirant'};
 
   let me=null, catalog={}, myProg=new Map(), activeRole=ROLE_ORDER[0], rt=null;
 
@@ -71,9 +53,7 @@ import {
       me = await ensureUserOrRedirect();
       const [cat, prog] = await Promise.all([loadCatalog(), loadMyProgress(me.id)]);
       catalog = cat; myProg = prog;
-      render();
-      bindRealtime();
-      bindExampleModal();
+      render(); bindRealtime();
     }catch(e){
       $("#app").innerHTML = `<div class="box"><div class="hd">Feil</div><div class="bd" style="color:#b00020">${esc(e.message||e)}</div></div>`;
       console.error(e);
@@ -82,116 +62,109 @@ import {
 
   function render(){
     $("#app").innerHTML = `
-      <h1 style="text-align:center;margin-bottom:6px">Mannskapsbok</h1>
+      <h1>Mannskapsbok</h1>
 
-      <!-- Toppbjelke: lagre / admin / logg ut -->
-      <div class="topbar">
+      <div class="row" style="margin-bottom:10px">
         <button id="btnSave" class="btn">Lagre</button>
-        <a class="btn" href="./admin.html" style="text-align:center">Admin</a>
-        <button id="btnLogout" class="btn">Logg ut</button>
+        <a class="btn" href="./admin.html">Admin</a>
+        <button id="btnOut" class="btn">Logg ut</button>
+        <span class="note" style="margin-left:auto">Sist oppdatert: <b id="lastUpd">${lastUpdated()}</b></span>
       </div>
 
-      <!-- Navn + sist oppdatert -->
       <div class="box" style="margin-bottom:12px">
         <div class="bd">
-          <div class="name-row">
-            <div class="name-left">
-              <span class="note">Navn</span>
-              <b id="meName">${esc(me.name || '(sett navn)')}</b>
-              <span class="note">• ${esc(me.email||'')}</span>
+          <div class="row" style="gap:12px;flex-wrap:wrap;align-items:center">
+            <div><span class="note">Navn</span><div><b id="meName">${esc(me.name || me.email)}</b></div></div>
+            <div class="row" style="gap:8px">
+              <input id="ownerName"  class="field" placeholder="Ditt navn"  value="${esc(me.name||'')}"  style="max-width:220px">
+              <input id="ownerEmail" class="field" placeholder="E-post" value="${esc(me.email||'')}" style="max-width:240px">
+              <button id="saveOwner" class="btn">Oppdater</button>
             </div>
-            <span class="note">Sist oppdatert: <b id="lastUpd">${lastUpdated()}</b></span>
-          </div>
-
-          <!-- rediger navn/epost -->
-          <div class="row" style="gap:8px;justify-content:flex-start;margin-top:10px;flex-wrap:wrap">
-            <input id="ownerName"  class="field" placeholder="Fullt navn" value="${esc(me.name||'')}"  style="max-width:240px">
-            <input id="ownerEmail" class="field" placeholder="E-post"     value="${esc(me.email||'')}" style="max-width:260px">
-            <button id="saveOwner" class="btn">Oppdater</button>
           </div>
         </div>
       </div>
 
-      <!-- Roller på én rad -->
-      <div id="roleTabs" class="roles-tabs"></div>
+      <div id="roleTabs" class="rolebar"></div>
 
-      <!-- Panel med tabell -->
       <div id="panel"></div>
     `;
 
-    // toppknapper
-    $('#btnSave').onclick = ()=> toast('Lagret ✅');
-    $('#btnLogout').onclick = async ()=>{ await signOut(); location.replace('./login.html'); };
-    $('#saveOwner').onclick = async ()=>{
-      try{
-        const name = $('#ownerName').value.trim();
-        const email = $('#ownerEmail').value.trim();
-        if(!name){ alert('Skriv inn fullt navn.'); return; }
-        await updateProfile({ name, email });
-        me = await ensureUserOrRedirect();
-        $('#meName').textContent = me.name || '(sett navn)';
-        toast('Oppdatert');
-      }catch(e){ alert('Kunne ikke oppdatere: ' + (e.message||e)); }
+    $('#btnSave').onclick=()=> toast('Lagret ✅');
+    $('#btnOut').onclick=async()=>{ await sb.auth.signOut(); location.replace('./login.html'); };
+    $('#saveOwner').onclick=async()=>{
+      const name=$('#ownerName').value.trim(), email=$('#ownerEmail').value.trim();
+      await updateProfile({ name, email });
+      $('#meName').textContent = name || email || me.email;
+      toast('Oppdatert');
     };
 
     drawRoleTabs();
     drawRole(activeRole);
   }
 
+  function roleProgress(role){
+    const secs = catalog[role] || [];
+    let total = 0, done = 0;
+    secs.forEach(s => (s.items||[]).forEach(it => {
+      total++; if (myProg.get(String(it.id))?.done) done++;
+    }));
+    return [done, total];
+  }
+
   function drawRoleTabs(){
-    const host = $('#roleTabs'); host.innerHTML='';
+    const host = $('#roleTabs'); host.innerHTML = '';
     ROLE_ORDER.forEach(role=>{
+      const [done,total] = roleProgress(role);
+      let state = '';
+      if (total>0 && done===total) state = 'state-green';
+      else if (done>0)           state = 'state-yellow';
+
       const b = document.createElement('button');
-      b.className = 'roletab' + (role===activeRole?' active':'');
+      b.className = `roletab ${state} ${role===activeRole?'active':''}`;
       b.textContent = SHORT[role] || role;
+      b.title = `${done}/${total} fullført`;
       b.onclick = ()=>{ activeRole=role; drawRoleTabs(); drawRole(activeRole); };
       host.appendChild(b);
     });
   }
 
   function drawRole(role){
-    const secs = catalog[role]||[];
-    const panel=$("#panel");
+    const panel=$("#panel"); const secs=catalog[role]||[];
     if(!secs.length){ panel.innerHTML='<div class="box"><div class="bd">Ingen punkter.</div></div>'; return; }
 
-    const itemsMap = new Map();
-    secs.forEach(s=>s.items.forEach(it=> itemsMap.set(String(it.id), it)));
-
     panel.innerHTML = secs.map((s,si)=>`
-      <div class="box" style="margin-bottom:12px">
+      <div class="box" style="margin-bottom:10px">
         <div class="hd">${esc(s.title)}</div>
         <div class="bd">
-          <table class="mb-table">
-            <thead>
-              <tr>
-                <th style="width:56px">#</th>
-                <th>Jeg kan dette</th>
-                <th style="width:260px">Sjekket ut av</th>
-                <th style="width:160px">Dato</th>
-                <th style="width:90px">Avkryss</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${s.items.map((it,pi)=>{
-                const pr = myProg.get(String(it.id))||{};
-                const exBtn = it.has_example ? `<button class="btn small" data-ex="1" title="Vis eksempel">Eksempel</button>` : '';
-                return `<tr data-id="${String(it.id)}">
-                  <td>${si+1}.${pi+1}</td>
-                  <td>${esc(it.text)}</td>
-                  <td>
-                    <div class="row" style="gap:8px;align-items:center">
-                      <input class="field" type="text" value="${esc(pr.signed_by||'')}" placeholder="Skriv inn navn" style="width:100%">
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th style="width:60px">#</th>
+                  <th>Jeg kan dette</th>
+                  <th style="width:260px">Sjekket ut av</th>
+                  <th style="width:170px">Dato</th>
+                  <th style="width:92px">Avkryss</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${s.items.map((it,pi)=>{
+                  const pr=myProg.get(String(it.id))||{};
+                  const exBtn = it.has_example ? `<button class="btn small" data-ex="1">Eksempel</button>` : '';
+                  return `<tr data-id="${String(it.id)}">
+                    <td>${si+1}.${pi+1}</td>
+                    <td>${esc(it.text)}</td>
+                    <td class="signcell">
+                      <input class="field" type="text" value="${esc(pr.signed_by||'')}" placeholder="Skriv inn navn">
                       ${exBtn}
-                    </div>
-                  </td>
-                  <td><input class="field" type="date" value="${pr.date||''}" style="min-width:140px"></td>
-                  <td style="text-align:center">
-                    <button class="mini-check" data-done="${pr.done?1:0}" title="${pr.done?'Fullført':'Ikke fullført'}" aria-pressed="${pr.done?true:false}">✓</button>
-                  </td>
-                </tr>`;
-              }).join('')}
-            </tbody>
-          </table>
+                    </td>
+                    <td><input class="field" type="date" value="${pr.date||''}"></td>
+                    <td><button class="mini-check" data-done="${pr.done?1:0}" title="Avkryss">✓</button></td>
+                  </tr>`;
+                }).join('')}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     `).join('');
@@ -202,7 +175,7 @@ import {
       const d  = tr.querySelector('input[type="date"]');
       const s  = tr.querySelector('input[type="text"]');
       const b  = tr.querySelector('.mini-check');
-      const ex = tr.querySelector('button[data-ex]');
+      const ex = tr.querySelector('[data-ex]');
 
       async function commit(action=null){
         let done = !!myProg.get(id)?.done;
@@ -210,12 +183,8 @@ import {
         try{
           await upsertProgress(id,{ date:d.value||null, signed_by:(s.value||null), done }, me.id);
           myProg.set(id,{ item_id:id, date:d.value||null, signed_by:s.value||null, done });
-
           b.setAttribute('data-done', done ? '1' : '0');
-          b.setAttribute('aria-pressed', done ? 'true' : 'false');
-          b.title = done ? 'Fullført' : 'Ikke fullført';
-          b.classList.add('flash'); setTimeout(()=>b.classList.remove('flash'), 220);
-
+          drawRoleTabs();
           $('#lastUpd').textContent = lastUpdated();
         }catch(e){
           alert('Kunne ikke lagre: ' + (e.message||e));
@@ -227,8 +196,13 @@ import {
 
       if(ex){
         ex.onclick = ()=>{
-          const it = itemsMap.get(id);
-          openExampleModal(it?.example_text || '', it?.text || 'Eksempel / forklaring');
+          // hent eksempeltekst fra katalogen
+          let txt='';
+          for(const sec of (catalog[role]||[])){
+            const it=(sec.items||[]).find(i=>String(i.id)===id);
+            if(it){ txt=it.example_text||''; break; }
+          }
+          alert(txt || 'Ingen eksempeltekst.');
         };
       }
     });
@@ -241,29 +215,15 @@ import {
     t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),1200);
   }
 
-  // Eksempel-modal
-  function bindExampleModal(){
-    $('#exClose').onclick = closeExampleModal;
-    $('#exModal').addEventListener('click', (e)=>{ if(e.target === $('#exModal')) closeExampleModal(); });
-    document.addEventListener('keydown', (e)=>{ if(e.key === 'Escape' && $('#exModal').classList.contains('open')) closeExampleModal(); });
-  }
-  function openExampleModal(text, title){
-    $('#exTitle').textContent = title;
-    $('#exBody').textContent  = text || '—';
-    $('#exModal').classList.add('open');
-  }
-  function closeExampleModal(){ $('#exModal').classList.remove('open'); }
-
-  // Realtime
   function bindRealtime(){
     if(rt){ sb.removeChannel(rt); rt=null; }
     rt = sb.channel('mb-live-elev')
       .on('postgres_changes',{event:'*',schema:'public',table:'progress',filter:`user_id=eq.${me.id}`},
-        async()=>{ myProg=await loadMyProgress(me.id); drawRole(activeRole); $('#lastUpd').textContent=lastUpdated(); })
+        async()=>{ myProg=await loadMyProgress(me.id); drawRoleTabs(); drawRole(activeRole); $('#lastUpd').textContent=lastUpdated(); })
       .on('postgres_changes',{event:'*',schema:'public',table:'sections'},
-        async()=>{ catalog=await loadCatalog(); drawRole(activeRole); })
+        async()=>{ catalog=await loadCatalog(); drawRoleTabs(); drawRole(activeRole); })
       .on('postgres_changes',{event:'*',schema:'public',table:'items'},
-        async()=>{ catalog=await loadCatalog(); drawRole(activeRole); })
+        async()=>{ catalog=await loadCatalog(); drawRoleTabs(); drawRole(activeRole); })
       .subscribe();
   }
 
