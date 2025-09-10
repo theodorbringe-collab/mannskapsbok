@@ -5,13 +5,13 @@
   <title>Mannskapsbok – Admin</title>
   <link rel="stylesheet" href="./assets/styles.css?v=otp7">
   <style>
-    /* Små side-spesifikke tillegg */
+    /* Små side-spesifikke tillegg (samme som før) */
     .pill{padding:6px 10px;border:1px solid var(--line);border-radius:999px;background:#fff}
     .user-active{outline:3px solid rgba(37,99,235,.35); border-radius:12px; background:#f6fbff}
 
     /* Modal – lokal CSS så den alltid er riktig */
     .modal-backdrop{
-      position:fixed; inset:0; display:none; /* <- skjult fra start */
+      position:fixed; inset:0; display:none;
       align-items:flex-start; justify-content:center;
       background:rgba(2,6,23,.35); backdrop-filter:saturate(120%) blur(2px);
       padding:24px; z-index:1000;
@@ -22,7 +22,7 @@
       background:#fff; border:1px solid var(--line); border-radius:16px; box-shadow:var(--shadow);
     }
 
-    /* Mini logg-dropdown */
+    /* Mini logg-dropdown (samme som før) */
     .drop-wrap{position:relative}
     .drop-btn{position:relative}
     .drop-panel{
@@ -40,11 +40,15 @@
     .log-row{display:flex; gap:8px; align-items:center; font-size:12px; color:var(--muted); padding:2px 0}
     .log-row .msg{color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
     @keyframes fadeIn{from{opacity:0; transform:translateY(-2px)} to{opacity:1; transform:translateY(0)}}
+
+    /* Liten under-modal for "Eksempel" */
+    .modal-narrow .modal-card{ width:min(640px,94vw); }
+    .muted{color:var(--muted)}
   </style>
 </head>
 <body>
 
-<!-- Header + rød meny (isolert) -->
+<!-- Header + rød meny -->
 <div class="rk-header">
   <div class="wrap rk-head-inner">
     <div class="rk-logo"></div>
@@ -59,7 +63,7 @@
 
 <div class="wrap" id="app">Laster …</div>
 
-<!-- KATALOG-MODAL (helt skjult til man trykker "Katalog") -->
+<!-- KATALOG-MODAL (skjult til "Katalog" trykkes) -->
 <div id="catModal" class="modal-backdrop" aria-hidden="true" style="display:none">
   <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="catHdr">
     <div class="hd">
@@ -74,6 +78,30 @@
         <button id="addSec" class="btn small primary">+ Inndeling</button>
       </div>
       <div id="catWrap"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Liten modal for å styre Eksempel for ett punkt -->
+<div id="exModal" class="modal-backdrop modal-narrow" aria-hidden="true" style="display:none; z-index:1100">
+  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="exHdr">
+    <div class="hd">
+      <span id="exHdr">Eksempel for punkt</span>
+      <button id="exClose" class="btn small" style="float:right">Lukk</button>
+    </div>
+    <div class="bd">
+      <div class="note" id="exItemText" style="margin-bottom:10px"></div>
+      <label class="row" style="gap:8px;align-items:center;margin:8px 0">
+        <input id="exEnabled" type="checkbox">
+        <span>Aktiver eksempel for dette punktet</span>
+      </label>
+      <div id="exTextareaWrap" style="display:none">
+        <textarea id="exText" class="field" style="width:100%;min-height:140px" placeholder="Skriv eksempeltekst …"></textarea>
+      </div>
+      <div class="row" style="gap:8px;justify-content:flex-end;margin-top:12px">
+        <button id="exSave" class="btn primary">Lagre</button>
+      </div>
+      <div class="note muted">Tips: Slås “Aktiver eksempel” av, lagres teksten men vises ikke for eleven.</div>
     </div>
   </div>
 </div>
@@ -96,6 +124,7 @@ import {
 
   let me=null, users=[], catalog={}, selUserId=null, selUserProg=new Map(), rt=null;
 
+  // ————— init / shell —————
   async function init(){
     try{
       me = await ensureUserOrRedirect();
@@ -144,7 +173,6 @@ import {
       </div>
 
       <div class="split">
-        <!-- Venstre: brukerliste -->
         <div>
           <div class="box">
             <div class="hd">Velg bruker</div>
@@ -155,7 +183,6 @@ import {
           </div>
         </div>
 
-        <!-- Høyre: valgt brukers bok + kommentarer -->
         <div>
           <div class="box">
             <div class="hd">
@@ -191,10 +218,9 @@ import {
       if(drop.classList.contains('open') && !wrap.contains(ev.target)){ toggleLog(false); }
     });
 
-    // Katalog-knapp -> åpen modal
+    // Katalog-knapp
     const modal = $('#catModal');
     function openCatModal(){
-      // fyll roller hver gang (i tilfelle endringer)
       $('#catRole').innerHTML = ROLES.map(r=>`<option value="${r}">${r}</option>`).join('');
       modal.style.display = 'flex';
       modal.classList.add('open');
@@ -261,6 +287,8 @@ import {
   }
 
   // — katalog-editor i MODAL —
+  let exContext = { item:null }; // holder item for "Eksempel"-modalen
+
   async function drawCatalogEditor(){
     const roleSel = $('#catRole');
     if(!roleSel.options.length) roleSel.innerHTML = ROLES.map(r=>`<option value="${r}">${r}</option>`).join('');
@@ -294,6 +322,8 @@ import {
                     <button class="btn small" data-act="itUp">↑</button>
                     <button class="btn small" data-act="itDown">↓</button>
                     <button class="btn small" data-act="itEdit">Rediger</button>
+                    <!-- NY knapp: Eksempel -->
+                    <button class="btn small" data-act="itExample">${it.has_example ? 'Eksempel ✓' : 'Eksempel'}</button>
                     <button class="btn small" data-act="itDel">Slett</button>
                   </div>
                 </li>`).join('')}
@@ -322,15 +352,55 @@ import {
     $$('#catWrap li [data-act]').forEach(btn=>{
       btn.onclick=async()=>{
         const li=btn.closest('li'); const si=+li.dataset.si; const ii=+li.dataset.ii; const s=catalog[$('#catRole').value][si]; const it=s.items[ii];
+
         if(btn.dataset.act==='itUp'){ if(ii>0){ await moveItem(it.id, it.position, s.items[ii-1].id, s.items[ii-1].position); catalog=await loadCatalog(); drawCatalogEditor(); } }
         if(btn.dataset.act==='itDown'){ if(ii<s.items.length-1){ await moveItem(it.id, it.position, s.items[ii+1].id, s.items[ii+1].position); catalog=await loadCatalog(); drawCatalogEditor(); } }
         if(btn.dataset.act==='itEdit'){ const nt=prompt('Rediger beskrivelse:', it.text); if(nt!=null){ await editItem(it.id, nt.trim()); catalog=await loadCatalog(); drawCatalogEditor(); } }
         if(btn.dataset.act==='itDel'){ if(!confirm('Slette punkt?')) return; await deleteItem(it.id); catalog=await loadCatalog(); drawCatalogEditor(); }
+
+        // NY handling: Eksempel-editor
+        if(btn.dataset.act==='itExample'){ openExampleEditor(it); }
       };
     });
   }
 
-  // — velg bruker og rediger bok —
+  // — Eksempel-modal (kun for ett item) —
+  function openExampleEditor(it){
+    exContext.item = it;
+    $('#exItemText').textContent = it.text || '';
+    $('#exEnabled').checked = !!it.has_example;
+    $('#exTextareaWrap').style.display = it.has_example ? 'block' : 'none';
+    $('#exText').value = it.example_text || '';
+
+    const m = $('#exModal');
+    m.style.display='flex'; m.classList.add('open'); m.setAttribute('aria-hidden','false');
+  }
+  function closeExampleEditor(){
+    const m = $('#exModal');
+    m.classList.remove('open'); m.style.display='none'; m.setAttribute('aria-hidden','true');
+    exContext.item = null;
+  }
+  $('#exClose').onclick = closeExampleEditor;
+  $('#exModal').addEventListener('click', e=>{ if(e.target===$('#exModal')) closeExampleEditor(); });
+  $('#exEnabled').onchange = ()=>{ $('#exTextareaWrap').style.display = $('#exEnabled').checked ? 'block' : 'none'; };
+
+  $('#exSave').onclick = async ()=>{
+    if(!exContext.item) return;
+    const enabled = $('#exEnabled').checked;
+    const text    = $('#exText').value.trim();
+
+    // minimal oppdatering direkte her (vi rører ikke common.js)
+    await sb.from('items').update({
+      has_example: enabled,
+      example_text: enabled ? text : null
+    }).eq('id', exContext.item.id);
+
+    catalog = await loadCatalog();          // refetch
+    drawCatalogEditor();                    // oppdater liste/label (✓)
+    closeExampleEditor();
+  };
+
+  // — velg bruker og rediger bok (uendret) —
   async function selectUser(uid){
     selUserId = uid;
     const u = users.find(x=>x.id===uid);
@@ -338,7 +408,6 @@ import {
 
     selUserProg = await loadProgressFor(uid);
 
-    // marker aktiv i lista
     $$('#userList li').forEach(li=>li.classList.toggle('user-active', li.getAttribute('data-id')===uid));
 
     $('#selHdr').textContent = u.name || u.email || u.id;
