@@ -1,15 +1,28 @@
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
 
-// — Supabase (bruk ditt prosjekt) —
+/* ---------- Supabase (din instans) ---------- */
 export const SUPABASE_URL  = "https://yqiqvtuxwvgbcfpsoyno.supabase.co";
 export const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlxaXF2dHV4d3ZnYmNmcHNveW5vIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY4NDI1NjcsImV4cCI6MjA3MjQxODU2N30.JKgTfWJ6HqJ96P_ghVYP5vasph12yuk36jlfEBN3PBA";
 
 export const sb = createClient(SUPABASE_URL, SUPABASE_ANON);
 
-// Roller i katalogen
+/* ---------- Roller i katalogen ---------- */
 export const ROLES = ["Fartøysjef","NK","Matros","Aspirant","Rescuerunner"];
 
-/* ---------- Lokal identitet (enkel “bruker”) ---------- */
+/* ---------- Auth helpers ---------- */
+export async function ensureUser(){
+  // Krever at brukeren er innlogget i Supabase Auth (hvis ikke, kaster den)
+  const { data, error } = await sb.auth.getUser();
+  const user = data?.user;
+  if (error || !user) throw new Error("Not signed in");
+  const id = user.id;
+  const email = user.email || `user-${id.slice(0,8)}@local`;
+  const name = user.user_metadata?.name || user.user_metadata?.full_name || email;
+  await sb.from("profiles").upsert({ id, email, name }, { onConflict: "id" });
+  return { id, email, name };
+}
+
+/* ---------- Lokal identitet (fallback “elev”-modus) ---------- */
 export function getLocalIdentity(){
   return {
     id:    localStorage.getItem("mb_uid"),
@@ -74,13 +87,15 @@ export async function loadCatalog(){
 
 export async function loadMyProgress(uid){
   const { data } = await sb.from("progress").select("item_id,done,date,signed_by").eq("user_id", uid);
-  const map = new Map(); (data||[]).forEach(r=>map.set(Number(r.item_id), r));
+  const map = new Map();
+  (data||[]).forEach(r=>map.set(String(r.item_id), r)); // String-nøkler
   return map;
 }
 
 export async function loadProgressFor(uid){
   const { data } = await sb.from("progress").select("item_id,done,date,signed_by").eq("user_id", uid);
-  const map = new Map(); (data||[]).forEach(r=>map.set(Number(r.item_id), r));
+  const map = new Map();
+  (data||[]).forEach(r=>map.set(String(r.item_id), r)); // String-nøkler
   return map;
 }
 
