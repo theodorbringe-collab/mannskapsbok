@@ -153,3 +153,57 @@ export async function moveItem(aId,aPos,bId,bPos){
   let r = await sb.from("items").update({ position:bPos }).eq("id", aId); if(r.error) throw r.error;
   r = await sb.from("items").update({ position:aPos }).eq("id", bId); if(r.error) throw r.error;
 }
+/* ==== Email/Password auth ==== */
+
+// Registrer ny bruker (kan kreve e-postbekreftelse hvis aktivert)
+export async function signUpWithPassword(email, password){
+  const redirect = `${location.origin}${location.pathname.replace('login.html','elev.html')}`;
+  const { data, error } = await sb.auth.signUp({
+    email, password,
+    options: { emailRedirectTo: redirect }
+  });
+  if(error) throw error;
+  return data; // data.session kan være null hvis "Confirm email" er på
+}
+
+// Logg inn med e-post + passord
+export async function signInWithPassword(email, password){
+  const { error } = await sb.auth.signInWithPassword({ email, password });
+  if(error) throw error;
+}
+
+// Send "glemt passord" e-post
+export async function sendPasswordReset(email){
+  const redirectTo = `${location.origin}${location.pathname.replace('login.html','reset.html')}`;
+  const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo });
+  if(error) throw error;
+}
+
+// Etter klikk på reset-lenke -> sett nytt passord
+export async function updatePassword(newPassword){
+  const { data, error } = await sb.auth.updateUser({ password: newPassword });
+  if(error) throw error;
+  return data;
+}
+
+// Sørg for innlogget bruker eller redirect til login
+export async function ensureUserOrRedirect(){
+  const { data:{ user } } = await sb.auth.getUser();
+  if(user){
+    await sb.from("profiles").upsert({
+      id: user.id,
+      email: user.email || "",
+      name:  user.user_metadata?.name || user.user_metadata?.full_name || user.email || ""
+    }, { onConflict: "id" });
+    return { id:user.id, email:user.email, name:user.user_metadata?.name || user.user_metadata?.full_name || user.email };
+  }else{
+    const ret = encodeURIComponent(location.pathname + location.search);
+    location.replace(`./login.html?returnTo=${ret}`);
+    throw new Error("Redirecting to login");
+  }
+}
+
+export async function signOut(){
+  await sb.auth.signOut();
+}
+
