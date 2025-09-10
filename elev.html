@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Mannskapsbok – Elev</title>
-  <link rel="stylesheet" href="./assets/styles.css?v=3">
+  <link rel="stylesheet" href="./assets/styles.css?v=auth1">
   <style>
     .rk-header{background:#fff;border-bottom:1px solid #eaeaea}
     .rk-head-inner{display:flex;align-items:center;gap:14px;padding:10px 0}
@@ -17,7 +17,6 @@
     .rk-nav .wrap{display:flex;gap:12px;padding:6px 0;font-weight:700}
     .rk-nav a{color:#fff;text-decoration:none}
     .rk-nav a:hover{text-decoration:underline}
-    .rk-nav .sep{opacity:.7;color:#fff}
     .rk-header + .rk-nav + .wrap{margin-top:16px}
   </style>
 </head>
@@ -40,9 +39,9 @@
 <script type="module">
 import {
   sb, ROLES,
-  ensureLocalUser, setLocalIdentity,
+  ensureUserOrRedirect, updateProfile,
   loadCatalog, loadMyProgress, upsertProgress
-} from "./assets/common.js?v=3";
+} from "./assets/common.js?v=auth1";
 
 (function(){
   const $=(s,r=document)=>r.querySelector(s);
@@ -63,14 +62,13 @@ import {
 
   async function init(){
     try{
-      me = await ensureLocalUser();
+      me = await ensureUserOrRedirect();              // ← krever innlogging
       const [cat, prog] = await Promise.all([loadCatalog(), loadMyProgress(me.id)]);
       catalog = cat; myProg = prog;
       render();
       bindRealtime();
     }catch(e){
-      $("#app").innerHTML = `<div class="box"><div class="hd">Feil</div><div class="bd" style="color:#b00020;white-space:pre-wrap">${esc(e.stack||e.message||e)}</div></div>`;
-      console.error(e);
+      // Redirecter til login hvis ikke innlogget
     }
   }
 
@@ -80,7 +78,7 @@ import {
 
       <div class="row" style="margin-bottom:10px">
         <button id="btnSave" class="btn">Lagre</button>
-        <a class="btn" href="./admin.html">Admin</a>
+        <a class="btn" href="./admin.html?v=auth1">Admin</a>
         <span class="note" style="margin-left:auto">Sist oppdatert: <b id="lastUpd">${lastUpdated()}</b></span>
       </div>
 
@@ -98,16 +96,21 @@ import {
       </div>
 
       <div id="roleBar" class="rolebar"></div>
+
       <div id="panel"></div>
     `;
 
     $('#btnSave').onclick=()=> toast('Lagret ✅');
     $('#saveOwner').onclick=async()=>{
       const name=$('#ownerName').value.trim(), email=$('#ownerEmail').value.trim();
-      await setLocalIdentity({ name, email });
-      me = await ensureLocalUser();
-      $('#meName').textContent = me.name||me.email;
-      toast('Oppdatert');
+      try{
+        await updateProfile({ name, email });
+        me = await ensureUserOrRedirect();
+        $('#meName').textContent = me.name||me.email;
+        toast('Oppdatert');
+      }catch(e){
+        alert('Kunne ikke oppdatere profil: ' + (e.message||e));
+      }
     };
 
     drawRoleBar();
@@ -173,21 +176,21 @@ import {
       const b  = tr.querySelector('.mini-check');
 
       async function commit(action=null){
-        if(!id){ alert("Dette punktet mangler item_id – sjekk at 'items' har primærnøkkel (id / item_id)."); return; }
+        if(!id){ alert("Dette punktet mangler item_id."); return; }
         let done = !!myProg.get(id)?.done;
         if(action==='toggle'){ done=!done; if(done && !d.value) d.value=today(); if(!done) d.value=''; }
 
-        b.setAttribute('data-done', done ? '1' : '0'); // visuell feedback
+        // visuell feedback umiddelbart
+        b.setAttribute('data-done', done ? '1' : '0');
 
         try{
           await upsertProgress(id,{ date:d.value||null, signed_by:(s.value||null), done }, me.id);
           myProg.set(id,{ item_id:id, date:d.value||null, signed_by:s.value||null, done });
           drawRoleBar();
-          const upd = document.getElementById('lastUpd'); if(upd) upd.textContent = lastUpdated();
+          $('#lastUpd').textContent = lastUpdated();
         }catch(e){
           b.setAttribute('data-done', !done ? '1' : '0'); // rollback
           alert('Kunne ikke lagre: ' + (e.message||e));
-          console.error('commit error', e);
         }
       }
       s.onchange=()=>commit();
@@ -206,7 +209,7 @@ import {
     if(rt){ sb.removeChannel(rt); rt=null; }
     rt = sb.channel('mb-live-elev')
       .on('postgres_changes',{event:'*',schema:'public',table:'progress',filter:`user_id=eq.${me.id}`},
-        async()=>{ myProg=await loadMyProgress(me.id); drawRoleBar(); drawRole(activeRole); const upd=document.getElementById('lastUpd'); if(upd) upd.textContent=lastUpdated(); })
+        async()=>{ myProg=await loadMyProgress(me.id); drawRoleBar(); drawRole(activeRole); $('#lastUpd').textContent=lastUpdated(); })
       .on('postgres_changes',{event:'*',schema:'public',table:'sections'},
         async()=>{ catalog=await loadCatalog(); drawRoleBar(); drawRole(activeRole); })
       .on('postgres_changes',{event:'*',schema:'public',table:'items'},
