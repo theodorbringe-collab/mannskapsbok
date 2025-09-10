@@ -1,202 +1,282 @@
-:root{
-  --bg:#f4f6fb;
-  --card:#ffffff;
-  --text:#0b1220;
-  --muted:#64748b;
-  --line:#e5e7eb;
-  --accent:#2563eb;
-  --accent-2:#1e40af;
-  --good:#16a34a;
-  --warn:#d97706;
-  --bad:#dc2626;
-  --radius:14px;
-  --shadow:0 8px 24px rgba(15,23,42,.08);
-}
+<!doctype html>
+<html lang="no">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Mannskapsbok – Elev</title>
+  <link rel="stylesheet" href="./assets/styles.css?v=otp7">
+  <style>
+    /* side-spesifikt */
+    .top-actions{display:flex;gap:8px;justify-content:center;margin:10px 0 6px}
+    .name-row{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+    .name-left{display:flex;gap:12px;align-items:baseline}
 
-*{box-sizing:border-box}
-html,body{height:100%}
-body{
-  margin:0;
-  background:var(--bg);
-  color:var(--text);
-  font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sans-serif;
-}
+    /* enkel modal for eksempel-tekst */
+    .modal{position:fixed;inset:0;background:rgba(2,6,23,.48);display:none;align-items:center;justify-content:center;z-index:60}
+    .modal.open{display:flex}
+    .modal-card{width:min(720px,92vw);max-height:90vh;overflow:auto;background:#fff;border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow)}
+    .modal-hd{padding:14px 16px;background:#f8fafc;border-bottom:1px solid var(--line);font-weight:800;display:flex;justify-content:space-between;align-items:center}
+    .modal-bd{padding:14px 16px;white-space:pre-wrap}
+  </style>
+</head>
+<body>
 
-a{color:var(--accent);text-decoration:none}
-a:hover{text-decoration:underline}
+<!-- Isolert Røde-Kors header -->
+<div class="rk-header">
+  <div class="wrap rk-head-inner">
+    <div class="rk-logo"></div>
+    <div class="rk-title">Røde Kors<span class="rk-sub">Båten Bjørgvin</span></div>
+  </div>
+</div>
+<nav class="rk-nav">
+  <div class="wrap">
+    <a href="./elev.html">Hovedmeny</a>
+  </div>
+</nav>
 
-h1{margin:8px 0 14px;font-size:30px;letter-spacing:.2px}
-h2,h3{margin:12px 0 8px}
+<div class="wrap" id="app">Laster …</div>
 
-/* Standard bredde for topp-header, men hovedinnhold bruker .page */
-.wrap{max-width:1100px;margin:32px auto;padding:0 16px}
+<!-- Eksempel-modal (visning) -->
+<div class="modal" id="exModal" aria-hidden="true">
+  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="exTitle">
+    <div class="modal-hd">
+      <span id="exTitle">Eksempel / forklaring</span>
+      <button id="exClose" class="btn small">Lukk</button>
+    </div>
+    <div id="exBody" class="modal-bd"></div>
+  </div>
+</div>
 
-/* --- Midtstilte side-containere for hovedinnhold --- */
-.page{ max-width: 960px; margin: 0 auto; padding: 0 16px 16px; }
-.page-narrow{ max-width: 820px; margin: 0 auto; padding: 0 16px 16px; }
-@media (min-width: 1400px){
-  .page{ max-width: 900px; }
-  .page-narrow{ max-width: 780px; }
-}
+<script type="module">
+import {
+  sb, ROLES,
+  ensureUserOrRedirect, updateProfile, signOut,
+  loadCatalog, loadMyProgress, upsertProgress
+} from "./assets/common.js?v=otp7";
 
-/* ====== Nyttig base ====== */
-.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-.note{color:var(--muted);font-size:12px}
-.tag{display:inline-block;background:#eef2ff;color:#1e3a8a;padding:4px 8px;border-radius:999px;font-size:12px}
-.badge{
-  display:inline-block;font-size:12px;background:#eef2ff;color:#0f172a;
-  border:1px solid var(--line);padding:4px 8px;border-radius:999px
-}
-/* Admin-merking */
-.badge.admin{
-  background:#fff7e6;   /* lys oransje bakgrunn */
-  border-color:#f59e0b; /* oransje kant */
-  color:#b45309;        /* mørk oransje tekst */
-  font-weight:700;
-}
+(function(){
+  const $=(s,r=document)=>r.querySelector(s);
+  const $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
+  const esc=s=>(s||'').replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[m]));
+  const today=()=>new Date().toISOString().slice(0,10);
+  const clsFor=(done,total)=> total===0||done===0?'gray':(done<total?'yellow':'green');
 
-/* Kort / ruter / status */
-.grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));margin:12px 0}
-.card{border-radius:16px;background:transparent}
-.card>button{
-  width:100%;border:0;cursor:pointer;padding:18px 16px;border-radius:16px;font-weight:700;
-  background:var(--card);box-shadow:var(--shadow);text-align:left
-}
-.card .sub{display:block;margin-top:4px;font-weight:500;color:var(--muted);font-size:12px}
-.card>button:hover{transform:translateY(-1px);transition:.15s}
+  let me=null, catalog={}, myProg=new Map(), activeRole=ROLES[0], rt=null;
 
-/* Statusfarger for rolleknapper */
-.gray   {background:#fff}
-.yellow {background:#fff7e6}
-.yellow .sub{color:#b45309}
-.green  {background:#ecfdf5}
-.green  .sub{color:#065f46}
+  function lastUpdated(){
+    let d=null;
+    for(const v of myProg.values()){
+      if(v?.date){ const t=new Date(v.date); if(!d || t>d) d=t; }
+    }
+    return d ? d.toLocaleDateString('no-NO') : '—';
+  }
 
-/* Tabs */
-.tabs{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}
-.tab{padding:10px 12px;border-radius:999px;background:var(--card);border:1px solid var(--line);cursor:pointer}
-.tab:hover{border-color:#cbd5e1}
-.tab.active{background:var(--accent);border-color:var(--accent);color:#fff}
+  async function init(){
+    try{
+      me = await ensureUserOrRedirect();               // 🔐 ekte login
+      const [cat, prog] = await Promise.all([loadCatalog(), loadMyProgress(me.id)]);
+      catalog = cat; myProg = prog;
+      render();
+      bindRealtime();
+      bindExampleModal();
+    }catch(e){
+      $("#app").innerHTML = `<div class="box"><div class="hd">Feil</div><div class="bd" style="color:#b00020">${esc(e.message||e)}</div></div>`;
+      console.error(e);
+    }
+  }
 
-/* Bokser (paneler) */
-.box{
-  background:var(--card);
-  border-radius:var(--radius);
-  box-shadow:var(--shadow);
-  overflow:hidden;
-  margin-bottom:12px;
-  border:1px solid var(--line)
-}
-.box .hd{
-  padding:14px 16px;
-  background:#f8fafc;
-  border-bottom:1px solid var(--line);
-  font-weight:800
-}
-.box .bd{padding:14px 16px}
+  function render(){
+    $("#app").innerHTML = `
+      <div class="page page-narrow">
+        <h1 style="text-align:center;margin-bottom:6px">Mannskapsbok</h1>
 
-/* Lister */
-.list{list-style:none;margin:0;padding:0;max-height:480px;overflow:auto}
-.list li{display:flex;justify-content:space-between;gap:8px;align-items:center;padding:10px 12px;border-bottom:1px solid var(--line)}
-.list li:last-child{border-bottom:0}
-.list li:hover{background:#f8fafc}
+        <div class="top-actions">
+          <button id="btnSave" class="btn">Lagre</button>
+          <a class="btn" href="./admin.html">Admin</a>
+          <button id="btnLogout" class="btn">Logg ut</button>
+        </div>
 
-/* Tabeller – ryddig, lett å lese */
-table{width:100%;border-collapse:separate;border-spacing:0}
-thead th{
-  position:sticky; top:0; z-index:1;
-  font-weight:800; background:#f8fafc; border-bottom:1px solid var(--line)
-}
-th,td{padding:12px 10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
-tbody tr:nth-child(even){background:#fbfdff}
-tbody tr:hover{background:#f6fbff}
+        <div class="box" style="margin-bottom:12px">
+          <div class="bd">
+            <div class="name-row">
+              <div class="name-left">
+                <span class="note">Navn</span>
+                <b id="meName">${esc(me.name||me.email)}</b>
+              </div>
+              <span class="note">Sist oppdatert: <b id="lastUpd">${lastUpdated()}</b></span>
+            </div>
+            <div class="row" style="gap:8px;justify-content:center;margin-top:10px;flex-wrap:wrap">
+              <input id="ownerName"  class="field" placeholder="Endre navn"  value="${esc(me.name||'')}"  style="max-width:220px">
+              <input id="ownerEmail" class="field" placeholder="Endre e-post" value="${esc(me.email||'')}" style="max-width:240px">
+              <button id="saveOwner" class="btn">Oppdater</button>
+            </div>
+          </div>
+        </div>
 
-/* Inputs / knapper */
-.field,
-input[type="text"],input[type="date"],input[type="email"],select{
-  width:auto;min-height:40px;padding:10px 12px;border-radius:10px;
-  border:1.5px solid var(--line);background:#fff;color:#var(--text)
-}
-.field:focus,
-input[type="text"]:focus,input[type="date"]:focus,input[type="email"]:focus,select:focus{
-  outline:3px solid rgba(37,99,235,.2);border-color:var(--accent)
-}
-input[type="checkbox"]{width:18px;height:18px}
+        <div id="roleBar" class="rolebar" style="justify-content:center"></div>
 
-.btn{
-  --bg:#fff; --fg:var(--text); --bd:var(--line);
-  background:var(--bg); color:var(--fg); border:1.5px solid var(--bd);
-  padding:10px 12px;border-radius:12px;cursor:pointer;font-weight:600
-}
-.btn:hover{filter:brightness(0.98)}
-.btn:active{transform:translateY(1px)}
-.btn.primary{--bg:var(--accent);--fg:#fff;--bd:var(--accent)}
-.btn.small{padding:6px 8px;font-size:12px}
+        <div id="panel"></div>
+      </div>
+    `;
 
-/* Layout-split på admin (bedre bredder) */
-.split{display:grid;grid-template-columns:320px 1fr;gap:12px}
-@media (min-width:1100px){ .split{ grid-template-columns:360px 1fr; gap:16px; } }
-@media (max-width:900px){ .split{grid-template-columns:1fr} }
+    $('#btnSave').onclick = ()=> toast('Lagret ✅');
+    $('#btnLogout').onclick = async ()=>{
+      await signOut(); location.replace('./login.html');
+    };
+    $('#saveOwner').onclick = async ()=>{
+      try{
+        const name=$('#ownerName').value.trim(), email=$('#ownerEmail').value.trim();
+        await updateProfile({ name, email });             // 🔄 lagres i profiles
+        me = await ensureUserOrRedirect();
+        $('#meName').textContent = me.name||me.email;
+        toast('Oppdatert');
+      }catch(e){ alert('Kunne ikke oppdatere: ' + (e.message||e)); }
+    };
 
-/* Små forbedringer for mobil */
-@media (max-width:640px){
-  h1{font-size:24px}
-  th:nth-child(1),td:nth-child(1){width:56px}
-}
+    drawRoleBar();
+    drawRole(activeRole);
+  }
 
-/* Toast */
-.toast{position:fixed;right:16px;bottom:16px;background:#111;color:#fff;padding:10px 12px;border-radius:10px;opacity:0;transform:translateY(6px);transition:.2s}
-.toast.show{opacity:1;transform:translateY(0)}
+  function drawRoleBar(){
+    const host=$('#roleBar'); host.innerHTML='';
+    ROLES.forEach(role=>{
+      const its=(catalog[role]||[]).flatMap(s=>s.items);
+      const total=its.length;
+      const done=its.filter(it=>myProg.get(String(it.id))?.done).length;
+      const b=document.createElement('button');
+      b.className=`rolebtn ${clsFor(done,total)}`;
+      b.innerHTML = `${role}<span class="sub">${done}/${total} fullført</span>`;
+      b.onclick=()=>{ activeRole=role; drawRole(activeRole); };
+      host.appendChild(b);
+    });
+  }
 
-/* Rolleknapper (FS/NK/...) – tydeligere */
-.rolebar{display:flex;gap:12px;flex-wrap:wrap;margin:8px 0 14px;justify-content:center}
-.rolebtn{
-  border:1.5px solid var(--line); background:#fff; color:var(--text);
-  border-radius:14px; padding:14px 16px; cursor:pointer;
-  box-shadow:var(--shadow); font-weight:800; min-width:180px; text-align:left
-}
-.rolebtn .sub{display:block;font-size:12px;color:var(--muted);margin-top:4px}
-.rolebtn.gray{background:#fff}
-.rolebtn.yellow{background:#fff7e6;border-color:#f9cf8a}
-.rolebtn.green{background:#ecfdf5;border-color:#86efac}
-.rolebtn:hover{transform:translateY(-1px);transition:.15s}
+  function drawRole(role){
+    const panel=$("#panel"); const secs=catalog[role]||[];
+    if(!secs.length){ panel.innerHTML='<div class="box"><div class="bd">Ingen punkter.</div></div>'; return; }
 
-/* Dato + “avkrysset punkt” til høyre */
-.datecell{display:flex;gap:10px;align-items:center}
+    // map for raskt oppslag av eksempel-tekst
+    const itemsMap = new Map();
+    secs.forEach(s=>s.items.forEach(it=> itemsMap.set(String(it.id), it)));
 
-/* Check-knapp – veldig tydelig når fullført */
-.mini-check{
-  --on:#2563eb; --off:#d1d5db;
-  width:42px;height:42px;border-radius:12px;border:2px solid var(--off);
-  background:#fff;color:#fff;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;
-  transition:background .15s ease,border-color .15s ease,box-shadow .15s ease,transform .12s ease;
-}
-.mini-check::before{content:"✓";font-weight:900;color:transparent;font-size:20px;line-height:1}
-.mini-check[data-done="1"]{background:var(--on);border-color:var(--on);box-shadow:0 0 0 4px rgba(37,99,235,.18)}
-.mini-check[data-done="1"]::before{color:#fff}
-.mini-check[data-done="0"]{background:#fff;border-color:var(--off)}
-.mini-check[data-done="0"]::before{color:transparent}
-.mini-check:hover{box-shadow:0 0 0 4px rgba(37,99,235,.12)}
-.mini-check:focus-visible{outline:3px solid rgba(37,99,235,.35)}
-.mini-check.flash{animation:pop .22s ease-out}
-@keyframes pop{from{transform:scale(.92)} to{transform:scale(1)}}
+    panel.innerHTML = secs.map((s,si)=>`
+      <div class="box" style="margin-bottom:12px">
+        <div class="hd">${esc(s.title)}</div>
+        <div class="bd">
+          <table class="mb-table">
+            <thead>
+              <tr>
+                <th style="width:56px">#</th>
+                <th>Jeg kan dette</th>
+                <th style="width:260px">Sjekket ut av</th>
+                <th style="width:160px">Dato</th>
+                <th style="width:90px">Avkryss</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${s.items.map((it,pi)=>{
+                const pr=myProg.get(String(it.id))||{};
+                const exBtn = it.has_example ? `<button class="btn small" data-ex="1" title="Vis eksempel">Eksempel</button>` : '';
+                return `<tr data-id="${String(it.id)}">
+                  <td>${si+1}.${pi+1}</td>
+                  <td>${esc(it.text)}</td>
+                  <td>
+                    <div class="row" style="gap:8px;align-items:center">
+                      <input class="field" type="text" value="${esc(pr.signed_by||'')}" placeholder="Skriv inn navn" style="width:100%">
+                      ${exBtn}
+                    </div>
+                  </td>
+                  <td><input class="field" type="date" value="${pr.date||''}" style="min-width:140px"></td>
+                  <td style="text-align:center">
+                    <button class="mini-check" data-done="${pr.done?1:0}" title="${pr.done?'Fullført':'Ikke fullført'}" aria-pressed="${pr.done?true:false}">✓</button>
+                  </td>
+                </tr>`;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `).join('');
 
-/* Input for dato litt tydeligere */
-.datecell input[type="date"]{min-width:140px}
+    // handlers
+    $$('#panel tbody tr').forEach(tr=>{
+      const id = tr.getAttribute('data-id');
+      const d  = tr.querySelector('input[type="date"]');
+      const s  = tr.querySelector('input[type="text"]');
+      const b  = tr.querySelector('.mini-check');
+      const ex = tr.querySelector('button[data-ex]');
 
-/* ====== ISOLERT RØDE-KORS HEADER ====== */
-.rk-header{ background:#fff; border-bottom:1px solid #eaeaea; }
-.rk-head-inner{ display:flex; align-items:center; gap:14px; padding:10px 0; }
-.rk-logo{ position:relative; width:42px; height:42px; flex:0 0 42px; }
-.rk-logo::before,.rk-logo::after{ content:""; position:absolute; background:#ff1a1a; border-radius:2px; }
-.rk-logo::before{ width:70%; height:26%; left:15%; top:37%; }
-.rk-logo::after{  width:26%; height:70%; left:37%; top:15%; }
-.rk-title{ font-size:28px; font-weight:800; letter-spacing:.2px; color:#000; }
-.rk-title .rk-sub{ font-weight:600; margin-left:.25em; }
-.rk-nav{ background:#ff1a1a; }
-.rk-nav .wrap{ display:flex; gap:12px; padding:6px 0; font-weight:700; }
-.rk-nav a{ color:#fff; text-decoration:none; }
-.rk-nav a:hover{ text-decoration:underline; }
-.rk-nav .sep{ opacity:.7; color:#fff; }
-/* litt luft etter header+nav */
-.rk-header + .rk-nav + .wrap{ margin-top:16px; }
+      async function commit(action=null){
+        let done = !!myProg.get(id)?.done;
+        if(action==='toggle'){ done=!done; if(done && !d.value) d.value=today(); if(!done) d.value=''; }
+        try{
+          await upsertProgress(id,{ date:d.value||null, signed_by:(s.value||null), done }, me.id);
+          myProg.set(id,{ item_id:id, date:d.value||null, signed_by:s.value||null, done });
+
+          // visuell oppdatering
+          b.setAttribute('data-done', done ? '1' : '0');
+          b.setAttribute('aria-pressed', done ? 'true' : 'false');
+          b.title = done ? 'Fullført' : 'Ikke fullført';
+          b.classList.add('flash'); setTimeout(()=>b.classList.remove('flash'), 220);
+
+          drawRoleBar();
+          $('#lastUpd').textContent = lastUpdated();
+        }catch(e){
+          alert('Kunne ikke lagre: ' + (e.message||e));
+        }
+      }
+      s.onchange=()=>commit();
+      d.onchange=()=>commit();
+      b.onclick =()=>commit('toggle');
+
+      if(ex){
+        ex.onclick = ()=>{
+          const it = itemsMap.get(id);
+          openExampleModal(it?.example_text || '', it?.text || 'Eksempel / forklaring');
+        };
+      }
+    });
+  }
+
+  // liten toast
+  function toast(msg){
+    let t=document.getElementById('toast');
+    if(!t){ t=document.createElement('div'); t.id='toast'; t.className='toast'; document.body.appendChild(t); }
+    t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),1200);
+  }
+
+  // Eksempel-modal
+  function bindExampleModal(){
+    $('#exClose').onclick = closeExampleModal;
+    $('#exModal').addEventListener('click', (e)=>{
+      if(e.target === $('#exModal')) closeExampleModal(); // klikk utenfor kortet
+    });
+    document.addEventListener('keydown', (e)=>{
+      if(e.key === 'Escape' && $('#exModal').classList.contains('open')) closeExampleModal();
+    });
+  }
+  function openExampleModal(text, title){
+    $('#exTitle').textContent = title;
+    $('#exBody').textContent  = text || '—';
+    $('#exModal').classList.add('open');
+  }
+  function closeExampleModal(){
+    $('#exModal').classList.remove('open');
+  }
+
+  function bindRealtime(){
+    if(rt){ sb.removeChannel(rt); rt=null; }
+    rt = sb.channel('mb-live-elev')
+      .on('postgres_changes',{event:'*',schema:'public',table:'progress',filter:`user_id=eq.${me.id}`},
+        async()=>{ myProg=await loadMyProgress(me.id); drawRoleBar(); drawRole(activeRole); $('#lastUpd').textContent=lastUpdated(); })
+      .on('postgres_changes',{event:'*',schema:'public',table:'sections'},
+        async()=>{ catalog=await loadCatalog(); drawRoleBar(); drawRole(activeRole); })
+      .on('postgres_changes',{event:'*',schema:'public',table:'items'},
+        async()=>{ catalog=await loadCatalog(); drawRoleBar(); drawRole(activeRole); })
+      .subscribe();
+  }
+
+  init();
+})();
+</script>
+</body>
+</html>
