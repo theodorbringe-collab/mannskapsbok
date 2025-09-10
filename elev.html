@@ -4,7 +4,7 @@
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Mannskapsbok – Elev</title>
   <link rel="stylesheet" href="./assets/styles.css">
-  <!-- Isolated Røde-Kors header styles (only .rk-*) -->
+  <!-- Isolert Røde-Kors header -->
   <style>
     .rk-header{background:#fff;border-bottom:1px solid #eaeaea}
     .rk-head-inner{display:flex;align-items:center;gap:14px;padding:10px 0}
@@ -24,7 +24,6 @@
 </head>
 <body>
 
-<!-- Header + rød meny (isolert) -->
 <div class="rk-header">
   <div class="wrap rk-head-inner">
     <div class="rk-logo"></div>
@@ -169,7 +168,7 @@ import {
 
     // handlers
     $$('#panel tbody tr').forEach(tr=>{
-      const id = tr.getAttribute('data-id');             // always a string -> avoids null item_id
+      const id = tr.getAttribute('data-id');             // alltid string
       const d  = tr.querySelector('input[type="date"]');
       const s  = tr.querySelector('input[type="text"]');
       const b  = tr.querySelector('.mini-check');
@@ -177,13 +176,18 @@ import {
       async function commit(action=null){
         let done = !!myProg.get(id)?.done;
         if(action==='toggle'){ done=!done; if(done && !d.value) d.value=today(); if(!done) d.value=''; }
+
+        // Umiddelbar visuell feedback:
+        b.setAttribute('data-done', done ? '1' : '0');
+
         try{
           await upsertProgress(id,{ date:d.value||null, signed_by:(s.value||null), done }, me.id);
           myProg.set(id,{ item_id:id, date:d.value||null, signed_by:s.value||null, done });
-          b.setAttribute('data-done', done ? '1' : '0');
           drawRoleBar();
           $('#lastUpd').textContent = lastUpdated();
         }catch(e){
+          // Rull tilbake ved feil
+          b.setAttribute('data-done', !done ? '1' : '0');
           alert('Kunne ikke lagre: ' + (e.message||e));
         }
       }
@@ -193,7 +197,7 @@ import {
     });
   }
 
-  // small toast
+  // liten toast
   function toast(msg){
     let t=document.getElementById('toast');
     if(!t){ t=document.createElement('div'); t.id='toast'; t.className='toast'; document.body.appendChild(t); }
