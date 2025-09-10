@@ -35,7 +35,6 @@ h2,h3{margin:12px 0 8px}
 .note{color:var(--muted);font-size:12px}
 .tag{display:inline-block;background:#eef2ff;color:#1e3a8a;padding:4px 8px;border-radius:999px;font-size:12px}
 .badge{display:inline-block;font-size:12px;background:#eef2ff;color:#0f172a;border:1px solid var(--line);padding:4px 8px;border-radius:999px}
-
 /* Admin-merking */
 .badge.admin{
   background:#fff7e6;
@@ -43,6 +42,22 @@ h2,h3{margin:12px 0 8px}
   color:#b45309;
   font-weight:700;
 }
+
+/* Kort / ruter / status */
+.grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));margin:12px 0}
+.card{border-radius:16px;background:transparent}
+.card>button{
+  width:100%;border:0;cursor:pointer;padding:18px 16px;border-radius:16px;font-weight:700;
+  background:var(--card);box-shadow:var(--shadow);text-align:left
+}
+.card .sub{display:block;margin-top:4px;font-weight:500;color:var(--muted);font-size:12px}
+.card>button:hover{transform:translateY(-1px);transition:.15s}
+
+/* Tabs (generelt) */
+.tabs{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}
+.tab{padding:10px 12px;border-radius:999px;background:var(--card);border:1px solid var(--line);cursor:pointer}
+.tab:hover{border-color:#cbd5e1}
+.tab.active{background:var(--accent);border-color:var(--accent);color:#fff}
 
 /* Bokser (paneler) */
 .box{
@@ -77,18 +92,6 @@ th,td{padding:12px 10px;border-bottom:1px solid var(--line);text-align:left;vert
 tbody tr:nth-child(even){background:#fbfdff}
 tbody tr:hover{background:#f6fbff}
 
-/* Mobilvennlig tabell som holder én rad og scroller sideveis */
-.table-wrap{overflow-x:auto; -webkit-overflow-scrolling:touch; border-radius:12px}
-.table-wrap table{min-width:780px; table-layout:fixed}
-.table-wrap th:nth-child(1), .table-wrap td:nth-child(1){width:60px}
-.table-wrap th:nth-child(3), .table-wrap td:nth-child(3){width:260px}
-.table-wrap th:nth-child(4), .table-wrap td:nth-child(4){width:170px}
-.table-wrap th:nth-child(5), .table-wrap td:nth-child(5){width:92px; text-align:center}
-
-/* Signeringscelle: input + Eksempel-knapp på én linje */
-.signcell{display:flex; gap:8px; align-items:center; white-space:nowrap}
-.signcell .field{flex:1; min-width:0}
-
 /* Inputs / knapper */
 .field,
 input[type="text"],input[type="date"],input[type="email"],select{
@@ -111,42 +114,59 @@ input[type="checkbox"]{width:18px;height:18px}
 .btn.primary{--bg:var(--accent);--fg:#fff;--bd:var(--accent)}
 .btn.small{padding:6px 8px;font-size:12px}
 
-/* Rollefaner (FS/NK/...) */
+/* Layout-split på admin */
+.split{display:grid;grid-template-columns:320px 1fr;gap:12px}
+@media (max-width:900px){ .split{grid-template-columns:1fr} }
+
+/* Små forbedringer for mobil */
+@media (max-width:640px){
+  h1{font-size:24px}
+  th:nth-child(1),td:nth-child(1){width:56px}
+}
+
+/* Toast */
+.toast{position:fixed;right:16px;bottom:16px;background:#111;color:#fff;padding:10px 12px;border-radius:10px;opacity:0;transform:translateY(6px);transition:.2s}
+.toast.show{opacity:1;transform:translateY(0)}
+
+/* ====== Rollefaner (FS/NK/...) ====== */
 .rolebar{display:flex;gap:10px;flex-wrap:wrap;margin:8px 0 14px}
-.roletab{
+
+/* Støtt både .rolebtn og .roletab som navn */
+.rolebtn,.roletab{
   border:1.5px solid var(--line);
   background:#fff; color:#0b1220;
   border-radius:14px; padding:12px 14px;
   cursor:pointer; font-weight:800; min-width:140px; text-align:left;
+  transition:transform .15s ease, box-shadow .15s ease, background .15s ease, border-color .15s ease, color .15s ease;
 }
-.roletab.active{box-shadow:0 0 0 3px rgba(37,99,235,.18)}
-.roletab:hover{transform:translateY(-1px);transition:.15s}
+.rolebtn:hover,.roletab:hover{transform:translateY(-1px)}
 
-/* KNALLE STATUSFARGER */
-.roletab.state-yellow{
-  background:#fff3c4;
-  border-color:#f59e0b;
+/* KNALL farger – samme på elev & admin */
+.rolebtn.state-yellow,.roletab.state-yellow{
+  background:#fff3c4;        /* gul bakgrunn */
+  border-color:#f59e0b;      /* tydelig kant */
+  color:#7c2d12;
 }
-.roletab.state-green{
-  background:#10b981;
+.rolebtn.state-yellow.active,.roletab.state-yellow.active{
+  box-shadow:0 0 0 3px rgba(245,158,11,.35);
+}
+
+.rolebtn.state-green,.roletab.state-green{
+  background:#10b981;        /* KNALL grønn */
   border-color:#059669;
   color:#fff;
 }
-.roletab.state-green.active{box-shadow:0 0 0 3px rgba(16,185,129,.35)}
+.rolebtn.state-green.active,.roletab.state-green.active{
+  box-shadow:0 0 0 3px rgba(16,185,129,.35);
+}
 
-/* Admin: farg accordion-header i samme stil */
-.accordion{border:1px solid var(--line);border-radius:12px;overflow:hidden;margin-bottom:10px;background:#fff}
-.acc-hd{display:flex;justify-content:space-between;align-items:center;padding:12px 14px;font-weight:800;background:#f8fafc;cursor:pointer}
-.acc-bd{display:none;padding:12px 14px}
-.accordion.open .acc-bd{display:block}
-.accordion.state-yellow .acc-hd{background:#fff3c4;border-bottom-color:#f59e0b}
-.accordion.state-green .acc-hd{background:#10b981;color:#fff}
-.accordion.state-green .acc-count{color:#e6fffa}
+/* Aktiv fane beholder state-fargen – bare glød */
+.rolebtn.active,.roletab.active{}
 
-/* Dato + “avkrysset” */
+/* Dato + “avkrysset punkt” til høyre */
 .datecell{display:flex;gap:10px;align-items:center}
 
-/* Check-knapp – tydelig når fullført */
+/* Check-knapp – tydelig blå når fullført */
 .mini-check{
   --on:#2563eb; --off:#d1d5db;
   width:42px;height:42px;border-radius:12px;border:2px solid var(--off);
@@ -160,17 +180,36 @@ input[type="checkbox"]{width:18px;height:18px}
 .mini-check[data-done="0"]::before{color:transparent}
 .mini-check:hover{box-shadow:0 0 0 4px rgba(37,99,235,.12)}
 .mini-check:focus-visible{outline:3px solid rgba(37,99,235,.35)}
+.mini-check.flash{animation:pop .22s ease-out}
+@keyframes pop{from{transform:scale(.92)} to{transform:scale(1)}}
 
-/* Toast */
-.toast{position:fixed;right:16px;bottom:16px;background:#111;color:#fff;padding:10px 12px;border-radius:10px;opacity:0;transform:translateY(6px);transition:.2s}
-.toast.show{opacity:1;transform:translateY(0)}
+/* Input for dato litt tydeligere */
+.datecell input[type="date"]{min-width:140px}
 
-/* Små forbedringer for mobil */
-@media (max-width:640px){
-  h1{font-size:24px}
-  .mini-check{width:38px;height:38px;border-radius:10px}
-  .table-wrap th,.table-wrap td{padding:10px 8px}
+/* Liten sekundær knapp – “Eksempel” */
+.exbtn{
+  border:1px solid var(--line);
+  background:#f8fafc;
+  border-radius:10px;
+  padding:8px 10px;
+  font-size:12px;
+  cursor:pointer;
 }
+.exbtn:hover{filter:brightness(0.98)}
+
+/* Modal (brukes av eksempel-vindu) */
+.modal-backdrop{
+  position:fixed; inset:0; background:rgba(0,0,0,.35);
+  display:none; align-items:center; justify-content:center; z-index:1000;
+}
+.modal-backdrop.open{display:flex}
+.modal-card{
+  width:min(720px,92vw); max-height:80vh; overflow:auto;
+  background:#fff; border:1px solid var(--line); border-radius:16px; box-shadow:var(--shadow);
+}
+.modal-card .hd{padding:12px 14px; background:#f8fafc; border-bottom:1px solid var(--line); font-weight:800}
+.modal-card .bd{padding:14px}
+.modal-card textarea{width:100%; min-height:160px}
 
 /* ====== ISOLERT RØDE-KORS HEADER ====== */
 .rk-header{ background:#fff; border-bottom:1px solid #eaeaea; }
@@ -185,4 +224,6 @@ input[type="checkbox"]{width:18px;height:18px}
 .rk-nav .wrap{ display:flex; gap:12px; padding:6px 0; font-weight:700; }
 .rk-nav a{ color:#fff; text-decoration:none; }
 .rk-nav a:hover{ text-decoration:underline; }
+.rk-nav .sep{ opacity:.7; color:#fff; }
+/* litt luft etter header+nav */
 .rk-header + .rk-nav + .wrap{ margin-top:16px; }
