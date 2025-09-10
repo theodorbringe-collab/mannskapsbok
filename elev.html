@@ -3,14 +3,12 @@
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Mannskapsbok – Elev</title>
-  <link rel="stylesheet" href="./assets/styles.css?v=otp9">
+  <link rel="stylesheet" href="./assets/styles.css?v=restore1">
   <style>
-    /* side-spesifikt */
     .top-actions{display:flex;gap:8px;justify-content:center;margin:10px 0 6px}
     .name-row{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap}
     .name-left{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}
 
-    /* enkel modal for eksempel-tekst */
     .modal{position:fixed;inset:0;background:rgba(2,6,23,.48);display:none;align-items:center;justify-content:center;z-index:60}
     .modal.open{display:flex}
     .modal-card{width:min(720px,92vw);max-height:90vh;overflow:auto;background:#fff;border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow)}
@@ -20,7 +18,6 @@
 </head>
 <body>
 
-<!-- Isolert Røde-Kors header -->
 <div class="rk-header">
   <div class="wrap rk-head-inner">
     <div class="rk-logo"></div>
@@ -35,7 +32,6 @@
 
 <div class="wrap" id="app">Laster …</div>
 
-<!-- Eksempel-modal (visning) -->
 <div class="modal" id="exModal" aria-hidden="true">
   <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="exTitle">
     <div class="modal-hd">
@@ -58,12 +54,9 @@ import {
   const $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
   const esc=s=>(s||'').replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[m]));
   const today=()=>new Date().toISOString().slice(0,10);
+  const clsFor=(done,total)=> total===0||done===0?'gray':(done<total?'yellow':'green');
 
-  // ønsket rekkefølge + korte etiketter
-  const ROLE_ORDER = ['Fartøysjef','NK','Matros','Rescuerunner','Aspirant'];
-  const SHORT = { Fartøysjef:'FS', NK:'NK', Matros:'Matros', Rescuerunner:'Rescuerunner', Aspirant:'Aspirant' };
-
-  let me=null, catalog={}, myProg=new Map(), activeRole=ROLE_ORDER[0], rt=null;
+  let me=null, catalog={}, myProg=new Map(), activeRole=ROLES[0], rt=null;
 
   function lastUpdated(){
     let d=null;
@@ -75,7 +68,7 @@ import {
 
   async function init(){
     try{
-      me = await ensureUserOrRedirect();               // 🔐 ekte login
+      me = await ensureUserOrRedirect();
       const [cat, prog] = await Promise.all([loadCatalog(), loadMyProgress(me.id)]);
       catalog = cat; myProg = prog;
       render();
@@ -117,17 +110,14 @@ import {
           </div>
         </div>
 
-        <!-- ROLLE-STRIPE (horisontal) -->
-        <div id="roleBar" class="rolebar roles-strip"></div>
+        <div id="roleBar" class="rolebar" style="justify-content:center"></div>
 
         <div id="panel"></div>
       </div>
     `;
 
     $('#btnSave').onclick = ()=> toast('Lagret ✅');
-    $('#btnLogout').onclick = async ()=>{
-      await signOut(); location.replace('./login.html');
-    };
+    $('#btnLogout').onclick = async ()=>{ await signOut(); location.replace('./login.html'); };
     $('#saveOwner').onclick = async ()=>{
       try{
         const name = $('#ownerName').value.trim();
@@ -146,12 +136,14 @@ import {
 
   function drawRoleBar(){
     const host=$('#roleBar'); host.innerHTML='';
-    const roles = ROLE_ORDER.filter(r=>ROLES.includes(r));
-    roles.forEach(role=>{
+    ROLES.forEach(role=>{
+      const its=(catalog[role]||[]).flatMap(s=>s.items);
+      const total=its.length;
+      const done=its.filter(it=>myProg.get(String(it.id))?.done).length;
       const b=document.createElement('button');
-      b.className=`rolebtn ${role===activeRole?'active':''}`;
-      b.textContent = SHORT[role] || role;
-      b.onclick=()=>{ activeRole=role; drawRoleBar(); drawRole(activeRole); };
+      b.className=`rolebtn ${clsFor(done,total)}`;
+      b.innerHTML = `${role}<span class="sub">${done}/${total} fullført</span>`;
+      b.onclick=()=>{ activeRole=role; drawRole(activeRole); };
       host.appendChild(b);
     });
   }
@@ -160,7 +152,6 @@ import {
     const panel=$("#panel"); const secs=catalog[role]||[];
     if(!secs.length){ panel.innerHTML='<div class="box"><div class="bd">Ingen punkter.</div></div>'; return; }
 
-    // map for raskt oppslag av eksempel-tekst
     const itemsMap = new Map();
     secs.forEach(s=>s.items.forEach(it=> itemsMap.set(String(it.id), it)));
 
@@ -203,7 +194,6 @@ import {
       </div>
     `).join('');
 
-    // handlers
     $$('#panel tbody tr').forEach(tr=>{
       const id = tr.getAttribute('data-id');
       const d  = tr.querySelector('input[type="date"]');
@@ -218,12 +208,12 @@ import {
           await upsertProgress(id,{ date:d.value||null, signed_by:(s.value||null), done }, me.id);
           myProg.set(id,{ item_id:id, date:d.value||null, signed_by:s.value||null, done });
 
-          // visuell oppdatering
           b.setAttribute('data-done', done ? '1' : '0');
           b.setAttribute('aria-pressed', done ? 'true' : 'false');
           b.title = done ? 'Fullført' : 'Ikke fullført';
           b.classList.add('flash'); setTimeout(()=>b.classList.remove('flash'), 220);
 
+          drawRoleBar();
           $('#lastUpd').textContent = lastUpdated();
         }catch(e){
           alert('Kunne ikke lagre: ' + (e.message||e));
@@ -242,18 +232,16 @@ import {
     });
   }
 
-  // liten toast
   function toast(msg){
     let t=document.getElementById('toast');
     if(!t){ t=document.createElement('div'); t.id='toast'; t.className='toast'; document.body.appendChild(t); }
     t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),1200);
   }
 
-  // Eksempel-modal
   function bindExampleModal(){
     $('#exClose').onclick = closeExampleModal;
     $('#exModal').addEventListener('click', (e)=>{
-      if(e.target === $('#exModal')) closeExampleModal(); // klikk utenfor kortet
+      if(e.target === $('#exModal')) closeExampleModal();
     });
     document.addEventListener('keydown', (e)=>{
       if(e.key === 'Escape' && $('#exModal').classList.contains('open')) closeExampleModal();
@@ -264,19 +252,17 @@ import {
     $('#exBody').textContent  = text || '—';
     $('#exModal').classList.add('open');
   }
-  function closeExampleModal(){
-    $('#exModal').classList.remove('open');
-  }
+  function closeExampleModal(){ $('#exModal').classList.remove('open'); }
 
   function bindRealtime(){
     if(rt){ sb.removeChannel(rt); rt=null; }
     rt = sb.channel('mb-live-elev')
       .on('postgres_changes',{event:'*',schema:'public',table:'progress',filter:`user_id=eq.${me.id}`},
-        async()=>{ myProg=await loadMyProgress(me.id); drawRole(activeRole); $('#lastUpd').textContent=lastUpdated(); })
+        async()=>{ myProg=await loadMyProgress(me.id); drawRoleBar(); drawRole(activeRole); $('#lastUpd').textContent=lastUpdated(); })
       .on('postgres_changes',{event:'*',schema:'public',table:'sections'},
-        async()=>{ catalog=await loadCatalog(); drawRole(activeRole); })
+        async()=>{ catalog=await loadCatalog(); drawRoleBar(); drawRole(activeRole); })
       .on('postgres_changes',{event:'*',schema:'public',table:'items'},
-        async()=>{ catalog=await loadCatalog(); drawRole(activeRole); })
+        async()=>{ catalog=await loadCatalog(); drawRoleBar(); drawRole(activeRole); })
       .subscribe();
   }
 
