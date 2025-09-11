@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Mannskapsbok – Elev</title>
-  <link rel="stylesheet" href="./assets/styles.css?v=otp10">
+  <link rel="stylesheet" href="./assets/styles.css?v=otp11">
   <style>
     /* popup for Eksempel */
     .modal-backdrop{position:fixed;inset:0;display:none;align-items:flex-start;justify-content:center;background:rgba(2,6,23,.35);backdrop-filter:saturate(120%) blur(2px);padding:24px;z-index:1000}
@@ -39,7 +39,7 @@ import {
   sb, ROLES,
   ensureUserOrRedirect, updateProfile, signOut,
   loadCatalog, loadMyProgress, upsertProgress
-} from "./assets/common.js?v=otp10";
+} from "./assets/common.js?v=otp11";
 
 (function(){
   const $=(s,r=document)=>r.querySelector(s);
@@ -138,7 +138,6 @@ import {
                 <th>Jeg kan dette</th>
                 <th style="width:260px">Sjekket ut av</th>
                 <th class="w-date">Dato</th>
-                <th class="w-check">Avkryss</th>
               </tr>
             </thead>
             <tbody>
@@ -153,8 +152,11 @@ import {
                       ${it.has_example ? `<button class="btn small ex-btn" data-ex="${encodeURIComponent(it.example_text||'')}">Eksempel</button>` : ``}
                     </div>
                   </td>
-                  <td class="datecell w-date"><input class="field" type="date" value="${pr.date||''}"></td>
-                  <td class="checkcell w-check"><button class="mini-check" data-done="${pr.done?1:0}" title="Avkrysset">✓</button></td>
+                  <!-- Dato + avkryss i samme celle -->
+                  <td class="datecell w-date">
+                    <input class="field" type="date" value="${pr.date||''}">
+                    <button class="mini-check" data-done="${pr.done?1:0}" title="Avkrysset">✓</button>
+                  </td>
                 </tr>`;
               }).join('')}
             </tbody>
