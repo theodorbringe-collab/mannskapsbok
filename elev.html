@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Mannskapsbok – Elev</title>
-  <link rel="stylesheet" href="./assets/styles.css?v=otp8">
+  <link rel="stylesheet" href="./assets/styles.css?v=otp9">
 
   <!-- Kun små, lokale tillegg for elev-siden -->
   <style>
@@ -60,7 +60,7 @@ import {
   ensureUserOrRedirect, updateProfile,
   loadCatalog, loadMyProgress, upsertProgress,
   signOut
-} from "./assets/common.js?v=otp8";
+} from "./assets/common.js?v=otp9";
 
 (function(){
   const $=(s,r=document)=>r.querySelector(s);
@@ -166,8 +166,8 @@ import {
                 <th style="width:60px">#</th>
                 <th>Jeg kan dette</th>
                 <th style="width:260px">Sjekket ut av</th>
-                <th style="width:170px">Dato</th>
-                <th style="width:90px">Avkryss</th>
+                <th class="w-date">Dato</th>
+                <th class="w-check">Avkryss</th>
               </tr>
             </thead>
             <tbody>
@@ -182,10 +182,10 @@ import {
                       ${it.has_example ? `<button class="btn small ex-btn" data-ex="${encodeURIComponent(it.example_text||'')}">Eksempel</button>` : ``}
                     </div>
                   </td>
-                  <td class="datecell">
+                  <td class="datecell w-date">
                     <input class="field" type="date" value="${pr.date||''}">
                   </td>
-                  <td class="datecell">
+                  <td class="datecell w-check">
                     <button class="mini-check" data-done="${pr.done?1:0}" title="Avkrysset">✓</button>
                   </td>
                 </tr>`;
