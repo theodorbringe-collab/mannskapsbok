@@ -3,69 +3,34 @@
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Mannskapsbok – Admin</title>
-  <link rel="stylesheet" href="./assets/styles.css?v=otp7">
+  <link rel="stylesheet" href="./assets/styles.css?v=otp10">
   <style>
-    /* Små side-spesifikke tillegg (samme som før) */
-    .pill{padding:6px 10px;border:1px solid var(--line);border-radius:999px;background:#fff}
-    .user-active{outline:3px solid rgba(37,99,235,.35); border-radius:12px; background:#f6fbff}
-
-    /* Modal – lokal CSS så den alltid er riktig */
-    .modal-backdrop{
-      position:fixed; inset:0; display:none;
-      align-items:flex-start; justify-content:center;
-      background:rgba(2,6,23,.35); backdrop-filter:saturate(120%) blur(2px);
-      padding:24px; z-index:1000;
-    }
-    .modal-backdrop.open{ display:flex; }
-    .modal-card{
-      width:min(1100px,96vw); max-height:85vh; overflow:auto;
-      background:#fff; border:1px solid var(--line); border-radius:16px; box-shadow:var(--shadow);
-    }
-
-    /* Mini logg-dropdown (samme som før) */
-    .drop-wrap{position:relative}
-    .drop-btn{position:relative}
-    .drop-panel{
-      position:absolute; top:42px; right:0; z-index:30;
-      width:min(520px,90vw); max-height:220px; overflow:auto;
-      background:var(--card); border:1px solid var(--line);
-      border-radius:12px; box-shadow:var(--shadow); display:none;
-    }
-    .drop-panel.open{display:block; animation:fadeIn .12s ease-out}
-    .drop-hd{
-      position:sticky; top:0; z-index:1; display:flex; justify-content:space-between; align-items:center;
-      gap:8px; padding:8px 10px; font-weight:700; background:#f8fafc; border-bottom:1px solid var(--line)
-    }
-    .drop-bd{padding:8px 10px}
-    .log-row{display:flex; gap:8px; align-items:center; font-size:12px; color:var(--muted); padding:2px 0}
-    .log-row .msg{color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
-    @keyframes fadeIn{from{opacity:0; transform:translateY(-2px)} to{opacity:1; transform:translateY(0)}}
-
-    /* Liten under-modal for "Eksempel" */
-    .modal-narrow .modal-card{ width:min(640px,94vw); }
-    .muted{color:var(--muted)}
+    /* liten modal for katalog */
+    .backdrop{position:fixed;inset:0;display:none;align-items:flex-start;justify-content:center;background:rgba(2,6,23,.35);backdrop-filter:saturate(120%) blur(2px);padding:24px;z-index:1000}
+    .backdrop.open{display:flex}
+    .card{width:min(900px,96vw);max-height:88vh;overflow:auto;background:#fff;border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow)}
+    .card .hd{padding:14px 16px;background:#f8fafc;border-bottom:1px solid var(--line);font-weight:800}
+    .card .bd{padding:14px 16px}
+    .pill{padding:2px 8px;border-radius:999px;border:1px solid var(--line);font-size:12px}
+    .pill.on{background:#ecfdf5;border-color:#34d399;color:#065f46}
   </style>
 </head>
 <body>
 
-<!-- Header + rød meny -->
+<!-- Header -->
 <div class="rk-header">
   <div class="wrap rk-head-inner">
     <div class="rk-logo"></div>
     <div class="rk-title">Røde Kors<span class="rk-sub">Båten Bjørgvin</span></div>
   </div>
 </div>
-<nav class="rk-nav">
-  <div class="wrap">
-    <a href="./elev.html">Hovedmeny</a>
-  </div>
-</nav>
+<nav class="rk-nav"><div class="wrap"><a href="./elev.html">Hovedmeny</a></div></nav>
 
 <div class="wrap" id="app">Laster …</div>
 
-<!-- KATALOG-MODAL (skjult til "Katalog" trykkes) -->
-<div id="catModal" class="modal-backdrop" aria-hidden="true" style="display:none">
-  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="catHdr">
+<!-- Katalog-modal -->
+<div id="catModal" class="backdrop" aria-hidden="true">
+  <div class="card" role="dialog" aria-modal="true" aria-labelledby="catHdr">
     <div class="hd">
       <span id="catHdr">Katalog – rediger punkter og inndelinger</span>
       <button id="catClose" class="btn small" style="float:right">Lukk</button>
@@ -82,39 +47,15 @@
   </div>
 </div>
 
-<!-- Liten modal for å styre Eksempel for ett punkt -->
-<div id="exModal" class="modal-backdrop modal-narrow" aria-hidden="true" style="display:none; z-index:1100">
-  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="exHdr">
-    <div class="hd">
-      <span id="exHdr">Eksempel for punkt</span>
-      <button id="exClose" class="btn small" style="float:right">Lukk</button>
-    </div>
-    <div class="bd">
-      <div class="note" id="exItemText" style="margin-bottom:10px"></div>
-      <label class="row" style="gap:8px;align-items:center;margin:8px 0">
-        <input id="exEnabled" type="checkbox">
-        <span>Aktiver eksempel for dette punktet</span>
-      </label>
-      <div id="exTextareaWrap" style="display:none">
-        <textarea id="exText" class="field" style="width:100%;min-height:140px" placeholder="Skriv eksempeltekst …"></textarea>
-      </div>
-      <div class="row" style="gap:8px;justify-content:flex-end;margin-top:12px">
-        <button id="exSave" class="btn primary">Lagre</button>
-      </div>
-      <div class="note muted">Tips: Slås “Aktiver eksempel” av, lagres teksten men vises ikke for eleven.</div>
-    </div>
-  </div>
-</div>
-
 <script type="module">
 import {
   sb, ROLES,
-  ensureUserOrRedirect,
-  listUsers, loadCatalog, loadProgressFor, loadComments, loadLogs,
+  ensureUserOrRedirect, listUsers, loadCatalog, loadProgressFor, loadComments, loadLogs,
   upsertProgress, addComment,
   addSection, updateSectionTitle, moveSection, deleteSection,
-  addItem, editItem, deleteItem, moveItem
-} from "./assets/common.js?v=otp7";
+  addItem, editItem, deleteItem, moveItem, setItemExample,
+  setUserAdmin
+} from "./assets/common.js?v=otp10";
 
 (function(){
   const $=(s,r=document)=>r.querySelector(s);
@@ -124,18 +65,9 @@ import {
 
   let me=null, users=[], catalog={}, selUserId=null, selUserProg=new Map(), rt=null;
 
-  // ————— init / shell —————
   async function init(){
     try{
       me = await ensureUserOrRedirect();
-
-      // sjekk admin
-      const { data:prof, error:perr } = await sb.from("profiles").select("is_admin,name,email").eq("id", me.id).single();
-      if(perr) throw perr;
-      if(!prof?.is_admin){
-        $('#app').innerHTML = `<div class="box"><div class="hd">Ingen tilgang</div><div class="bd">Denne siden er bare for administratorer.</div></div>`;
-        return;
-      }
 
       [users, catalog] = await Promise.all([listUsers(), loadCatalog()]);
       render(); bindRealtime();
@@ -149,25 +81,8 @@ import {
     $('#app').innerHTML = `
       <div class="row" style="justify-content:space-between">
         <h1>Admin</h1>
-
         <div class="row" style="gap:8px">
-          <button id="openCatalog" class="btn">Katalog</button>
-
-          <!-- Mini logg-dropdown -->
-          <div class="row drop-wrap" id="logWrapBtn">
-            <button id="btnLog" class="btn drop-btn" aria-expanded="false" aria-controls="logDrop">Logg</button>
-            <div id="logDrop" class="drop-panel" role="region" aria-hidden="true">
-              <div class="drop-hd">
-                <span>Systemlogg</span>
-                <div class="row" style="gap:6px">
-                  <button id="logRefresh" class="btn small">Oppdater</button>
-                  <button id="logClose" class="btn small">Lukk</button>
-                </div>
-              </div>
-              <div id="logList" class="drop-bd">—</div>
-            </div>
-          </div>
-
+          <button id="btnCatalog" class="btn">Katalog</button>
           <a class="btn" href="./elev.html">← Til elev-siden</a>
         </div>
       </div>
@@ -175,7 +90,7 @@ import {
       <div class="split">
         <div>
           <div class="box">
-            <div class="hd">Velg bruker</div>
+            <div class="hd">Brukere</div>
             <div class="bd">
               <input id="userSearch" class="field" placeholder="Søk navn/epost …" style="width:100%;margin-bottom:10px">
               <ul id="userList" class="list"></ul>
@@ -186,13 +101,13 @@ import {
         <div>
           <div class="box">
             <div class="hd">
-              <span id="selHdr" class="pill">Ingen valgt</span>
+              <span id="selHdr">Velg en bruker</span>
               <div class="row" style="gap:8px;margin-left:auto">
-                <label class="note"><input id="editToggle" type="checkbox" checked style="vertical-align:middle"> Rediger som admin</label>
+                <button id="toggleAdmin" class="btn small" disabled>Gjør admin</button>
                 <button id="btnDeleteUser" class="btn small" disabled>Slett bruker</button>
               </div>
             </div>
-            <div class="bd" id="userBook"><div class="note">Velg en bruker i listen til venstre.</div></div>
+            <div class="bd" id="userBook"><div class="note">Ingen valgt.</div></div>
           </div>
 
           <div class="box" style="margin-top:12px">
@@ -209,57 +124,24 @@ import {
       </div>
     `;
 
-    // logg dropdown
-    $('#btnLog').onclick    = async (e)=>{ e.stopPropagation(); await toggleLog(true); };
-    $('#logRefresh').onclick= async (e)=>{ e.stopPropagation(); await fillLogList(); };
-    $('#logClose').onclick  = (e)=>{ e.stopPropagation(); toggleLog(false); };
-    document.addEventListener('click',(ev)=>{
-      const drop = $('#logDrop'); const wrap=$('#logWrapBtn');
-      if(drop.classList.contains('open') && !wrap.contains(ev.target)){ toggleLog(false); }
-    });
+    // fyll rolle-valg i modal
+    $('#catRole').innerHTML = ROLES.map(r=>`<option value="${r}">${r}</option>`).join('');
 
-    // Katalog-knapp
-    const modal = $('#catModal');
-    function openCatModal(){
-      $('#catRole').innerHTML = ROLES.map(r=>`<option value="${r}">${r}</option>`).join('');
-      modal.style.display = 'flex';
-      modal.classList.add('open');
-      modal.setAttribute('aria-hidden','false');
-      drawCatalogEditor();
-    }
-    function closeCatModal(){
-      modal.classList.remove('open');
-      modal.style.display = 'none';
-      modal.setAttribute('aria-hidden','true');
-    }
-    $('#openCatalog').onclick = openCatModal;
-    $('#catClose').onclick    = closeCatModal;
-    modal.addEventListener('click', (e)=>{ if(e.target===modal) closeCatModal(); });
+    $('#btnCatalog').onclick = ()=> toggleCatalog(true);
+    $('#catClose').onclick   = ()=> toggleCatalog(false);
 
     $('#userSearch').oninput = drawUsers;
 
+    $('#addSec').onclick     = async()=>{
+      await addSection($('#catRole').value);
+      catalog = await loadCatalog();
+      drawCatalogEditor();
+    };
+
     drawUsers();
+    drawCatalogEditor();
   }
 
-  async function fillLogList(){
-    const entries = await loadLogs(150);
-    $('#logList').innerHTML = entries.map(l=>`
-      <div class="log-row">
-        <span class="note">${new Date(l.created_at).toLocaleTimeString('no-NO',{hour:'2-digit',minute:'2-digit'})}</span>
-        <span class="msg">${esc(l.message||'')}</span>
-      </div>
-    `).join('') || '<div class="note">Tom logg.</div>';
-  }
-  async function toggleLog(open){
-    const drop = $('#logDrop');
-    const willOpen = (open===true) ? true : (open===false ? false : !drop.classList.contains('open'));
-    if(willOpen){ await fillLogList(); }
-    drop.classList.toggle('open', willOpen);
-    $('#btnLog').setAttribute('aria-expanded', willOpen?'true':'false');
-    drop.setAttribute('aria-hidden', willOpen?'false':'true');
-  }
-
-  // — brukerliste —
   async function drawUsers(){
     const list = $('#userList');
     const q = ($('#userSearch').value||'').toLowerCase();
@@ -267,12 +149,12 @@ import {
     if(!arr.length){ list.innerHTML='<li><span class="note">Ingen brukere</span></li>'; return; }
 
     list.innerHTML = arr.map(u=>`
-      <li data-id="${u.id}" class="${(u.id===selUserId)?'user-active':''}">
+      <li data-id="${u.id}" style="cursor:pointer">
         <div>
-          <div><b>${esc(u.name||u.email||u.id)}</b></div>
+          <div><b>${esc(u.name||u.email||u.id)}</b> ${u.is_admin?'<span class="badge admin">Admin</span>':''}</div>
           <div class="note">${esc(u.email||'')}</div>
         </div>
-        <span class="badge ${u.is_admin?'admin':''}" id="sum-${u.id}">${u.is_admin?'Admin':'—'}</span>
+        <span class="badge" id="sum-${u.id}">…</span>
       </li>
     `).join('');
 
@@ -282,146 +164,38 @@ import {
       const map = await loadProgressFor(u.id);
       const total = Object.values(catalog).flatMap(secs=>secs.flatMap(s=>s.items)).length;
       let done=0; for(const v of map.values()) if(v?.done) done++;
-      const chip = $(`#sum-${u.id}`); if(chip && !u.is_admin) chip.textContent = `${done}/${total}`;
+      const chip = $(`#sum-${u.id}`); if(chip) chip.textContent = `${done}/${total}`;
     }
   }
 
-  // — katalog-editor i MODAL —
-  let exContext = { item:null }; // holder item for "Eksempel"-modalen
-
-  async function drawCatalogEditor(){
-    const roleSel = $('#catRole');
-    if(!roleSel.options.length) roleSel.innerHTML = ROLES.map(r=>`<option value="${r}">${r}</option>`).join('');
-    const role=roleSel.value;
-    const secs=catalog[role]||[];
-    const wrap=$('#catWrap');
-
-    if(!secs.length){
-      wrap.innerHTML='<div class="note">Ingen inndelinger. Trykk “+ Inndeling”.</div>';
-    }else{
-      wrap.innerHTML = secs.map((s,si)=>`
-        <div class="box" style="margin-bottom:10px">
-          <div class="hd">
-            <div class="row" style="gap:8px;align-items:center">
-              <span class="note">${si+1}</span>
-              <input class="field secTitle" data-si="${si}" value="${esc(s.title)}" style="min-width:220px">
-              <button class="btn small" data-act="secUp" data-si="${si}">↑</button>
-              <button class="btn small" data-act="secDown" data-si="${si}">↓</button>
-              <button class="btn small" data-act="secDel" data-si="${si}">Slett</button>
-              <span class="note" style="margin-left:auto">Nytt punkt</span>
-              <input class="field newItem" data-si="${si}" placeholder="Beskrivelse …" style="min-width:260px">
-              <button class="btn small primary" data-act="addItem" data-si="${si}">+ Legg til</button>
-            </div>
-          </div>
-          <div class="bd">
-            <ul class="list">
-              ${(s.items||[]).map((it,ii)=>`
-                <li data-si="${si}" data-ii="${ii}">
-                  <span class="muted">${esc(it.text)}</span>
-                  <div class="row" style="gap:6px">
-                    <button class="btn small" data-act="itUp">↑</button>
-                    <button class="btn small" data-act="itDown">↓</button>
-                    <button class="btn small" data-act="itEdit">Rediger</button>
-                    <!-- NY knapp: Eksempel -->
-                    <button class="btn small" data-act="itExample">${it.has_example ? 'Eksempel ✓' : 'Eksempel'}</button>
-                    <button class="btn small" data-act="itDel">Slett</button>
-                  </div>
-                </li>`).join('')}
-            </ul>
-          </div>
-        </div>
-      `).join('');
-    }
-
-    // events i modal
-    $('#catRole').onchange = ()=> drawCatalogEditor();
-    $('#addSec').onclick   = async()=>{ await addSection($('#catRole').value); catalog=await loadCatalog(); drawCatalogEditor(); };
-
-    $$('#catWrap .secTitle').forEach(inp=>{
-      inp.onchange=async()=>{ const si=+inp.dataset.si; await updateSectionTitle(secs[si].id, inp.value.trim()||secs[si].title); catalog=await loadCatalog(); drawCatalogEditor(); };
-    });
-    $$('#catWrap [data-act]').forEach(btn=>{
-      btn.onclick=async()=>{
-        const act=btn.dataset.act; const si=+btn.dataset.si;
-        if(act==='secDel'){ if(!confirm('Slette inndeling?')) return; await deleteSection(secs[si].id); catalog=await loadCatalog(); drawCatalogEditor(); return; }
-        if(act==='secUp')  { if(si>0){ await moveSection(secs[si].id, secs[si].position, secs[si-1].id, secs[si-1].position); catalog=await loadCatalog(); drawCatalogEditor(); } return; }
-        if(act==='secDown'){ if(si<secs.length-1){ await moveSection(secs[si].id, secs[si].position, secs[si+1].id, secs[si+1].position); catalog=await loadCatalog(); drawCatalogEditor(); } return; }
-        if(act==='addItem'){ const inp=$(`#catWrap .newItem[data-si="${si}"]`); const txt=(inp.value||'').trim(); if(!txt) return; await addItem(secs[si].id, txt); inp.value=''; catalog=await loadCatalog(); drawCatalogEditor(); return; }
-      };
-    });
-    $$('#catWrap li [data-act]').forEach(btn=>{
-      btn.onclick=async()=>{
-        const li=btn.closest('li'); const si=+li.dataset.si; const ii=+li.dataset.ii; const s=catalog[$('#catRole').value][si]; const it=s.items[ii];
-
-        if(btn.dataset.act==='itUp'){ if(ii>0){ await moveItem(it.id, it.position, s.items[ii-1].id, s.items[ii-1].position); catalog=await loadCatalog(); drawCatalogEditor(); } }
-        if(btn.dataset.act==='itDown'){ if(ii<s.items.length-1){ await moveItem(it.id, it.position, s.items[ii+1].id, s.items[ii+1].position); catalog=await loadCatalog(); drawCatalogEditor(); } }
-        if(btn.dataset.act==='itEdit'){ const nt=prompt('Rediger beskrivelse:', it.text); if(nt!=null){ await editItem(it.id, nt.trim()); catalog=await loadCatalog(); drawCatalogEditor(); } }
-        if(btn.dataset.act==='itDel'){ if(!confirm('Slette punkt?')) return; await deleteItem(it.id); catalog=await loadCatalog(); drawCatalogEditor(); }
-
-        // NY handling: Eksempel-editor
-        if(btn.dataset.act==='itExample'){ openExampleEditor(it); }
-      };
-    });
-  }
-
-  // — Eksempel-modal (kun for ett item) —
-  function openExampleEditor(it){
-    exContext.item = it;
-    $('#exItemText').textContent = it.text || '';
-    $('#exEnabled').checked = !!it.has_example;
-    $('#exTextareaWrap').style.display = it.has_example ? 'block' : 'none';
-    $('#exText').value = it.example_text || '';
-
-    const m = $('#exModal');
-    m.style.display='flex'; m.classList.add('open'); m.setAttribute('aria-hidden','false');
-  }
-  function closeExampleEditor(){
-    const m = $('#exModal');
-    m.classList.remove('open'); m.style.display='none'; m.setAttribute('aria-hidden','true');
-    exContext.item = null;
-  }
-  $('#exClose').onclick = closeExampleEditor;
-  $('#exModal').addEventListener('click', e=>{ if(e.target===$('#exModal')) closeExampleEditor(); });
-  $('#exEnabled').onchange = ()=>{ $('#exTextareaWrap').style.display = $('#exEnabled').checked ? 'block' : 'none'; };
-
-  $('#exSave').onclick = async ()=>{
-    if(!exContext.item) return;
-    const enabled = $('#exEnabled').checked;
-    const text    = $('#exText').value.trim();
-
-    // minimal oppdatering direkte her (vi rører ikke common.js)
-    await sb.from('items').update({
-      has_example: enabled,
-      example_text: enabled ? text : null
-    }).eq('id', exContext.item.id);
-
-    catalog = await loadCatalog();          // refetch
-    drawCatalogEditor();                    // oppdater liste/label (✓)
-    closeExampleEditor();
-  };
-
-  // — velg bruker og rediger bok (uendret) —
   async function selectUser(uid){
     selUserId = uid;
     const u = users.find(x=>x.id===uid);
     if(!u){ $('#userBook').innerHTML='<div class="note">Fant ikke bruker.</div>'; return; }
 
     selUserProg = await loadProgressFor(uid);
-
-    $$('#userList li').forEach(li=>li.classList.toggle('user-active', li.getAttribute('data-id')===uid));
-
-    $('#selHdr').textContent = u.name || u.email || u.id;
+    $('#selHdr').innerHTML = `${esc(u.name||u.email||u.id)} ${u.is_admin?'<span class="badge admin">Admin</span>':''}`;
     $('#btnDeleteUser').disabled = false;
+    $('#toggleAdmin').disabled   = false;
+    $('#toggleAdmin').textContent = u.is_admin ? 'Fjern admin' : 'Gjør admin';
 
-    await renderUserBook(uid, $('#editToggle').checked);
+    await renderUserBook(uid, true);
     await drawComments(uid);
 
-    $('#editToggle').onchange = ()=> renderUserBook(uid, $('#editToggle').checked);
     $('#addComment').onclick = async ()=>{
       const t=($('#commentTxt').value||'').trim(); if(!t) return;
       await addComment(uid, t, me.id); $('#commentTxt').value=''; await drawComments(uid);
     };
     $('#btnDeleteUser').onclick = ()=> deleteUser(uid);
+    $('#toggleAdmin').onclick   = async ()=>{
+      const newVal = !u.is_admin;
+      await setUserAdmin(uid, newVal);
+      users = await listUsers();
+      const nu = users.find(x=>x.id===uid);
+      $('#toggleAdmin').textContent = nu.is_admin ? 'Fjern admin' : 'Gjør admin';
+      $('#selHdr').innerHTML = `${esc(nu.name||nu.email||nu.id)} ${nu.is_admin?'<span class="badge admin">Admin</span>':''}`;
+      drawUsers();
+    };
   }
 
   async function renderUserBook(uid, editable){
@@ -432,9 +206,17 @@ import {
       return `
         <div class="box" style="margin-bottom:12px">
           <div class="hd">${role}</div>
-          <div class="bd">
+          <div class="bd table-wrap">
             <table>
-              <thead><tr><th style="width:60px">#</th><th>Beskrivelse</th><th style="width:240px">Sjekket ut av</th><th style="width:200px">Dato</th></tr></thead>
+              <thead>
+                <tr>
+                  <th style="width:60px">#</th>
+                  <th>Beskrivelse</th>
+                  <th style="width:240px">Sjekket ut av</th>
+                  <th class="w-date">Dato</th>
+                  <th class="w-check">Avkryss</th>
+                </tr>
+              </thead>
               <tbody>
                 ${secs.map((s,si)=> s.items.map((it,ii)=>{
                   const key = String(it.id);
@@ -445,10 +227,8 @@ import {
                       <td>${si+1}.${ii+1}</td>
                       <td>${esc(it.text)}</td>
                       <td><input ${dis} class="field" type="text" value="${esc(pr.signed_by||'')}" placeholder="Skriv inn navn" style="width:100%"></td>
-                      <td class="datecell">
-                        <input ${dis} class="field" type="date" value="${pr.date||''}">
-                        <button ${dis} class="mini-check" data-done="${pr.done?1:0}" title="Avkryss">✓</button>
-                      </td>
+                      <td class="datecell w-date"><input ${dis} class="field" type="date" value="${pr.date||''}"></td>
+                      <td class="checkcell w-check"><button ${dis} class="mini-check" data-done="${pr.done?1:0}" title="Avkryss">✓</button></td>
                     </tr>`;
                 }).join('')).join('')}
               </tbody>
@@ -459,25 +239,23 @@ import {
 
     el.innerHTML = html;
 
-    if(editable){
-      $$('#userBook tbody tr').forEach(tr=>{
-        const id = tr.getAttribute('data-id');
-        const d  = tr.querySelector('input[type="date"]');
-        const s  = tr.querySelector('input[type="text"]');
-        const b  = tr.querySelector('.mini-check');
+    $$('#userBook tbody tr').forEach(tr=>{
+      const id = tr.getAttribute('data-id');
+      const d  = tr.querySelector('input[type="date"]');
+      const s  = tr.querySelector('input[type="text"]');
+      const b  = tr.querySelector('.mini-check');
 
-        async function commit(action=null){
-          let done = !!selUserProg.get(id)?.done;
-          if(action==='toggle'){ done=!done; if(done && !d.value) d.value=today(); if(!done) d.value=''; }
-          await upsertProgress(id,{ date:d.value||null, signed_by:(s.value||null), done }, uid);
-          selUserProg.set(id,{ item_id:id, date:d.value||null, signed_by:s.value||null, done });
-          b.setAttribute('data-done', done ? '1':'0');
-        }
-        s.onchange=()=>commit();
-        d.onchange=()=>commit();
-        b.onclick =()=>commit('toggle');
-      });
-    }
+      async function commit(action=null){
+        let done = !!selUserProg.get(id)?.done;
+        if(action==='toggle'){ done=!done; if(done && !d.value) d.value=today(); if(!done) d.value=''; }
+        await upsertProgress(id,{ date:d.value||null, signed_by:(s.value||null), done }, uid);
+        selUserProg.set(id,{ item_id:id, date:d.value||null, signed_by:s.value||null, done });
+        b.setAttribute('data-done', done ? '1':'0');
+      }
+      s.onchange=()=>commit();
+      d.onchange=()=>commit();
+      b.onclick =()=>commit('toggle');
+    });
   }
 
   async function drawComments(uid){
@@ -499,26 +277,104 @@ import {
     render();
   }
 
+  /* ----- Katalog-editor i modal ----- */
+  function toggleCatalog(open){
+    const bd = $('#catModal');
+    bd.classList.toggle('open', !!open);
+    bd.style.display = open ? 'flex' : 'none';
+    if(open) drawCatalogEditor();
+  }
+
+  async function drawCatalogEditor(){
+    $('#catRole').innerHTML = ROLES.map(r=>`<option value="${r}" ${r===$('#catRole').value?'selected':''}>${r}</option>`).join('') || ROLES.map(r=>`<option value="${r}">${r}</option>`).join('');
+    const role=$('#catRole').value || ROLES[0];
+    const secs=catalog[role]||[];
+    const wrap=$('#catWrap');
+
+    if(!secs.length){ wrap.innerHTML='<div class="note">Ingen inndelinger. Trykk “+ Inndeling”.</div>'; return; }
+
+    wrap.innerHTML = secs.map((s,si)=>`
+      <div class="box" style="margin-bottom:10px">
+        <div class="hd">
+          <div class="row" style="gap:8px;align-items:center">
+            <span class="note">${si+1}</span>
+            <input class="field secTitle" data-si="${si}" value="${esc(s.title)}" style="min-width:220px">
+            <button class="btn small" data-act="secUp" data-si="${si}">↑</button>
+            <button class="btn small" data-act="secDown" data-si="${si}">↓</button>
+            <button class="btn small" data-act="secDel" data-si="${si}">Slett</button>
+            <span class="note" style="margin-left:auto">Nytt punkt</span>
+            <input class="field newItem" data-si="${si}" placeholder="Beskrivelse …" style="min-width:260px">
+            <button class="btn small primary" data-act="addItem" data-si="${si}">+ Legg til</button>
+          </div>
+        </div>
+        <div class="bd">
+          <ul class="list">
+            ${(s.items||[]).map((it,ii)=>`
+              <li data-si="${si}" data-ii="${ii}">
+                <span class="muted">${esc(it.text)}</span>
+                <div class="row" style="gap:6px">
+                  <button class="btn small" data-act="itUp">↑</button>
+                  <button class="btn small" data-act="itDown">↓</button>
+                  <button class="btn small" data-act="itEdit">Rediger</button>
+                  <button class="btn small" data-act="itDel">Slett</button>
+                  <!-- Eksempel-knapp -->
+                  <button class="btn small ${it.has_example?'pill on':'pill'}" data-act="itEx">${it.has_example?'Eksempel på':'Legg til eksempel'}</button>
+                </div>
+              </li>`).join('')}
+          </ul>
+        </div>
+      </div>
+    `).join('');
+
+    // hendelser
+    $$('#catWrap .secTitle').forEach(inp=>{
+      inp.onchange=async()=>{ const si=+inp.dataset.si; await updateSectionTitle(secs[si].id, inp.value.trim()||secs[si].title); catalog=await loadCatalog(); drawCatalogEditor(); };
+    });
+    $$('#catWrap [data-act]').forEach(btn=>{
+      btn.onclick=async()=>{
+        const act=btn.dataset.act; const si=+btn.dataset.si;
+        if(act==='secDel'){ if(!confirm('Slette inndeling?')) return; await deleteSection(secs[si].id); catalog=await loadCatalog(); drawCatalogEditor(); return; }
+        if(act==='secUp')  { if(si>0){ await moveSection(secs[si].id, secs[si].position, secs[si-1].id, secs[si-1].position); catalog=await loadCatalog(); drawCatalogEditor(); } return; }
+        if(act==='secDown'){ if(si<secs.length-1){ await moveSection(secs[si].id, secs[si].position, secs[si+1].id, secs[si+1].position); catalog=await loadCatalog(); drawCatalogEditor(); } return; }
+        if(act==='addItem'){ const inp=$(`#catWrap .newItem[data-si="${si}"]`); const txt=(inp.value||'').trim(); if(!txt) return; await addItem(secs[si].id, txt); inp.value=''; catalog=await loadCatalog(); drawCatalogEditor(); return; }
+      };
+    });
+
+    $$('#catWrap li [data-act]').forEach(btn=>{
+      btn.onclick=async()=>{
+        const li=btn.closest('li'); const si=+li.dataset.si; const ii=+li.dataset.ii; const s=catalog[$('#catRole').value][si]; const it=s.items[ii];
+        if(btn.dataset.act==='itUp'){ if(ii>0){ await moveItem(it.id, it.position, s.items[ii-1].id, s.items[ii-1].position); catalog=await loadCatalog(); drawCatalogEditor(); } }
+        if(btn.dataset.act==='itDown'){ if(ii<s.items.length-1){ await moveItem(it.id, it.position, s.items[ii+1].id, s.items[ii+1].position); catalog=await loadCatalog(); drawCatalogEditor(); } }
+        if(btn.dataset.act==='itEdit'){ const nt=prompt('Rediger beskrivelse:', it.text); if(nt!=null){ await editItem(it.id, nt.trim()); catalog=await loadCatalog(); drawCatalogEditor(); } }
+        if(btn.dataset.act==='itDel'){ if(!confirm('Slette punkt?')) return; await deleteItem(it.id); catalog=await loadCatalog(); drawCatalogEditor(); }
+        if(btn.dataset.act==='itEx'){
+          // toggle + rediger tekst
+          let has = !!it.has_example;
+          if(!has){
+            const txt = prompt('Skriv eksempeltekst for punktet:','');
+            if(txt!=null){ await setItemExample(it.id, true, txt); }
+          }else{
+            const choice = confirm('Fjerne eksempel? (OK=fjern, Avbryt=rediger)');
+            if(choice){ await setItemExample(it.id, false, null); }
+            else{
+              const nt = prompt('Rediger eksempeltekst:', it.example_text||'');
+              if(nt!=null){ await setItemExample(it.id, true, nt); }
+            }
+          }
+          catalog = await loadCatalog(); drawCatalogEditor();
+        }
+      };
+    });
+
+    $('#catRole').onchange = drawCatalogEditor;
+  }
+
   function bindRealtime(){
     if(rt){ sb.removeChannel(rt); rt=null; }
     rt = sb.channel('mb-live-admin')
-      .on('postgres_changes',{event:'*',schema:'public',table:'sections'}, async()=>{
-        catalog=await loadCatalog();
-        if($('#catModal').classList.contains('open')) drawCatalogEditor();
-        if(selUserId) renderUserBook(selUserId, $('#editToggle').checked);
-      })
-      .on('postgres_changes',{event:'*',schema:'public',table:'items'}, async()=>{
-        catalog=await loadCatalog();
-        if($('#catModal').classList.contains('open')) drawCatalogEditor();
-        if(selUserId) renderUserBook(selUserId, $('#editToggle').checked);
-      })
-      .on('postgres_changes',{event:'*',schema:'public',table:'progress'}, async(payload)=>{
-        const row = payload.new || payload.old;
-        if(selUserId && row?.user_id===selUserId){
-          selUserProg = await loadProgressFor(selUserId);
-          renderUserBook(selUserId, $('#editToggle').checked);
-        }
-      })
+      .on('postgres_changes',{event:'*',schema:'public',table:'sections'}, async()=>{ catalog=await loadCatalog(); if(selUserId) renderUserBook(selUserId, true); })
+      .on('postgres_changes',{event:'*',schema:'public',table:'items'},    async()=>{ catalog=await loadCatalog(); if(selUserId) renderUserBook(selUserId, true); })
+      .on('postgres_changes',{event:'*',schema:'public',table:'progress'}, async(payload)=>{ const row = payload.new || payload.old; if(selUserId && row?.user_id===selUserId){ selUserProg = await loadProgressFor(selUserId); renderUserBook(selUserId, true); } })
       .subscribe();
   }
 
