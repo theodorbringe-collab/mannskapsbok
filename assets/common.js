@@ -153,3 +153,19 @@ export async function setUserAdmin(userId, isAdmin){
   const { error } = await sb.from("profiles").update({ is_admin: !!isAdmin }).eq("id", userId);
   if(error) throw error;
 }
+// Login via OTP
+export async function signInEmailOtp(email) {
+  const { error } = await sb.auth.signInWithOtp({ email });
+  if (error) throw error;
+}
+
+// Verifiser kode
+export async function verifyEmailOtp(email, token) {
+  const { error } = await sb.auth.verifyOtp({
+    email,
+    token,
+    type: "email"
+  });
+  if (error) throw error;
+}
+
