@@ -73,7 +73,7 @@
     }
 
     th {
-      background: #f0f0f0;
+      background: #e9ecef;
       font-weight: bold;
     }
 
@@ -102,30 +102,45 @@
     .status-ok {
       color: green;
     }
+
+    .header-toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 30px;
+    }
+
+    .fulloversikt {
+      margin-top: 40px;
+    }
   </style>
 </head>
 <body>
   <div class="container">
+    <div class="header-toolbar">
+      <button class="button" onclick="window.location.href='modulvalg.html'">← Tilbake til startside</button>
+      <button class="button" onclick="visFullDepotOversikt()">📋 Full depotoversikt</button>
+    </div>
+
     <div class="card">
       <h2>Depotstyring</h2>
 
-      <!-- Områdevalg og ny -->
       <div class="toolbar">
         <select id="områdeSelect" onchange="velgOmråde(this.value)"></select>
         <input type="text" id="nyttOmråde" placeholder="Nytt område" />
         <button class="button" onclick="leggTilOmråde()">➕ Nytt område</button>
       </div>
 
-      <!-- Kategorivalg og ny -->
       <div class="toolbar">
         <select id="kategoriSelect" onchange="velgKategori(this.value)"></select>
         <input type="text" id="nyKategori" placeholder="Ny kategori" />
         <button class="button" onclick="leggTilKategori()">➕ Ny kategori</button>
       </div>
 
-      <!-- Innhold -->
       <div id="kategori-innhold" style="margin-top: 30px;"></div>
     </div>
+
+    <div class="card fulloversikt" id="full-oversikt" style="display:none;"></div>
   </div>
 
   <script>
@@ -169,6 +184,7 @@
       } else {
         document.getElementById('kategori-innhold').innerHTML = '<p>Ingen kategorier tilgjengelig.</p>';
       }
+      document.getElementById('full-oversikt').style.display = 'none';
     }
 
     function oppdaterKategoriValg() {
@@ -260,6 +276,31 @@
       if (vare.antall <= 3) vare.status = "lav";
       else vare.status = "ok";
       visKategori(lagerdata[valgtOmråde][valgtKategori]);
+    }
+
+    function visFullDepotOversikt() {
+      let html = `<h2>Full oversikt over depot</h2><table><thead><tr>
+        <th>Område</th><th>Kategori</th><th>Navn</th><th>Antall</th><th>Status</th>
+      </tr></thead><tbody>`;
+
+      for (let område in lagerdata) {
+        for (let kategori in lagerdata[område]) {
+          lagerdata[område][kategori].forEach(vare => {
+            html += `<tr>
+              <td>${område}</td>
+              <td>${kategori}</td>
+              <td>${vare.navn}</td>
+              <td>${vare.antall}</td>
+              <td class="${vare.status === 'lav' ? 'status-lav' : 'status-ok'}">${vare.status}</td>
+            </tr>`;
+          });
+        }
+      }
+
+      html += `</tbody></table>`;
+      const oversikt = document.getElementById('full-oversikt');
+      oversikt.innerHTML = html;
+      oversikt.style.display = 'block';
     }
 
     document.addEventListener("DOMContentLoaded", init);
