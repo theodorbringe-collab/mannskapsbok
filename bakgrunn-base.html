@@ -1,309 +1,259 @@
 <!DOCTYPE html>
 <html lang="no">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Depotstyring</title>
-  <link href="https://fonts.googleapis.com/css2?family=Roboto&display=swap" rel="stylesheet">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Depot – RC Bjørgvin</title>
   <style>
     body {
+      font-family: 'Segoe UI', sans-serif;
       margin: 0;
-      font-family: 'Roboto', sans-serif;
-      background: #f4f6f9;
+      padding: 30px;
+      background: #f4f6f8;
+      color: #333;
     }
-
-    .container {
-      padding: 40px;
-      max-width: 1200px;
-      margin: auto;
-    }
+    h2 { margin-top: 0; }
 
     .card {
-      background: white;
-      border-radius: 8px;
+      background: #fff;
       padding: 20px;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
       margin-bottom: 30px;
     }
 
-    .card h2 {
-      margin-top: 0;
-      font-size: 24px;
-      color: #333;
+    summary {
+      font-weight: bold;
+      padding: 10px;
+      cursor: pointer;
     }
 
-    .toolbar {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
-      margin-bottom: 20px;
-    }
-
-    .toolbar input,
-    .toolbar select {
-      padding: 8px;
+    details {
       border: 1px solid #ccc;
-      border-radius: 4px;
-      font-size: 14px;
+      border-radius: 6px;
+      margin-bottom: 10px;
+      background: #fff;
     }
 
-    .button {
+    .enhet-linje {
+      display: flex;
+      justify-content: space-between;
+      padding: 10px 16px;
+      border-top: 1px solid #eee;
+      align-items: center;
+    }
+
+    .status-badge {
+      background: #e53935;
+      color: white;
+      border-radius: 4px;
+      font-size: 12px;
+      padding: 2px 6px;
+      margin-right: 10px;
+    }
+
+    .ikoner {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .ikoner span {
+      display: inline-block;
+      font-size: 16px;
+    }
+
+    .btn {
       background: #1976d2;
       color: white;
+      padding: 6px 10px;
+      font-size: 14px;
       border: none;
-      padding: 8px 16px;
       border-radius: 4px;
       cursor: pointer;
     }
 
-    .button:hover {
-      background: #125ea9;
-    }
-
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 14px;
-    }
-
-    th, td {
-      text-align: left;
-      padding: 12px;
-      border-bottom: 1px solid #eee;
-    }
-
-    th {
-      background: #e9ecef;
-      font-weight: bold;
-    }
-
-    .plukk-seksjon {
-      margin-top: 30px;
-    }
-
-    .plukk-seksjon h3 {
-      margin-bottom: 10px;
-    }
-
-    .plukk-seksjon ul {
-      list-style: none;
-      padding-left: 0;
-    }
-
-    .plukk-seksjon li {
-      padding: 5px 0;
-    }
-
-    .status-lav {
-      color: red;
-      font-weight: bold;
-    }
-
-    .status-ok {
-      color: green;
-    }
-
-    .header-toolbar {
+    .tabbar {
       display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 30px;
+      gap: 10px;
+      margin-top: 20px;
     }
 
-    .fulloversikt {
-      margin-top: 40px;
+    .tabbar button {
+      padding: 8px 14px;
+      border: none;
+      border-radius: 4px;
+      background: #e0e0e0;
+      cursor: pointer;
     }
+
+    .tabbar button.active {
+      background: #1976d2;
+      color: white;
+    }
+
+    .tab-innhold {
+      margin-top: 20px;
+      border-top: 1px solid #ccc;
+      padding-top: 20px;
+    }
+
+    .seksjon {
+      margin-bottom: 20px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      padding: 10px;
+    }
+
+    .skap-header {
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    .skap-innhold {
+      margin-top: 10px;
+      padding-left: 10px;
+    }
+
+    .vare {
+      margin-bottom: 8px;
+    }
+
+    .ok { color: green; font-weight: bold; }
+    .mangler { color: red; font-weight: bold; }
   </style>
 </head>
 <body>
-  <div class="container">
-    <div class="header-toolbar">
-      <button class="button" onclick="window.location.href='modulvalg.html'">← Tilbake til startside</button>
-      <button class="button" onclick="visFullDepotOversikt()">📋 Full depotoversikt</button>
+
+  <div class="card">
+    <h2>Depotoversikt</h2>
+    <div id="oversikt"></div>
+  </div>
+
+  <div class="card" id="enhet-detaljer" style="display:none;">
+    <h2 id="enhet-navn">Enhet</h2>
+    <div class="tabbar">
+      <button class="tab active" onclick="byttTab('sjekkliste')">Sjekkliste</button>
+      <button class="tab" onclick="byttTab('merknader')">Merknader</button>
+      <button class="tab" onclick="byttTab('plukk')">Plukkliste</button>
+      <button class="tab" onclick="byttTab('rapport')">Kronologisk rapport</button>
     </div>
-
-    <div class="card">
-      <h2>Depotstyring</h2>
-
-      <div class="toolbar">
-        <select id="områdeSelect" onchange="velgOmråde(this.value)"></select>
-        <input type="text" id="nyttOmråde" placeholder="Nytt område" />
-        <button class="button" onclick="leggTilOmråde()">➕ Nytt område</button>
-      </div>
-
-      <div class="toolbar">
-        <select id="kategoriSelect" onchange="velgKategori(this.value)"></select>
-        <input type="text" id="nyKategori" placeholder="Ny kategori" />
-        <button class="button" onclick="leggTilKategori()">➕ Ny kategori</button>
-      </div>
-
-      <div id="kategori-innhold" style="margin-top: 30px;"></div>
+    <div class="tab-innhold" id="tab-content">
+      <!-- fylles med JS -->
     </div>
-
-    <div class="card fulloversikt" id="full-oversikt" style="display:none;"></div>
   </div>
 
   <script>
-    let lagerdata = {
-      "Depot A": {
-        "Bekledning": [
-          { navn: "Uniform", antall: 10, status: "ok" }
+    const mockData = [
+      {
+        stasjon: "Stasjon Austevoll",
+        enheter: [
+          {
+            navn: "581 - ambulansebåt",
+            dager: -17,
+            merknader: 3,
+            mangler: 2,
+            skap: [
+              {
+                navn: "Skap 1",
+                sjekk: "Ukentlig sjekk\nSjekkes hver 7. dag, kl. 08:00",
+                varer: [
+                  { navn: "O2-kolbe", antall: 4, status: "ok" }
+                ]
+              },
+              {
+                navn: "Skap 3",
+                sjekk: "Ukentlig sjekk\nSjekkes hver 7. dag, kl. 08:00",
+                varer: []
+              }
+            ]
+          }
         ]
-      },
-      "Depot B": {
-        "Verneutstyr": [
-          { navn: "Hjelm", antall: 3, status: "lav" }
-        ]
       }
-    };
+    ];
 
-    let valgtOmråde = "Depot A";
-    let valgtKategori = "Bekledning";
-    let plukkliste = [];
+    function byggOversikt() {
+      const container = document.getElementById('oversikt');
+      mockData.forEach(stasjon => {
+        const details = document.createElement('details');
+        const summary = document.createElement('summary');
+        summary.textContent = stasjon.stasjon;
+        details.appendChild(summary);
 
-    function init() {
-      oppdaterOmrådeValg();
-      velgOmråde(valgtOmråde);
-    }
+        stasjon.enheter.forEach(enhet => {
+          const row = document.createElement('div');
+          row.className = 'enhet-linje';
 
-    function oppdaterOmrådeValg() {
-      const select = document.getElementById('områdeSelect');
-      select.innerHTML = '';
-      for (let område in lagerdata) {
-        select.innerHTML += `<option value="${område}">${område}</option>`;
-      }
-      select.value = valgtOmråde;
-    }
+          row.innerHTML = `
+            <div>
+              <span class="status-badge">${enhet.dager} DAGER</span>
+              ${enhet.navn}
+            </div>
+            <div class="ikoner">
+              <span>📝 ${enhet.merknader}</span>
+              <span>🛒 ${enhet.mangler}</span>
+              <button class="btn" onclick="visEnhet('${stasjon.stasjon}','${enhet.navn}')">Åpne</button>
+            </div>
+          `;
 
-    function velgOmråde(område) {
-      valgtOmråde = område;
-      oppdaterKategoriValg();
-      const førsteKategori = Object.keys(lagerdata[valgtOmråde])[0] || null;
-      if (førsteKategori) {
-        velgKategori(førsteKategori);
-      } else {
-        document.getElementById('kategori-innhold').innerHTML = '<p>Ingen kategorier tilgjengelig.</p>';
-      }
-      document.getElementById('full-oversikt').style.display = 'none';
-    }
+          details.appendChild(row);
+        });
 
-    function oppdaterKategoriValg() {
-      const select = document.getElementById('kategoriSelect');
-      select.innerHTML = '';
-      for (let kategori in lagerdata[valgtOmråde]) {
-        select.innerHTML += `<option value="${kategori}">${kategori}</option>`;
-      }
-      select.value = valgtKategori;
-    }
-
-    function velgKategori(kategori) {
-      valgtKategori = kategori;
-      const varer = lagerdata[valgtOmråde][valgtKategori] || [];
-      visKategori(varer);
-    }
-
-    function leggTilOmråde() {
-      const nytt = document.getElementById('nyttOmråde').value.trim();
-      if (nytt && !lagerdata[nytt]) {
-        lagerdata[nytt] = {};
-        valgtOmråde = nytt;
-        document.getElementById('nyttOmråde').value = '';
-        oppdaterOmrådeValg();
-        oppdaterKategoriValg();
-      }
-    }
-
-    function leggTilKategori() {
-      const nyKat = document.getElementById('nyKategori').value.trim();
-      if (nyKat && !lagerdata[valgtOmråde][nyKat]) {
-        lagerdata[valgtOmråde][nyKat] = [];
-        valgtKategori = nyKat;
-        document.getElementById('nyKategori').value = '';
-        oppdaterKategoriValg();
-        velgKategori(nyKat);
-      }
-    }
-
-    function visKategori(varer) {
-      let html = `<table><thead><tr>
-        <th>Navn</th><th>Antall</th><th>Status</th><th>Plukk</th><th>Uttak</th>
-      </tr></thead><tbody>`;
-
-      varer.forEach((vare, index) => {
-        html += `<tr>
-          <td>${vare.navn}</td>
-          <td>${vare.antall}</td>
-          <td class="${vare.status === 'lav' ? 'status-lav' : 'status-ok'}">${vare.status}</td>
-          <td><button class="button" onclick="leggTilPlukkliste(${index})">Plukk</button></td>
-          <td><button class="button" onclick="registrerUttak(${index})">Uttak</button></td>
-        </tr>`;
-      });
-
-      html += "</tbody></table>";
-
-      html += `
-        <div class="plukk-seksjon">
-          <h3>🧾 Plukkliste</h3>
-          <ul id="plukk-visning"></ul>
-        </div>
-      `;
-
-      document.getElementById("kategori-innhold").innerHTML = html;
-      oppdaterPlukklisteVisning();
-    }
-
-    function leggTilPlukkliste(index) {
-      const vare = lagerdata[valgtOmråde][valgtKategori][index];
-      if (!plukkliste.includes(vare.navn)) {
-        plukkliste.push(vare.navn);
-      }
-      oppdaterPlukklisteVisning();
-    }
-
-    function oppdaterPlukklisteVisning() {
-      const ul = document.getElementById("plukk-visning");
-      ul.innerHTML = "";
-      plukkliste.forEach(item => {
-        const li = document.createElement("li");
-        li.textContent = item;
-        ul.appendChild(li);
+        container.appendChild(details);
       });
     }
 
-    function registrerUttak(index) {
-      const vare = lagerdata[valgtOmråde][valgtKategori][index];
-      if (vare.antall > 0) vare.antall -= 1;
-      if (vare.antall <= 3) vare.status = "lav";
-      else vare.status = "ok";
-      visKategori(lagerdata[valgtOmråde][valgtKategori]);
+    function visEnhet(stasjonNavn, enhetNavn) {
+      const enhet = mockData
+        .find(s => s.stasjon === stasjonNavn)
+        .enheter.find(e => e.navn === enhetNavn);
+
+      document.getElementById('enhet-navn').textContent = `${enhet.navn}`;
+      document.getElementById('enhet-detaljer').style.display = 'block';
+      visSjekkliste(enhet);
+      aktiverTab('sjekkliste');
     }
 
-    function visFullDepotOversikt() {
-      let html = `<h2>Full oversikt over depot</h2><table><thead><tr>
-        <th>Område</th><th>Kategori</th><th>Navn</th><th>Antall</th><th>Status</th>
-      </tr></thead><tbody>`;
+    function byttTab(tab) {
+      const active = document.querySelector('.tab.active');
+      if (active) active.classList.remove('active');
+      document.querySelector(`.tabbar button[onclick="byttTab('${tab}')"]`).classList.add('active');
 
-      for (let område in lagerdata) {
-        for (let kategori in lagerdata[område]) {
-          lagerdata[område][kategori].forEach(vare => {
-            html += `<tr>
-              <td>${område}</td>
-              <td>${kategori}</td>
-              <td>${vare.navn}</td>
-              <td>${vare.antall}</td>
-              <td class="${vare.status === 'lav' ? 'status-lav' : 'status-ok'}">${vare.status}</td>
-            </tr>`;
-          });
-        }
-      }
-
-      html += `</tbody></table>`;
-      const oversikt = document.getElementById('full-oversikt');
-      oversikt.innerHTML = html;
-      oversikt.style.display = 'block';
+      const navn = document.getElementById('enhet-navn').textContent;
+      const enhet = mockData[0].enheter.find(e => e.navn === navn);
+      if (tab === 'sjekkliste') visSjekkliste(enhet);
+      else document.getElementById('tab-content').innerHTML = `<p>${tab} (kommer snart)</p>`;
     }
 
-    document.addEventListener("DOMContentLoaded", init);
+    function aktiverTab(tab) {
+      document.querySelectorAll('.tab').forEach(btn => btn.classList.remove('active'));
+      document.querySelector(`.tab[onclick="byttTab('${tab}')"]`).classList.add('active');
+    }
+
+    function visSjekkliste(enhet) {
+      const div = document.getElementById('tab-content');
+      div.innerHTML = '';
+
+      enhet.skap.forEach(skap => {
+        const seksjon = document.createElement('div');
+        seksjon.className = 'seksjon';
+        seksjon.innerHTML = `
+          <div class="skap-header" onclick="this.nextElementSibling.style.display = this.nextElementSibling.style.display === 'none' ? 'block' : 'none'">
+            ${skap.navn} <span style="float:right;font-size:12px;color:#666;">${skap.sjekk}</span>
+          </div>
+          <div class="skap-innhold">
+            ${
+              skap.varer.length
+                ? skap.varer.map(v => `<div class="vare">${v.navn} – ${v.antall} stk <span class="${v.status === 'ok' ? 'ok' : 'mangler'}">${v.status === 'ok' ? '✔️ Alt OK' : '❌ Mangler'}</span></div>`).join('')
+                : '<i>Ingen registrerte varer</i>'
+            }
+          </div>
+        `;
+        div.appendChild(seksjon);
+      });
+    }
+
+    document.addEventListener('DOMContentLoaded', byggOversikt);
   </script>
 </body>
 </html>
