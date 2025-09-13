@@ -3,20 +3,20 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Depot – RC Bjørgvin</title>
+  <title>Depot – Kort Stil</title>
   <style>
     body {
-      font-family: 'Segoe UI', sans-serif;
+      font-family: 'Roboto', sans-serif;
       margin: 0;
       padding: 30px;
-      background: #f4f6f8;
+      background: #eef2f7;
       color: #333;
     }
     .top-bar {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 20px;
+      margin-bottom: 30px;
     }
     .btn {
       background: #1976d2;
@@ -28,61 +28,52 @@
       font-size: 14px;
       margin-left: 5px;
     }
-    .btn:hover {
-      background: #125ea9;
+    .btn:hover { background: #125ea9; }
+
+    .card {
+      background: white;
+      border-radius: 10px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+      padding: 20px;
+      margin-bottom: 20px;
     }
-    .accordion {
-      border: 1px solid #ccc;
-      border-radius: 6px;
-      margin-bottom: 10px;
-      background-color: #fff;
+    .card h3 {
+      margin: 0 0 15px 0;
+      font-size: 20px;
+      color: #1976d2;
     }
-    summary {
-      padding: 12px 16px;
-      cursor: pointer;
-      font-weight: bold;
+    .list-item {
       display: flex;
       justify-content: space-between;
       align-items: center;
+      padding: 10px 0;
+      border-top: 1px solid #ddd;
     }
-    summary::-webkit-details-marker {
-      display: none;
+    .list-item:first-child {
+      border-top: none;
     }
-    .badge-days {
+    .badge {
       background: #e53935;
       color: white;
       padding: 2px 6px;
       border-radius: 4px;
       font-size: 12px;
-      margin-right: 8px;
-    }
-    .undermeny {
-      padding-left: 20px;
-    }
-    .rad {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 8px 16px;
-      border-top: 1px solid #eee;
-    }
-    .rad:nth-child(odd) {
-      background: #fafafa;
+      margin-right: 10px;
     }
     .green-btn {
       background: #4CAF50;
       color: white;
-      border: none;
       padding: 4px 10px;
+      border: none;
       border-radius: 4px;
-      font-size: 13px;
       cursor: pointer;
+      font-size: 13px;
     }
     .edit-input {
       border: 1px solid #aaa;
-      padding: 4px 6px;
+      padding: 4px;
       font-size: 14px;
-      margin-right: 5px;
+      margin-right: 10px;
     }
   </style>
 </head>
@@ -91,19 +82,18 @@
   <div class="top-bar">
     <button class="btn" onclick="window.location.href='index.html'">← Tilbake</button>
     <div>
-      <button class="btn" onclick="toggleEditMode()">🛠️ Rediger depot</button>
+      <button class="btn" onclick="toggleEditMode()">🛠️ Rediger</button>
       <button class="btn" onclick="lagreStruktur()">💾 Lagre</button>
     </div>
   </div>
 
-  <div id="containerOversikt"></div>
+  <div id="cardsContainer"></div>
 
   <script>
     let editMode = false;
-    const STORAGE_KEY = "depotStructure_v3";
+    const STORAGE_KEY = "depotCardsStruct";
     const DATE_KEY_PREFIX = "lastChecked_";
 
-    // Data
     let structure = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [
       {
         navn: "Stasjon Austevoll",
@@ -114,146 +104,148 @@
       }
     ];
 
-    function toggleEditMode(){
+    function toggleEditMode() {
       editMode = !editMode;
-      renderOversikt();
+      renderCards();
     }
 
-    function lagreStruktur(){
+    function lagreStruktur() {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(structure));
       alert("Struktur lagret!");
       editMode = false;
-      renderOversikt();
+      renderCards();
     }
 
-    function lagreSjekk(enhetId){
+    function lagreSjekk(id) {
       const now = new Date().toISOString();
-      localStorage.setItem(DATE_KEY_PREFIX + enhetId, now);
-      renderOversikt();
+      localStorage.setItem(DATE_KEY_PREFIX + id, now);
+      renderCards();
     }
 
-    function dagerSidenSistSjekk(enhetId){
-      const datoStr = localStorage.getItem(DATE_KEY_PREFIX + enhetId);
-      if(!datoStr) return "–";
-      const sist = new Date(datoStr);
+    function dagerSiden(id) {
+      const datoStr = localStorage.getItem(DATE_KEY_PREFIX + id);
+      if (!datoStr) return "–";
+      const dato = new Date(datoStr);
       const nå = new Date();
-      const diff = Math.floor((nå - sist) / (1000 * 60 * 60 * 24));
-      return diff === 0 ? "✓ I dag" : `- ${diff} dager`;
+      const diff = Math.floor((nå - dato) / (1000 * 60 * 60 * 24));
+      return diff === 0 ? "I dag" : `${diff} dager`;
     }
 
-    function renderOversikt(){
-      const cont = document.getElementById("containerOversikt");
+    function renderCards() {
+      const cont = document.getElementById("cardsContainer");
       cont.innerHTML = "";
 
-      structure.forEach((oversikt, oIndex) => {
-        const detailsO = document.createElement("details");
-        detailsO.classList.add("accordion");
-        const summaryO = document.createElement("summary");
+      structure.forEach((oversikt, oi) => {
+        const card = document.createElement("div");
+        card.className = "card";
 
-        if(editMode){
+        // Overskrift
+        const h3 = document.createElement("h3");
+        if (editMode) {
           const input = document.createElement("input");
-          input.className = "edit-input";
           input.value = oversikt.navn;
-          input.onchange = e => structure[oIndex].navn = e.target.value;
-          summaryO.appendChild(input);
+          input.className = "edit-input";
+          input.onchange = e => oversikt.navn = e.target.value;
+          h3.appendChild(input);
 
           const btnX = document.createElement("button");
           btnX.textContent = "X";
           btnX.className = "btn";
-          btnX.onclick = e => {
-            e.stopPropagation();
-            structure.splice(oIndex, 1);
-            renderOversikt();
+          btnX.onclick = () => {
+            structure.splice(oi, 1);
+            renderCards();
           };
-          summaryO.appendChild(btnX);
+          h3.appendChild(btnX);
         } else {
-          summaryO.textContent = oversikt.navn;
+          h3.textContent = oversikt.navn;
         }
 
-        detailsO.appendChild(summaryO);
+        card.appendChild(h3);
 
-        const innerDiv = document.createElement("div");
-        innerDiv.className = "undermeny";
+        // Undermeny liste
+        oversikt.undermeny.forEach((um, ui) => {
+          const li = document.createElement("div");
+          li.className = "list-item";
+          
+          // venstre: navn + dager-badge
+          const left = document.createElement("div");
+          const badge = document.createElement("span");
+          badge.className = "badge";
+          badge.textContent = dagerSiden(um.id || um.navn);
+          left.appendChild(badge);
+          if (editMode) {
+            const inputU = document.createElement("input");
+            inputU.value = um.navn;
+            inputU.className = "edit-input";
+            inputU.onchange = e => oversikt.undermeny[ui].navn = e.target.value;
+            left.appendChild(inputU);
+          } else {
+            const txt = document.createTextNode(um.navn);
+            left.appendChild(txt);
+          }
 
-        oversikt.undermeny?.forEach((um, uIndex) => {
-          const rad = document.createElement("div");
-          rad.className = "rad";
+          li.appendChild(left);
 
-          const venstre = document.createElement("div");
-          venstre.innerHTML = `<span class="badge-days">${dagerSidenSistSjekk(um.id || um.navn)}</span>`;
+          // høyre: Alt OK + ev. slette
+          const right = document.createElement("div");
 
-          if(editMode){
-            const input = document.createElement("input");
-            input.className = "edit-input";
-            input.value = um.navn;
-            input.onchange = e => structure[oIndex].undermeny[uIndex].navn = e.target.value;
-            venstre.appendChild(input);
+          const okBtn = document.createElement("button");
+          okBtn.className = "green-btn";
+          okBtn.textContent = "Alt OK";
+          okBtn.onclick = () => {
+            const id = um.id || um.navn;
+            lagreSjekk(id);
+          };
+          right.appendChild(okBtn);
 
+          if (editMode) {
             const btnDel = document.createElement("button");
             btnDel.textContent = "X";
             btnDel.className = "btn";
             btnDel.onclick = () => {
-              structure[oIndex].undermeny.splice(uIndex, 1);
-              renderOversikt();
+              oversikt.undermeny.splice(ui, 1);
+              renderCards();
             };
-            venstre.appendChild(btnDel);
-          } else {
-            venstre.innerHTML += um.navn;
+            right.appendChild(btnDel);
           }
 
-          const høyre = document.createElement("div");
-
-          if(!editMode){
-            const okBtn = document.createElement("button");
-            okBtn.className = "green-btn";
-            okBtn.textContent = "Alt OK";
-            okBtn.onclick = () => {
-              const id = um.id || um.navn;
-              lagreSjekk(id);
-            };
-            høyre.appendChild(okBtn);
-          }
-
-          rad.appendChild(venstre);
-          rad.appendChild(høyre);
-          innerDiv.appendChild(rad);
+          li.appendChild(right);
+          card.appendChild(li);
         });
 
-        if(editMode){
-          const btnAdd = document.createElement("button");
-          btnAdd.className = "btn";
-          btnAdd.textContent = "➕ Legg til undermeny";
-          btnAdd.onclick = () => {
+        if (editMode) {
+          const btnAddUM = document.createElement("button");
+          btnAddUM.className = "btn";
+          btnAddUM.textContent = "➕ Legg til undermeny";
+          btnAddUM.onclick = () => {
             const navn = prompt("Navn på ny undermeny:");
-            if(!structure[oIndex].undermeny) structure[oIndex].undermeny = [];
-            if(navn){
-              structure[oIndex].undermeny.push({ id: Date.now(), navn });
-              renderOversikt();
+            if (navn) {
+              oversikt.undermeny.push({ id: Date.now(), navn });
+              renderCards();
             }
           };
-          innerDiv.appendChild(btnAdd);
+          card.appendChild(btnAddUM);
         }
 
-        detailsO.appendChild(innerDiv);
-        cont.appendChild(detailsO);
+        cont.appendChild(card);
       });
 
-      if(editMode){
-        const btnAddOversikt = document.createElement("button");
-        btnAddOversikt.className = "btn";
-        btnAddOversikt.textContent = "➕ Legg til oversikt";
-        btnAddOversikt.onclick = () => {
+      if (editMode) {
+        const btnAddO = document.createElement("button");
+        btnAddO.className = "btn";
+        btnAddO.textContent = "➕ Legg til oversikt";
+        btnAddO.onclick = () => {
           const navn = prompt("Navn på ny oversikt:");
-          if(navn){
-            structure.push({ navn: navn, undermeny: [] });
-            renderOversikt();
+          if (navn) {
+            structure.push({ navn, undermeny: [] });
+            renderCards();
           }
         };
-        cont.appendChild(btnAddOversikt);
+        cont.appendChild(btnAddO);
       }
     }
 
-    document.addEventListener("DOMContentLoaded", renderOversikt);
+    document.addEventListener("DOMContentLoaded", renderCards);
   </script>
 
 </body>
