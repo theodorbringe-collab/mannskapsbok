@@ -43,17 +43,17 @@
       margin-bottom: 30px;
     }
 
-    summary {
-      font-weight: bold;
-      padding: 10px;
-      cursor: pointer;
-    }
-
     details {
       border: 1px solid #ccc;
       border-radius: 6px;
       margin-bottom: 10px;
       background: #fff;
+    }
+
+    summary {
+      font-weight: bold;
+      padding: 10px;
+      cursor: pointer;
     }
 
     .enhet-linje {
@@ -177,9 +177,168 @@
       <button class="tab active" onclick="byttTab('sjekkliste')">Sjekkliste</button>
       <button class="tab" onclick="byttTab('merknader')">Merknader</button>
       <button class="tab" onclick="byttTab('plukk')">Plukkliste</button>
-      <button class="tab" onclick="byttTab('rapport')">Kronologisk rapport</button>
+      <button class="tab" onclick="byttTab('rapport')">Rapport</button>
     </div>
     <div class="tab-innhold" id="tab-content">
       <!-- fylles med JS -->
     </div>
   </div>
+
+  <script>
+    let redigeringsmodus = false;
+
+    const mockData = [
+      {
+        stasjon: "Stasjon Austevoll",
+        enheter: [
+          {
+            id: "581",
+            navn: "581 - ambulansebåt",
+            skap: [
+              {
+                navn: "Skap 1",
+                sjekk: "Ukentlig sjekk\nSjekkes hver 7. dag",
+                varer: [
+                  { navn: "O2-kolbe", antall: 4, status: "ok" }
+                ]
+              },
+              {
+                navn: "Skap 3",
+                sjekk: "Ukentlig sjekk\nSjekkes hver 7. dag",
+                varer: []
+              }
+            ]
+          }
+        ]
+      }
+    ];
+
+    function toggleRediger() {
+      redigeringsmodus = !redigeringsmodus;
+      document.body.classList.toggle("edit-mode", redigeringsmodus);
+      byggOversikt();
+    }
+
+    function getSistSjekket(enhetId) {
+      const key = `sjekket_${enhetId}`;
+      const val = localStorage.getItem(key);
+      return val ? new Date(val) : null;
+    }
+
+    function settSjekket(enhetId) {
+      const key = `sjekket_${enhetId}`;
+      const now = new Date().toISOString();
+      localStorage.setItem(key, now);
+      byggOversikt();
+    }
+
+    function dagerSiden(dato) {
+      const now = new Date();
+      const then = new Date(dato);
+      const diff = Math.floor((now - then)/(1000*60*60*24));
+      return isNaN(diff) ? "-" : diff;
+    }
+
+    function byggOversikt() {
+      const container = document.getElementById('oversikt');
+      container.innerHTML = '';
+      mockData.forEach(stasjon => {
+        const details = document.createElement('details');
+        const summary = document.createElement('summary');
+        summary.textContent = stasjon.stasjon;
+        details.appendChild(summary);
+
+        stasjon.enheter.forEach(enhet => {
+          const sjekketTid = getSistSjekket(enhet.id);
+          const dager = sjekketTid ? dagerSiden(sjekketTid) : "-";
+          const row = document.createElement('div');
+          row.className = 'enhet-linje';
+
+          row.innerHTML = `
+            <div>
+              <span class="status-badge">${dager} dager siden sjekk</span>
+              ${redigeringsmodus ? `<input value="${enhet.navn}" />` : enhet.navn}
+            </div>
+            <div class="ikoner">
+              <span onclick="skrivMerknad('${enhet.navn}')">📝</span>
+              <span onclick="leggTilPlukk('${enhet.navn}')">🛒</span>
+              <button class="btn" onclick="visEnhet('${stasjon.stasjon}','${enhet.navn}')">Åpne</button>
+              ${!redigeringsmodus ? `<button class="check-btn" onclick="settSjekket('${enhet.id}')">✔️ Sjekket</button>` : ''}
+            </div>
+          `;
+
+          details.appendChild(row);
+        });
+
+        container.appendChild(details);
+      });
+    }
+
+    function skrivMerknad(enhet) {
+      const tekst = prompt(`Skriv merknad til depotansvarlig for: ${enhet}`);
+      if (tekst) {
+        alert("Merknad lagret! (Simulert)");
+      }
+    }
+
+    function leggTilPlukk(enhet) {
+      const tekst = prompt(`Hva må bestilles til: ${enhet}?`);
+      if (tekst) {
+        alert("Innkjøp registrert! (Simulert)");
+      }
+    }
+
+    function visEnhet(stasjonNavn, enhetNavn) {
+      const enhet = mockData
+        .find(s => s.stasjon === stasjonNavn)
+        .enheter.find(e => e.navn === enhetNavn);
+
+      document.getElementById('enhet-navn').textContent = `${enhet.navn}`;
+      document.getElementById('enhet-detaljer').style.display = 'block';
+      visSjekkliste(enhet);
+      aktiverTab('sjekkliste');
+    }
+
+    function byttTab(tab) {
+      const active = document.querySelector('.tab.active');
+      if (active) active.classList.remove('active');
+      document.querySelector(`.tabbar button[onclick="byttTab('${tab}')"]`).classList.add('active');
+
+      const navn = document.getElementById('enhet-navn').textContent;
+      const enhet = mockData[0].enheter.find(e => e.navn === navn);
+      if (tab === 'sjekkliste') visSjekkliste(enhet);
+      else document.getElementById('tab-content').innerHTML = `<p>${tab} (kommer snart)</p>`;
+    }
+
+    function aktiverTab(tab) {
+      document.querySelectorAll('.tab').forEach(btn => btn.classList.remove('active'));
+      document.querySelector(`.tab[onclick="byttTab('${tab}')"]`).classList.add('active');
+    }
+
+    function visSjekkliste(enhet) {
+      const div = document.getElementById('tab-content');
+      div.innerHTML = '';
+
+      enhet.skap.forEach(skap => {
+        const seksjon = document.createElement('div');
+        seksjon.className = 'seksjon';
+        seksjon.innerHTML = `
+          <div class="skap-header" onclick="this.nextElementSibling.style.display = this.nextElementSibling.style.display === 'none' ? 'block' : 'none'">
+            ${skap.navn} <span style="float:right;font-size:12px;color:#666;">${skap.sjekk}</span>
+          </div>
+          <div class="skap-innhold">
+            ${
+              skap.varer.length
+                ? skap.varer.map(v => `<div class="vare">${v.navn} – ${v.antall} stk <span class="${v.status === 'ok' ? 'ok' : 'mangler'}">${v.status === 'ok' ? '✔️ Alt OK' : '❌ Mangler'}</span></div>`).join('')
+                : '<i>Ingen registrerte varer</i>'
+            }
+          </div>
+        `;
+        div.appendChild(seksjon);
+      });
+    }
+
+    document.addEventListener('DOMContentLoaded', byggOversikt);
+  </script>
+</body>
+</html>
