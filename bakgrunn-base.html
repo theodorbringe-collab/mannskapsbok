@@ -1,9 +1,9 @@
 <!DOCTYPE html>
 <html lang="no">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Depot – Struktur og Oversikt</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Depot – RC Bjørgvin</title>
   <style>
     body {
       font-family: 'Segoe UI', sans-serif;
@@ -37,16 +37,15 @@
       margin-bottom: 10px;
       background-color: #fff;
     }
-    .accordion summary {
+    summary {
       padding: 12px 16px;
       cursor: pointer;
       font-weight: bold;
       display: flex;
       justify-content: space-between;
       align-items: center;
-      list-style: none;
     }
-    .accordion summary::-webkit-details-marker {
+    summary::-webkit-details-marker {
       display: none;
     }
     .badge-days {
@@ -79,18 +78,9 @@
       font-size: 13px;
       cursor: pointer;
     }
-    .info-icons {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-    .info-icons span, .info-icons button.small {
-      font-size: 14px;
-      cursor: pointer;
-    }
     .edit-input {
       border: 1px solid #aaa;
-      padding: 2px 6px;
+      padding: 4px 6px;
       font-size: 14px;
       margin-right: 5px;
     }
@@ -99,10 +89,10 @@
 <body>
 
   <div class="top-bar">
-    <button class="btn" onclick="window.location.href='index.html'">← Tilbake til meny</button>
+    <button class="btn" onclick="window.location.href='index.html'">← Tilbake</button>
     <div>
       <button class="btn" onclick="toggleEditMode()">🛠️ Rediger depot</button>
-      <button class="btn" onclick="lagreStruktur()">💾 Lagre Struktur</button>
+      <button class="btn" onclick="lagreStruktur()">💾 Lagre</button>
     </div>
   </div>
 
@@ -110,36 +100,16 @@
 
   <script>
     let editMode = false;
-    const STORAGE_KEY = "depotStructure_v2";
+    const STORAGE_KEY = "depotStructure_v3";
+    const DATE_KEY_PREFIX = "lastChecked_";
 
-    // Initial struktur (mock) eller hent fra localStorage
+    // Data
     let structure = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [
       {
-        navn: "Oversikt",
+        navn: "Stasjon Austevoll",
         undermeny: [
-          {
-            navn: "Fergehallen",
-            skap: [
-              {
-                navn: "Skap 1",
-                varer: [
-                  { navn: "Førstehjelpsbag", antall: 1, status: "ok" },
-                  { navn: "Bandasje", antall: 5, status: "ok" }
-                ]
-              }
-            ]
-          },
-          {
-            navn: "RC Bjørgvin",
-            skap: [
-              {
-                navn: "Dokumentmappe",
-                varer: [
-                  { navn: "Loggbok", antall: 1, status: "ok" }
-                ]
-              }
-            ]
-          }
+          { id: "581", navn: "Ambulansebåt 581" },
+          { id: "19", navn: "Bil 19 – SV93802" }
         ]
       }
     ];
@@ -156,218 +126,134 @@
       renderOversikt();
     }
 
+    function lagreSjekk(enhetId){
+      const now = new Date().toISOString();
+      localStorage.setItem(DATE_KEY_PREFIX + enhetId, now);
+      renderOversikt();
+    }
+
+    function dagerSidenSistSjekk(enhetId){
+      const datoStr = localStorage.getItem(DATE_KEY_PREFIX + enhetId);
+      if(!datoStr) return "–";
+      const sist = new Date(datoStr);
+      const nå = new Date();
+      const diff = Math.floor((nå - sist) / (1000 * 60 * 60 * 24));
+      return diff === 0 ? "✓ I dag" : `- ${diff} dager`;
+    }
+
     function renderOversikt(){
       const cont = document.getElementById("containerOversikt");
       cont.innerHTML = "";
+
       structure.forEach((oversikt, oIndex) => {
-        // Niveau 1: Oversikt
         const detailsO = document.createElement("details");
         detailsO.classList.add("accordion");
         const summaryO = document.createElement("summary");
 
         if(editMode){
-          const inputO = document.createElement("input");
-          inputO.value = oversikt.navn;
-          inputO.classList.add("edit-input");
-          inputO.onchange = (e) => oversikt.navn = e.target.value;
-          summaryO.appendChild(inputO);
-          const btnRemO = document.createElement("button");
-          btnRemO.textContent = "X";
-          btnRemO.style.marginLeft = "10px";
-          btnRemO.onclick = (e) => {
+          const input = document.createElement("input");
+          input.className = "edit-input";
+          input.value = oversikt.navn;
+          input.onchange = e => structure[oIndex].navn = e.target.value;
+          summaryO.appendChild(input);
+
+          const btnX = document.createElement("button");
+          btnX.textContent = "X";
+          btnX.className = "btn";
+          btnX.onclick = e => {
             e.stopPropagation();
             structure.splice(oIndex, 1);
             renderOversikt();
           };
-          summaryO.appendChild(btnRemO);
+          summaryO.appendChild(btnX);
         } else {
           summaryO.textContent = oversikt.navn;
         }
 
         detailsO.appendChild(summaryO);
 
-        // Niveau 2: Undermenyene
-        const umDiv = document.createElement("div");
-        umDiv.classList.add("undermeny");
+        const innerDiv = document.createElement("div");
+        innerDiv.className = "undermeny";
 
-        oversikt.undermeny.forEach((um, uIndex) => {
-          const detailsU = document.createElement("details");
-          const summaryU = document.createElement("summary");
-          
+        oversikt.undermeny?.forEach((um, uIndex) => {
+          const rad = document.createElement("div");
+          rad.className = "rad";
+
+          const venstre = document.createElement("div");
+          venstre.innerHTML = `<span class="badge-days">${dagerSidenSistSjekk(um.id || um.navn)}</span>`;
+
           if(editMode){
-            const inputU = document.createElement("input");
-            inputU.value = um.navn;
-            inputU.classList.add("edit-input");
-            inputU.onchange = (e) => um.navn = e.target.value;
-            summaryU.appendChild(inputU);
-            const btnRemU = document.createElement("button");
-            btnRemU.textContent = "X";
-            btnRemU.style.marginLeft = "10px";
-            btnRemU.onclick = (e) => {
-              e.stopPropagation();
-              oversikt.undermeny.splice(uIndex, 1);
+            const input = document.createElement("input");
+            input.className = "edit-input";
+            input.value = um.navn;
+            input.onchange = e => structure[oIndex].undermeny[uIndex].navn = e.target.value;
+            venstre.appendChild(input);
+
+            const btnDel = document.createElement("button");
+            btnDel.textContent = "X";
+            btnDel.className = "btn";
+            btnDel.onclick = () => {
+              structure[oIndex].undermeny.splice(uIndex, 1);
               renderOversikt();
             };
-            summaryU.appendChild(btnRemU);
+            venstre.appendChild(btnDel);
           } else {
-            summaryU.textContent = um.navn;
+            venstre.innerHTML += um.navn;
           }
 
-          detailsU.appendChild(summaryU);
+          const høyre = document.createElement("div");
 
-          // Niveau 3: Skap
-          const skapDiv = document.createElement("div");
-          skapDiv.style.paddingLeft = "20px";
-
-          um.skap.forEach((skap, sIndex) => {
-            const detailsS = document.createElement("details");
-            const summaryS = document.createElement("summary");
-
-            if(editMode){
-              const inputS = document.createElement("input");
-              inputS.value = skap.navn;
-              inputS.classList.add("edit-input");
-              inputS.onchange = (e) => skap.navn = e.target.value;
-              summaryS.appendChild(inputS);
-              const btnRemS = document.createElement("button");
-              btnRemS.textContent = "X";
-              btnRemS.style.marginLeft = "10px";
-              btnRemS.onclick = (e) => {
-                e.stopPropagation();
-                um.skap.splice(sIndex, 1);
-                renderOversikt();
-              };
-              summaryS.appendChild(btnRemS);
-            } else {
-              summaryS.textContent = skap.navn;
-            }
-
-            detailsS.appendChild(summaryS);
-
-            // Niveau 4: Varer
-            const varerUl = document.createElement("ul");
-            varerUl.style.paddingLeft = "20px";
-            skap.varer.forEach((vare, vIndex) => {
-              const li = document.createElement("li");
-              li.style.display = "flex";
-              li.style.justifyContent = "space-between";
-              li.style.alignItems = "center";
-              li.style.padding = "4px 0";
-
-              const left = document.createElement("div");
-              left.textContent = vare.navn + (vare.antall !== undefined ? ` – ${vare.antall} stk` : "");
-
-              if(vare.status && vare.status === "mangler"){
-                const spanWarn = document.createElement("span");
-                spanWarn.style.color = "red";
-                spanWarn.style.fontWeight = "bold";
-                spanWarn.textContent = "⚠️ Mangler";
-                left.appendChild(document.createTextNode(" "));
-                left.appendChild(spanWarn);
-              }
-
-              li.appendChild(left);
-
-              const right = document.createElement("div");
-              if(!editMode){
-                const okBtn = document.createElement("button");
-                okBtn.textContent = "Alt OK";
-                okBtn.classList.add("green-btn");
-                okBtn.onclick = () => {
-                  alert("Alt OK for " + vare.navn);
-                };
-                right.appendChild(okBtn);
-              } else {
-                const btnRemV = document.createElement("button");
-                btnRemV.textContent = "X";
-                btnRemV.classList.add("btn");
-                btnRemV.onclick = (e) => {
-                  e.stopPropagation();
-                  skap.varer.splice(vIndex,1);
-                  renderOversikt();
-                };
-                right.appendChild(btnRemV);
-              }
-
-              li.appendChild(right);
-              varerUl.appendChild(li);
-            });
-
-            // Legg til vare knapp i redigeringsmodus
-            if(editMode){
-              const btnAddVare = document.createElement("button");
-              btnAddVare.textContent = "Legg til vare";
-              btnAddVare.classList.add("btn");
-              btnAddVare.onclick = () => {
-                const navn = prompt("Navn på ny vare:");
-                if(navn){
-                  skap.varer.push({ navn: navn, antall: 1, status: "ok" });
-                  renderOversikt();
-                }
-              };
-              skapDiv.appendChild(btnAddVare);
-            }
-
-            detailsS.appendChild(varerUl);
-            skapDiv.appendChild(detailsS);
-          });
-
-          // Legg til skap i redigeringsmodus
-          if(editMode){
-            const btnAddSkap = document.createElement("button");
-            btnAddSkap.textContent = "Legg til skap";
-            btnAddSkap.classList.add("btn");
-            btnAddSkap.onclick = () => {
-              const navn = prompt("Navn på nytt skap:");
-              if(navn){
-                um.skap.push({ navn: navn, varer: [] });
-                renderOversikt();
-              }
+          if(!editMode){
+            const okBtn = document.createElement("button");
+            okBtn.className = "green-btn";
+            okBtn.textContent = "Alt OK";
+            okBtn.onclick = () => {
+              const id = um.id || um.navn;
+              lagreSjekk(id);
             };
-            skapDiv.appendChild(btnAddSkap);
+            høyre.appendChild(okBtn);
           }
 
-          detailsU.appendChild(skapDiv);
-          umDiv.appendChild(detailsU);
+          rad.appendChild(venstre);
+          rad.appendChild(høyre);
+          innerDiv.appendChild(rad);
         });
 
-        // Legg til undermeny i redigeringsmodus
         if(editMode){
-          const btnAddUM = document.createElement("button");
-          btnAddUM.textContent = "Legg til undermeny";
-          btnAddUM.classList.add("btn");
-          btnAddUM.onclick = () => {
+          const btnAdd = document.createElement("button");
+          btnAdd.className = "btn";
+          btnAdd.textContent = "➕ Legg til undermeny";
+          btnAdd.onclick = () => {
             const navn = prompt("Navn på ny undermeny:");
+            if(!structure[oIndex].undermeny) structure[oIndex].undermeny = [];
             if(navn){
-              oversikt.undermeny.push({ navn: navn, skap: [] });
+              structure[oIndex].undermeny.push({ id: Date.now(), navn });
               renderOversikt();
             }
           };
-          umDiv.appendChild(btnAddUM);
+          innerDiv.appendChild(btnAdd);
         }
 
-        detailsO.appendChild(umDiv);
+        detailsO.appendChild(innerDiv);
         cont.appendChild(detailsO);
       });
 
-      // Legg til oversikt i redigeringsmodus
       if(editMode){
-        const btnAddOvers = document.createElement("button");
-        btnAddOvers.textContent = "Legg til oversikt";
-        btnAddOvers.classList.add("btn");
-        btnAddOvers.onclick = () => {
+        const btnAddOversikt = document.createElement("button");
+        btnAddOversikt.className = "btn";
+        btnAddOversikt.textContent = "➕ Legg til oversikt";
+        btnAddOversikt.onclick = () => {
           const navn = prompt("Navn på ny oversikt:");
           if(navn){
             structure.push({ navn: navn, undermeny: [] });
             renderOversikt();
           }
         };
-        cont.appendChild(btnAddOvers);
+        cont.appendChild(btnAddOversikt);
       }
     }
 
-    // Først rendering
-    renderOversikt();
+    document.addEventListener("DOMContentLoaded", renderOversikt);
   </script>
 
 </body>
