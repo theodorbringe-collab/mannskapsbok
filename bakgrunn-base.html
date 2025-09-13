@@ -3,342 +3,205 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Depot – RC Bjørgvin</title>
+  <title>Depot rediger oversikt</title>
   <style>
-    body {
-      font-family: 'Segoe UI', sans-serif;
-      margin: 0;
-      padding: 30px;
-      background: #f4f6f8;
-      color: #333;
-    }
-    h2 { margin-top: 0; }
-
-    .top-bar {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 30px;
-    }
-
-    .btn {
-      background: #1976d2;
-      color: white;
-      padding: 8px 14px;
-      font-size: 14px;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-    }
-
-    .btn:hover {
-      background: #125ea9;
-    }
-
-    .card {
-      background: #fff;
-      padding: 20px;
-      border-radius: 8px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-      margin-bottom: 30px;
-    }
-
-    details {
-      border: 1px solid #ccc;
-      border-radius: 6px;
-      margin-bottom: 10px;
-      background: #fff;
-    }
-
-    summary {
-      font-weight: bold;
-      padding: 10px;
-      cursor: pointer;
-    }
-
-    .enhet-linje {
-      display: flex;
-      justify-content: space-between;
-      padding: 10px 16px;
-      border-top: 1px solid #eee;
-      align-items: center;
-    }
-
-    .status-badge {
-      background: #e53935;
-      color: white;
-      border-radius: 4px;
-      font-size: 12px;
-      padding: 2px 6px;
-      margin-right: 10px;
-    }
-
-    .ikoner {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-
-    .ikoner span {
-      display: inline-block;
-      font-size: 16px;
-      cursor: pointer;
-    }
-
-    .tabbar {
-      display: flex;
-      gap: 10px;
-      margin-top: 20px;
-    }
-
-    .tabbar button {
-      padding: 8px 14px;
-      border: none;
-      border-radius: 4px;
-      background: #e0e0e0;
-      cursor: pointer;
-    }
-
-    .tabbar button.active {
-      background: #1976d2;
-      color: white;
-    }
-
-    .tab-innhold {
-      margin-top: 20px;
-      border-top: 1px solid #ccc;
-      padding-top: 20px;
-    }
-
-    .seksjon {
-      margin-bottom: 20px;
-      border: 1px solid #ddd;
-      border-radius: 6px;
-      padding: 10px;
-    }
-
-    .skap-header {
-      font-weight: bold;
-      cursor: pointer;
-    }
-
-    .skap-innhold {
-      margin-top: 10px;
-      padding-left: 10px;
-    }
-
-    .vare {
-      margin-bottom: 8px;
-    }
-
-    .ok { color: green; font-weight: bold; }
-    .mangler { color: red; font-weight: bold; }
-
-    .check-btn {
-      background: #43a047;
-      color: white;
-      border: none;
-      padding: 4px 10px;
-      margin-left: 10px;
-      border-radius: 4px;
-      font-size: 12px;
-      cursor: pointer;
-    }
-
-    .edit-mode input {
-      border: 1px solid #aaa;
-      padding: 4px;
-      width: 100%;
-    }
-
-    .small-icon-btn {
-      background: none;
-      border: none;
-      color: #1976d2;
-      cursor: pointer;
-      font-size: 16px;
-    }
+    body { font-family: sans-serif; margin:20px; }
+    .btn { padding: 6px 12px; background:#1976d2; color:white; border:none; border-radius:4px; cursor:pointer; margin:2px; }
+    .btn:hover { background:#125ea9; }
+    .edit-mode input { padding:4px; margin:2px; }
+    ul { list-style-type: none; padding-left: 20px; }
+    .item { margin: 4px 0; }
   </style>
 </head>
 <body>
-  <div class="top-bar">
-    <button class="btn" onclick="window.location.href='index.html'">← Tilbake til meny</button>
-    <button class="btn" onclick="toggleRediger()">🛠️ Rediger depot</button>
-  </div>
 
-  <div class="card">
-    <h2>Depotoversikt</h2>
-    <div id="oversikt"></div>
-  </div>
+  <button class="btn" onclick="toggleEditMode()">Toggle Rediger Depot</button>
+  <button class="btn" onclick="lagreStruktur()">Lagre Struktur</button>
+  <div id="struktur-container"></div>
 
-  <div class="card" id="enhet-detaljer" style="display:none;">
-    <h2 id="enhet-navn">Enhet</h2>
-    <div class="tabbar">
-      <button class="tab active" onclick="byttTab('sjekkliste')">Sjekkliste</button>
-      <button class="tab" onclick="byttTab('merknader')">Merknader</button>
-      <button class="tab" onclick="byttTab('plukk')">Plukkliste</button>
-      <button class="tab" onclick="byttTab('rapport')">Rapport</button>
-    </div>
-    <div class="tab-innhold" id="tab-content">
-      <!-- fylles med JS -->
-    </div>
-  </div>
+<script>
+  let rediger = false;
 
-  <script>
-    let redigeringsmodus = false;
-
-    const mockData = [
-      {
-        stasjon: "Stasjon Austevoll",
-        enheter: [
-          {
-            id: "581",
-            navn: "581 - ambulansebåt",
-            skap: [
-              {
-                navn: "Skap 1",
-                sjekk: "Ukentlig sjekk\nSjekkes hver 7. dag",
-                varer: [
-                  { navn: "O2-kolbe", antall: 4, status: "ok" }
-                ]
-              },
-              {
-                navn: "Skap 3",
-                sjekk: "Ukentlig sjekk\nSjekkes hver 7. dag",
-                varer: []
-              }
-            ]
-          }
-        ]
-      }
-    ];
-
-    function toggleRediger() {
-      redigeringsmodus = !redigeringsmodus;
-      document.body.classList.toggle("edit-mode", redigeringsmodus);
-      byggOversikt();
-    }
-
-    function getSistSjekket(enhetId) {
-      const key = `sjekket_${enhetId}`;
-      const val = localStorage.getItem(key);
-      return val ? new Date(val) : null;
-    }
-
-    function settSjekket(enhetId) {
-      const key = `sjekket_${enhetId}`;
-      const now = new Date().toISOString();
-      localStorage.setItem(key, now);
-      byggOversikt();
-    }
-
-    function dagerSiden(dato) {
-      const now = new Date();
-      const then = new Date(dato);
-      const diff = Math.floor((now - then)/(1000*60*60*24));
-      return isNaN(diff) ? "-" : diff;
-    }
-
-    function byggOversikt() {
-      const container = document.getElementById('oversikt');
-      container.innerHTML = '';
-      mockData.forEach(stasjon => {
-        const details = document.createElement('details');
-        const summary = document.createElement('summary');
-        summary.textContent = stasjon.stasjon;
-        details.appendChild(summary);
-
-        stasjon.enheter.forEach(enhet => {
-          const sjekketTid = getSistSjekket(enhet.id);
-          const dager = sjekketTid ? dagerSiden(sjekketTid) : "-";
-          const row = document.createElement('div');
-          row.className = 'enhet-linje';
-
-          row.innerHTML = `
-            <div>
-              <span class="status-badge">${dager} dager siden sjekk</span>
-              ${redigeringsmodus ? `<input value="${enhet.navn}" />` : enhet.navn}
-            </div>
-            <div class="ikoner">
-              <span onclick="skrivMerknad('${enhet.navn}')">📝</span>
-              <span onclick="leggTilPlukk('${enhet.navn}')">🛒</span>
-              <button class="btn" onclick="visEnhet('${stasjon.stasjon}','${enhet.navn}')">Åpne</button>
-              ${!redigeringsmodus ? `<button class="check-btn" onclick="settSjekket('${enhet.id}')">✔️ Sjekket</button>` : ''}
-            </div>
-          `;
-
-          details.appendChild(row);
-        });
-
-        container.appendChild(details);
-      });
-    }
-
-    function skrivMerknad(enhet) {
-      const tekst = prompt(`Skriv merknad til depotansvarlig for: ${enhet}`);
-      if (tekst) {
-        alert("Merknad lagret! (Simulert)");
-      }
-    }
-
-    function leggTilPlukk(enhet) {
-      const tekst = prompt(`Hva må bestilles til: ${enhet}?`);
-      if (tekst) {
-        alert("Innkjøp registrert! (Simulert)");
-      }
-    }
-
-    function visEnhet(stasjonNavn, enhetNavn) {
-      const enhet = mockData
-        .find(s => s.stasjon === stasjonNavn)
-        .enheter.find(e => e.navn === enhetNavn);
-
-      document.getElementById('enhet-navn').textContent = `${enhet.navn}`;
-      document.getElementById('enhet-detaljer').style.display = 'block';
-      visSjekkliste(enhet);
-      aktiverTab('sjekkliste');
-    }
-
-    function byttTab(tab) {
-      const active = document.querySelector('.tab.active');
-      if (active) active.classList.remove('active');
-      document.querySelector(`.tabbar button[onclick="byttTab('${tab}')"]`).classList.add('active');
-
-      const navn = document.getElementById('enhet-navn').textContent;
-      const enhet = mockData[0].enheter.find(e => e.navn === navn);
-      if (tab === 'sjekkliste') visSjekkliste(enhet);
-      else document.getElementById('tab-content').innerHTML = `<p>${tab} (kommer snart)</p>`;
-    }
-
-    function aktiverTab(tab) {
-      document.querySelectorAll('.tab').forEach(btn => btn.classList.remove('active'));
-      document.querySelector(`.tab[onclick="byttTab('${tab}')"]`).classList.add('active');
-    }
-
-    function visSjekkliste(enhet) {
-      const div = document.getElementById('tab-content');
-      div.innerHTML = '';
-
-      enhet.skap.forEach(skap => {
-        const seksjon = document.createElement('div');
-        seksjon.className = 'seksjon';
-        seksjon.innerHTML = `
-          <div class="skap-header" onclick="this.nextElementSibling.style.display = this.nextElementSibling.style.display === 'none' ? 'block' : 'none'">
-            ${skap.navn} <span style="float:right;font-size:12px;color:#666;">${skap.sjekk}</span>
-          </div>
-          <div class="skap-innhold">
-            ${
-              skap.varer.length
-                ? skap.varer.map(v => `<div class="vare">${v.navn} – ${v.antall} stk <span class="${v.status === 'ok' ? 'ok' : 'mangler'}">${v.status === 'ok' ? '✔️ Alt OK' : '❌ Mangler'}</span></div>`).join('')
-                : '<i>Ingen registrerte varer</i>'
+  // Hent struktur fra localStorage eller bruk default
+  const lagreNøkkel = "depotStruktur";
+  let depotStruktur = JSON.parse(localStorage.getItem(lagreNøkkel)) || [
+    {
+      navn: "Fergehallen",
+      undermeny: [
+        {
+          navn: "RC Bjørgvin",
+          skap: [
+            {
+              navn: "Skap 1",
+              varer: ["Førstehjelpsbag", "Bandasje"]
             }
-          </div>
-        `;
-        div.appendChild(seksjon);
-      });
+          ]
+        }
+      ]
     }
+  ];
 
-    document.addEventListener('DOMContentLoaded', byggOversikt);
-  </script>
+  function toggleEditMode(){
+    rediger = !rediger;
+    renderStruktur();
+  }
+
+  function lagreStruktur(){
+    localStorage.setItem(lagreNøkkel, JSON.stringify(depotStruktur));
+    alert("Lagt til / redigert struktur lagret!");
+    rediger = false;
+    renderStruktur();
+  }
+
+  function renderStruktur(){
+    const container = document.getElementById("struktur-container");
+    container.innerHTML = "";
+    const ul = document.createElement("ul");
+    depotStruktur.forEach((oversikt, oi) => {
+      const liO = document.createElement("li");
+      liO.className = "item";
+      if(rediger){
+        liO.innerHTML = `<input value="${oversikt.navn}" onchange="endreOversikt(${oi}, this.value)" /> 
+          <button class="btn" onclick="fjernOversikt(${oi})">X</button>`;
+      } else {
+        liO.textContent = oversikt.navn;
+      }
+      // undermeny
+      const ulUnd = document.createElement("ul");
+      oversikt.undermeny.forEach((um, umi) => {
+        const liUm = document.createElement("li");
+        liUm.className = "item";
+        if(rediger){
+          liUm.innerHTML = `↳ <input value="${um.navn}" onchange="endreUndermeny(${oi}, ${umi}, this.value)" />
+            <button class="btn" onclick="fjernUndermeny(${oi}, ${umi})">X</button>`;
+        } else {
+          liUm.textContent = "↳ " + um.navn;
+        }
+        // skap
+        const ulSkap = document.createElement("ul");
+        um.skap.forEach((skap, ski) => {
+          const liSk = document.createElement("li");
+          liSk.className = "item";
+          if(rediger){
+            liSk.innerHTML = `↳↳ <input value="${skap.navn}" onchange="endreSkap(${oi}, ${umi}, ${ski}, this.value)" />
+              <button class="btn" onclick="fjernSkap(${oi}, ${umi}, ${ski})">X</button>`;
+          } else {
+            liSk.textContent = "↳↳ " + skap.navn;
+          }
+          // varer
+          const ulVar = document.createElement("ul");
+          skap.varer.forEach((vare, vi) => {
+            const liVa = document.createElement("li");
+            liVa.className = "item";
+            if(rediger){
+              liVa.innerHTML = `↳↳↳ <input value="${vare}" onchange="endreVare(${oi}, ${umi}, ${ski}, ${vi}, this.value)" />
+                <button class="btn" onclick="fjernVare(${oi}, ${umi}, ${ski}, ${vi})">X</button>`;
+            } else {
+              liVa.textContent = "↳↳↳ " + vare;
+            }
+            ulVar.appendChild(liVa);
+          });
+          // legg til vare knapp
+          if(rediger){
+            const addVareBtn = document.createElement("button");
+            addVareBtn.textContent = "Legg til vare";
+            addVareBtn.className = "btn";
+            addVareBtn.onclick = () => {
+              const navn = prompt("Navn på ny vare:");
+              if(navn) {
+                depotStruktur[oi].undermeny[umi].skap[ski].varer.push(navn);
+                renderStruktur();
+              }
+            };
+            liSk.appendChild(addVareBtn);
+          }
+          liSk.appendChild(ulVar);
+          ulSkap.appendChild(liSk);
+        });
+        // legg til skap knapp
+        if(rediger){
+          const addSkapBtn = document.createElement("button");
+          addSkapBtn.textContent = "Legg til skap";
+          addSkapBtn.className = "btn";
+          addSkapBtn.onclick = () => {
+            const navn = prompt("Navn på nytt skap:");
+            if(navn) {
+              depotStruktur[oi].undermeny[umi].skap.push({ navn: navn, varer: [] });
+              renderStruktur();
+            }
+          };
+          liUm.appendChild(addSkapBtn);
+        }
+        liUm.appendChild(ulSkap);
+        ulUnd.appendChild(liUm);
+      });
+      // legg til undermeny knapp
+      if(rediger){
+        const addUmBtn = document.createElement("button");
+        addUmBtn.textContent = "Legg til undermeny";
+        addUmBtn.className = "btn";
+        addUmBtn.onclick = () => {
+          const navn = prompt("Navn på ny undermeny:");
+          if(navn) {
+            depotStruktur[oi].undermeny.push({ navn: navn, skap: [] });
+            renderStruktur();
+          }
+        };
+        liO.appendChild(addUmBtn);
+      }
+
+      liO.appendChild(ulUnd);
+      ul.appendChild(liO);
+    });
+    // legg til oversikt knapp
+    if(rediger){
+      const addOversiktBtn = document.createElement("button");
+      addOversiktBtn.textContent = "Legg til oversikt";
+      addOversiktBtn.className = "btn";
+      addOversiktBtn.onclick = () => {
+        const navn = prompt("Navn på ny oversikt:");
+        if(navn) {
+          depotStruktur.push({ navn: navn, undermeny: [] });
+          renderStruktur();
+        }
+      };
+      container.appendChild(addOversiktBtn);
+    }
+    container.appendChild(ul);
+  }
+
+  function endreOversikt(oi, val){
+    depotStruktur[oi].navn = val;
+  }
+  function fjernOversikt(oi){
+    depotStruktur.splice(oi,1);
+    renderStruktur();
+  }
+  function endreUndermeny(oi, umi, val){
+    depotStruktur[oi].undermeny[umi].navn = val;
+  }
+  function fjernUndermeny(oi, umi){
+    depotStruktur[oi].undermeny.splice(umi,1);
+    renderStruktur();
+  }
+  function endreSkap(oi, umi, ski, val){
+    depotStruktur[oi].undermeny[umi].skap[ski].navn = val;
+  }
+  function fjernSkap(oi, umi, ski){
+    depotStruktur[oi].undermeny[umi].skap.splice(ski,1);
+    renderStruktur();
+  }
+  function endreVare(oi, umi, ski, vi, val){
+    depotStruktur[oi].undermeny[umi].skap[ski].varer[vi] = val;
+  }
+  function fjernVare(oi, umi, ski, vi){
+    depotStruktur[oi].undermeny[umi].skap[ski].varer.splice(vi,1);
+    renderStruktur();
+  }
+
+  // Initial render
+  renderStruktur();
+</script>
+
 </body>
 </html>
