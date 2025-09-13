@@ -1,87 +1,268 @@
-<!-- modulvalg.html -->
 <!DOCTYPE html>
 <html lang="no">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Modulvelger</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Depotstyring</title>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto&display=swap" rel="stylesheet">
   <style>
     body {
       margin: 0;
-      font-family: 'Segoe UI', sans-serif;
+      font-family: 'Roboto', sans-serif;
       background: #f4f6f9;
     }
 
     .container {
-      max-width: 1000px;
-      margin: 50px auto;
-      padding: 20px;
-    }
-
-    h1 {
-      text-align: center;
-      color: #333;
-    }
-
-    .grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 20px;
-      margin-top: 40px;
+      padding: 40px;
+      max-width: 1200px;
+      margin: auto;
     }
 
     .card {
       background: white;
-      border-radius: 10px;
-      padding: 30px 20px;
-      text-align: center;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      border-radius: 8px;
+      padding: 20px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+      margin-bottom: 30px;
+    }
+
+    .card h2 {
+      margin-top: 0;
+      font-size: 24px;
+      color: #333;
+    }
+
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+
+    .toolbar input,
+    .toolbar select {
+      padding: 8px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      font-size: 14px;
+    }
+
+    .button {
+      background: #1976d2;
+      color: white;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 4px;
       cursor: pointer;
-      transition: transform 0.2s, box-shadow 0.2s;
     }
 
-    .card:hover {
-      transform: translateY(-5px);
-      box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+    .button:hover {
+      background: #125ea9;
     }
 
-    .card h3 {
-      margin: 0;
-      font-size: 18px;
-      color: #1976d2;
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+
+    th, td {
+      text-align: left;
+      padding: 12px;
+      border-bottom: 1px solid #eee;
+    }
+
+    th {
+      background: #f0f0f0;
+      font-weight: bold;
+    }
+
+    .plukk-seksjon {
+      margin-top: 30px;
+    }
+
+    .plukk-seksjon h3 {
+      margin-bottom: 10px;
+    }
+
+    .plukk-seksjon ul {
+      list-style: none;
+      padding-left: 0;
+    }
+
+    .plukk-seksjon li {
+      padding: 5px 0;
+    }
+
+    .status-lav {
+      color: red;
+      font-weight: bold;
+    }
+
+    .status-ok {
+      color: green;
     }
   </style>
 </head>
 <body>
   <div class="container">
-    <h1>Velg Modul</h1>
-    <div class="grid">
-      <div class="card" onclick="location.href='bakgrunn-base.html'">
-        <h3>Depot</h3>
+    <div class="card">
+      <h2>Depotstyring</h2>
+
+      <!-- Områdevalg og ny -->
+      <div class="toolbar">
+        <select id="områdeSelect" onchange="velgOmråde(this.value)"></select>
+        <input type="text" id="nyttOmråde" placeholder="Nytt område" />
+        <button class="button" onclick="leggTilOmråde()">➕ Nytt område</button>
       </div>
-      <div class="card">
-        <h3>Kalender</h3>
+
+      <!-- Kategorivalg og ny -->
+      <div class="toolbar">
+        <select id="kategoriSelect" onchange="velgKategori(this.value)"></select>
+        <input type="text" id="nyKategori" placeholder="Ny kategori" />
+        <button class="button" onclick="leggTilKategori()">➕ Ny kategori</button>
       </div>
-      <div class="card">
-        <h3>Gjøremål</h3>
-      </div>
-      <div class="card">
-        <h3>Faktura</h3>
-      </div>
-      <div class="card">
-        <h3>Min side</h3>
-      </div>
-      <div class="card">
-        <h3>Varsling</h3>
-      </div>
-      <div class="card">
-        <h3>Vakter</h3>
-      </div>
-      <div class="card">
-        <h3>Sidekonfigurasjon</h3>
-      </div>
+
+      <!-- Innhold -->
+      <div id="kategori-innhold" style="margin-top: 30px;"></div>
     </div>
   </div>
+
+  <script>
+    let lagerdata = {
+      "Depot A": {
+        "Bekledning": [
+          { navn: "Uniform", antall: 10, status: "ok" }
+        ]
+      },
+      "Depot B": {
+        "Verneutstyr": [
+          { navn: "Hjelm", antall: 3, status: "lav" }
+        ]
+      }
+    };
+
+    let valgtOmråde = "Depot A";
+    let valgtKategori = "Bekledning";
+    let plukkliste = [];
+
+    function init() {
+      oppdaterOmrådeValg();
+      velgOmråde(valgtOmråde);
+    }
+
+    function oppdaterOmrådeValg() {
+      const select = document.getElementById('områdeSelect');
+      select.innerHTML = '';
+      for (let område in lagerdata) {
+        select.innerHTML += `<option value="${område}">${område}</option>`;
+      }
+      select.value = valgtOmråde;
+    }
+
+    function velgOmråde(område) {
+      valgtOmråde = område;
+      oppdaterKategoriValg();
+      const førsteKategori = Object.keys(lagerdata[valgtOmråde])[0] || null;
+      if (førsteKategori) {
+        velgKategori(førsteKategori);
+      } else {
+        document.getElementById('kategori-innhold').innerHTML = '<p>Ingen kategorier tilgjengelig.</p>';
+      }
+    }
+
+    function oppdaterKategoriValg() {
+      const select = document.getElementById('kategoriSelect');
+      select.innerHTML = '';
+      for (let kategori in lagerdata[valgtOmråde]) {
+        select.innerHTML += `<option value="${kategori}">${kategori}</option>`;
+      }
+      select.value = valgtKategori;
+    }
+
+    function velgKategori(kategori) {
+      valgtKategori = kategori;
+      const varer = lagerdata[valgtOmråde][valgtKategori] || [];
+      visKategori(varer);
+    }
+
+    function leggTilOmråde() {
+      const nytt = document.getElementById('nyttOmråde').value.trim();
+      if (nytt && !lagerdata[nytt]) {
+        lagerdata[nytt] = {};
+        valgtOmråde = nytt;
+        document.getElementById('nyttOmråde').value = '';
+        oppdaterOmrådeValg();
+        oppdaterKategoriValg();
+      }
+    }
+
+    function leggTilKategori() {
+      const nyKat = document.getElementById('nyKategori').value.trim();
+      if (nyKat && !lagerdata[valgtOmråde][nyKat]) {
+        lagerdata[valgtOmråde][nyKat] = [];
+        valgtKategori = nyKat;
+        document.getElementById('nyKategori').value = '';
+        oppdaterKategoriValg();
+        velgKategori(nyKat);
+      }
+    }
+
+    function visKategori(varer) {
+      let html = `<table><thead><tr>
+        <th>Navn</th><th>Antall</th><th>Status</th><th>Plukk</th><th>Uttak</th>
+      </tr></thead><tbody>`;
+
+      varer.forEach((vare, index) => {
+        html += `<tr>
+          <td>${vare.navn}</td>
+          <td>${vare.antall}</td>
+          <td class="${vare.status === 'lav' ? 'status-lav' : 'status-ok'}">${vare.status}</td>
+          <td><button class="button" onclick="leggTilPlukkliste(${index})">Plukk</button></td>
+          <td><button class="button" onclick="registrerUttak(${index})">Uttak</button></td>
+        </tr>`;
+      });
+
+      html += "</tbody></table>";
+
+      html += `
+        <div class="plukk-seksjon">
+          <h3>🧾 Plukkliste</h3>
+          <ul id="plukk-visning"></ul>
+        </div>
+      `;
+
+      document.getElementById("kategori-innhold").innerHTML = html;
+      oppdaterPlukklisteVisning();
+    }
+
+    function leggTilPlukkliste(index) {
+      const vare = lagerdata[valgtOmråde][valgtKategori][index];
+      if (!plukkliste.includes(vare.navn)) {
+        plukkliste.push(vare.navn);
+      }
+      oppdaterPlukklisteVisning();
+    }
+
+    function oppdaterPlukklisteVisning() {
+      const ul = document.getElementById("plukk-visning");
+      ul.innerHTML = "";
+      plukkliste.forEach(item => {
+        const li = document.createElement("li");
+        li.textContent = item;
+        ul.appendChild(li);
+      });
+    }
+
+    function registrerUttak(index) {
+      const vare = lagerdata[valgtOmråde][valgtKategori][index];
+      if (vare.antall > 0) vare.antall -= 1;
+      if (vare.antall <= 3) vare.status = "lav";
+      else vare.status = "ok";
+      visKategori(lagerdata[valgtOmråde][valgtKategori]);
+    }
+
+    document.addEventListener("DOMContentLoaded", init);
+  </script>
 </body>
 </html>
-
