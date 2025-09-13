@@ -34,17 +34,30 @@
 
     .toolbar {
       display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 20px;
       flex-wrap: wrap;
       gap: 10px;
+      margin-bottom: 20px;
     }
 
-    .toolbar input[type="search"] {
-      padding: 8px 12px;
+    .toolbar input,
+    .toolbar select {
+      padding: 8px;
       border: 1px solid #ccc;
       border-radius: 4px;
+      font-size: 14px;
+    }
+
+    .button {
+      background: #1976d2;
+      color: white;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    .button:hover {
+      background: #125ea9;
     }
 
     table {
@@ -64,214 +77,192 @@
       font-weight: bold;
     }
 
-    .status-tag {
-      padding: 4px 8px;
-      border-radius: 4px;
-      font-weight: bold;
-      font-size: 12px;
-      display: inline-block;
+    .plukk-seksjon {
+      margin-top: 30px;
     }
 
-    .status-available {
-      background: #e0f7e9;
-      color: #2e7d32;
+    .plukk-seksjon h3 {
+      margin-bottom: 10px;
     }
 
-    .status-out {
-      background: #fdecea;
-      color: #c62828;
+    .plukk-seksjon ul {
+      list-style: none;
+      padding-left: 0;
     }
 
-    .button {
-      background: #1976d2;
-      color: white;
-      border: none;
-      padding: 8px 16px;
-      border-radius: 4px;
-      cursor: pointer;
+    .plukk-seksjon li {
+      padding: 5px 0;
     }
 
-    .button:hover {
-      background: #1565c0;
-    }
-
-    .small-select {
-      padding: 6px;
-      font-size: 13px;
-    }
-
-    .estimat {
-      font-size: 12px;
-      color: #666;
-    }
-
-    /* MODAL STYLES */
-    .modal {
-      display: none;
-      position: fixed;
-      z-index: 1000;
-      left: 0; top: 0;
-      width: 100%; height: 100%;
-      background-color: rgba(0, 0, 0, 0.5);
-    }
-
-    .modal-content {
-      background: white;
-      margin: 10% auto;
-      padding: 30px;
-      border-radius: 8px;
-      width: 90%;
-      max-width: 500px;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.2);
-    }
-
-    .modal-content h3 {
-      margin-top: 0;
-      color: #333;
-    }
-
-    .modal-content label {
-      display: block;
-      margin-top: 15px;
+    .status-lav {
+      color: red;
       font-weight: bold;
     }
 
-    .modal-content input,
-    .modal-content select {
-      width: 100%;
-      padding: 8px;
-      margin-top: 5px;
-      border: 1px solid #ccc;
-      border-radius: 4px;
+    .status-ok {
+      color: green;
     }
-
-    .modal-footer {
-      margin-top: 20px;
-      display: flex;
-      justify-content: flex-end;
-      gap: 10px;
-    }
-
-    .close {
-      background: #ccc;
-    }
-
-    .close:hover {
-      background: #999;
-    }
-
   </style>
 </head>
 <body>
   <div class="container">
     <div class="card">
+      <h2>Depotstyring</h2>
+
+      <!-- Områdevalg og ny -->
       <div class="toolbar">
-        <h2>Depotstyring</h2>
-        <div>
-          <input type="search" placeholder="Søk utstyr..." />
-          <button class="button" onclick="openModal()">➕ Registrer nytt utstyr</button>
-        </div>
+        <select id="områdeSelect" onchange="velgOmråde(this.value)"></select>
+        <input type="text" id="nyttOmråde" placeholder="Nytt område" />
+        <button class="button" onclick="leggTilOmråde()">➕ Nytt område</button>
       </div>
 
-      <table>
-        <thead>
-          <tr>
-            <th>Navn</th>
-            <th>Type</th>
-            <th>Plassering</th>
-            <th>Status</th>
-            <th>Kostnad</th>
-            <th>Flytt til</th>
-            <th>Forbruk</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td>Hjelm MSA Gallet</td>
-            <td>Beskyttelse</td>
-            <td>Depot A</td>
-            <td><span class="status-tag status-available">Tilgjengelig</span></td>
-            <td>kr 1 250,-</td>
-            <td>
-              <select class="small-select">
-                <option>Depot B</option>
-                <option>Depot C</option>
-              </select>
-            </td>
-            <td><span class="estimat">Estimat: 2 pr mnd</span></td>
-          </tr>
-          <tr>
-            <td>Drakt Tychem</td>
-            <td>Kjemikalievern</td>
-            <td>Depot B</td>
-            <td><span class="status-tag status-out">Utlånt</span></td>
-            <td>kr 3 500,-</td>
-            <td>
-              <select class="small-select">
-                <option>Depot A</option>
-                <option>Depot C</option>
-              </select>
-            </td>
-            <td><span class="estimat">Estimat: 1 pr kvartal</span></td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-  </div>
-
-  <!-- MODAL -->
-  <div class="modal" id="modal">
-    <div class="modal-content">
-      <h3>Registrer nytt utstyr</h3>
-      <label for="navn">Utstyrsnavn</label>
-      <input type="text" id="navn">
-
-      <label for="type">Type</label>
-      <input type="text" id="type">
-
-      <label for="plassering">Plassering</label>
-      <select id="plassering">
-        <option>Depot A</option>
-        <option>Depot B</option>
-        <option>Depot C</option>
-      </select>
-
-      <label for="status">Status</label>
-      <select id="status">
-        <option>Tilgjengelig</option>
-        <option>Utlånt</option>
-      </select>
-
-      <label for="kostnad">Kostnad (kr)</label>
-      <input type="number" id="kostnad">
-
-      <div class="modal-footer">
-        <button class="button close" onclick="closeModal()">Avbryt</button>
-        <button class="button" onclick="lagreUtstyr()">Lagre</button>
+      <!-- Kategorivalg og ny -->
+      <div class="toolbar">
+        <select id="kategoriSelect" onchange="velgKategori(this.value)"></select>
+        <input type="text" id="nyKategori" placeholder="Ny kategori" />
+        <button class="button" onclick="leggTilKategori()">➕ Ny kategori</button>
       </div>
+
+      <!-- Innhold -->
+      <div id="kategori-innhold" style="margin-top: 30px;"></div>
     </div>
   </div>
 
   <script>
-    function openModal() {
-      document.getElementById('modal').style.display = 'block';
+    let lagerdata = {
+      "Depot A": {
+        "Bekledning": [
+          { navn: "Uniform", antall: 10, status: "ok" }
+        ]
+      },
+      "Depot B": {
+        "Verneutstyr": [
+          { navn: "Hjelm", antall: 3, status: "lav" }
+        ]
+      }
+    };
+
+    let valgtOmråde = "Depot A";
+    let valgtKategori = "Bekledning";
+    let plukkliste = [];
+
+    function init() {
+      oppdaterOmrådeValg();
+      velgOmråde(valgtOmråde);
     }
 
-    function closeModal() {
-      document.getElementById('modal').style.display = 'none';
+    function oppdaterOmrådeValg() {
+      const select = document.getElementById('områdeSelect');
+      select.innerHTML = '';
+      for (let område in lagerdata) {
+        select.innerHTML += `<option value="${område}">${område}</option>`;
+      }
+      select.value = valgtOmråde;
     }
 
-    function lagreUtstyr() {
-      const navn = document.getElementById('navn').value;
-      const type = document.getElementById('type').value;
-      const plassering = document.getElementById('plassering').value;
-      const status = document.getElementById('status').value;
-      const kostnad = document.getElementById('kostnad').value;
-
-      alert(`Utstyr "${navn}" ble registrert!`);
-      closeModal();
+    function velgOmråde(område) {
+      valgtOmråde = område;
+      oppdaterKategoriValg();
+      const førsteKategori = Object.keys(lagerdata[valgtOmråde])[0] || null;
+      if (førsteKategori) {
+        velgKategori(førsteKategori);
+      } else {
+        document.getElementById('kategori-innhold').innerHTML = '<p>Ingen kategorier tilgjengelig.</p>';
+      }
     }
+
+    function oppdaterKategoriValg() {
+      const select = document.getElementById('kategoriSelect');
+      select.innerHTML = '';
+      for (let kategori in lagerdata[valgtOmråde]) {
+        select.innerHTML += `<option value="${kategori}">${kategori}</option>`;
+      }
+      select.value = valgtKategori;
+    }
+
+    function velgKategori(kategori) {
+      valgtKategori = kategori;
+      const varer = lagerdata[valgtOmråde][valgtKategori] || [];
+      visKategori(varer);
+    }
+
+    function leggTilOmråde() {
+      const nytt = document.getElementById('nyttOmråde').value.trim();
+      if (nytt && !lagerdata[nytt]) {
+        lagerdata[nytt] = {};
+        valgtOmråde = nytt;
+        document.getElementById('nyttOmråde').value = '';
+        oppdaterOmrådeValg();
+        oppdaterKategoriValg();
+      }
+    }
+
+    function leggTilKategori() {
+      const nyKat = document.getElementById('nyKategori').value.trim();
+      if (nyKat && !lagerdata[valgtOmråde][nyKat]) {
+        lagerdata[valgtOmråde][nyKat] = [];
+        valgtKategori = nyKat;
+        document.getElementById('nyKategori').value = '';
+        oppdaterKategoriValg();
+        velgKategori(nyKat);
+      }
+    }
+
+    function visKategori(varer) {
+      let html = `<table><thead><tr>
+        <th>Navn</th><th>Antall</th><th>Status</th><th>Plukk</th><th>Uttak</th>
+      </tr></thead><tbody>`;
+
+      varer.forEach((vare, index) => {
+        html += `<tr>
+          <td>${vare.navn}</td>
+          <td>${vare.antall}</td>
+          <td class="${vare.status === 'lav' ? 'status-lav' : 'status-ok'}">${vare.status}</td>
+          <td><button class="button" onclick="leggTilPlukkliste(${index})">Plukk</button></td>
+          <td><button class="button" onclick="registrerUttak(${index})">Uttak</button></td>
+        </tr>`;
+      });
+
+      html += "</tbody></table>";
+
+      html += `
+        <div class="plukk-seksjon">
+          <h3>🧾 Plukkliste</h3>
+          <ul id="plukk-visning"></ul>
+        </div>
+      `;
+
+      document.getElementById("kategori-innhold").innerHTML = html;
+      oppdaterPlukklisteVisning();
+    }
+
+    function leggTilPlukkliste(index) {
+      const vare = lagerdata[valgtOmråde][valgtKategori][index];
+      if (!plukkliste.includes(vare.navn)) {
+        plukkliste.push(vare.navn);
+      }
+      oppdaterPlukklisteVisning();
+    }
+
+    function oppdaterPlukklisteVisning() {
+      const ul = document.getElementById("plukk-visning");
+      ul.innerHTML = "";
+      plukkliste.forEach(item => {
+        const li = document.createElement("li");
+        li.textContent = item;
+        ul.appendChild(li);
+      });
+    }
+
+    function registrerUttak(index) {
+      const vare = lagerdata[valgtOmråde][valgtKategori][index];
+      if (vare.antall > 0) vare.antall -= 1;
+      if (vare.antall <= 3) vare.status = "lav";
+      else vare.status = "ok";
+      visKategori(lagerdata[valgtOmråde][valgtKategori]);
+    }
+
+    document.addEventListener("DOMContentLoaded", init);
   </script>
 </body>
 </html>
-
