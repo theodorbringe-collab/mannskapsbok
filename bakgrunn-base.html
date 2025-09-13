@@ -14,6 +14,27 @@
     }
     h2 { margin-top: 0; }
 
+    .top-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 30px;
+    }
+
+    .btn {
+      background: #1976d2;
+      color: white;
+      padding: 8px 14px;
+      font-size: 14px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    .btn:hover {
+      background: #125ea9;
+    }
+
     .card {
       background: #fff;
       padding: 20px;
@@ -61,15 +82,6 @@
     .ikoner span {
       display: inline-block;
       font-size: 16px;
-    }
-
-    .btn {
-      background: #1976d2;
-      color: white;
-      padding: 6px 10px;
-      font-size: 14px;
-      border: none;
-      border-radius: 4px;
       cursor: pointer;
     }
 
@@ -121,9 +133,38 @@
 
     .ok { color: green; font-weight: bold; }
     .mangler { color: red; font-weight: bold; }
+
+    .check-btn {
+      background: #43a047;
+      color: white;
+      border: none;
+      padding: 4px 10px;
+      margin-left: 10px;
+      border-radius: 4px;
+      font-size: 12px;
+      cursor: pointer;
+    }
+
+    .edit-mode input {
+      border: 1px solid #aaa;
+      padding: 4px;
+      width: 100%;
+    }
+
+    .small-icon-btn {
+      background: none;
+      border: none;
+      color: #1976d2;
+      cursor: pointer;
+      font-size: 16px;
+    }
   </style>
 </head>
 <body>
+  <div class="top-bar">
+    <button class="btn" onclick="window.location.href='index.html'">← Tilbake til meny</button>
+    <button class="btn" onclick="toggleRediger()">🛠️ Rediger depot</button>
+  </div>
 
   <div class="card">
     <h2>Depotoversikt</h2>
@@ -142,118 +183,3 @@
       <!-- fylles med JS -->
     </div>
   </div>
-
-  <script>
-    const mockData = [
-      {
-        stasjon: "Stasjon Austevoll",
-        enheter: [
-          {
-            navn: "581 - ambulansebåt",
-            dager: -17,
-            merknader: 3,
-            mangler: 2,
-            skap: [
-              {
-                navn: "Skap 1",
-                sjekk: "Ukentlig sjekk\nSjekkes hver 7. dag, kl. 08:00",
-                varer: [
-                  { navn: "O2-kolbe", antall: 4, status: "ok" }
-                ]
-              },
-              {
-                navn: "Skap 3",
-                sjekk: "Ukentlig sjekk\nSjekkes hver 7. dag, kl. 08:00",
-                varer: []
-              }
-            ]
-          }
-        ]
-      }
-    ];
-
-    function byggOversikt() {
-      const container = document.getElementById('oversikt');
-      mockData.forEach(stasjon => {
-        const details = document.createElement('details');
-        const summary = document.createElement('summary');
-        summary.textContent = stasjon.stasjon;
-        details.appendChild(summary);
-
-        stasjon.enheter.forEach(enhet => {
-          const row = document.createElement('div');
-          row.className = 'enhet-linje';
-
-          row.innerHTML = `
-            <div>
-              <span class="status-badge">${enhet.dager} DAGER</span>
-              ${enhet.navn}
-            </div>
-            <div class="ikoner">
-              <span>📝 ${enhet.merknader}</span>
-              <span>🛒 ${enhet.mangler}</span>
-              <button class="btn" onclick="visEnhet('${stasjon.stasjon}','${enhet.navn}')">Åpne</button>
-            </div>
-          `;
-
-          details.appendChild(row);
-        });
-
-        container.appendChild(details);
-      });
-    }
-
-    function visEnhet(stasjonNavn, enhetNavn) {
-      const enhet = mockData
-        .find(s => s.stasjon === stasjonNavn)
-        .enheter.find(e => e.navn === enhetNavn);
-
-      document.getElementById('enhet-navn').textContent = `${enhet.navn}`;
-      document.getElementById('enhet-detaljer').style.display = 'block';
-      visSjekkliste(enhet);
-      aktiverTab('sjekkliste');
-    }
-
-    function byttTab(tab) {
-      const active = document.querySelector('.tab.active');
-      if (active) active.classList.remove('active');
-      document.querySelector(`.tabbar button[onclick="byttTab('${tab}')"]`).classList.add('active');
-
-      const navn = document.getElementById('enhet-navn').textContent;
-      const enhet = mockData[0].enheter.find(e => e.navn === navn);
-      if (tab === 'sjekkliste') visSjekkliste(enhet);
-      else document.getElementById('tab-content').innerHTML = `<p>${tab} (kommer snart)</p>`;
-    }
-
-    function aktiverTab(tab) {
-      document.querySelectorAll('.tab').forEach(btn => btn.classList.remove('active'));
-      document.querySelector(`.tab[onclick="byttTab('${tab}')"]`).classList.add('active');
-    }
-
-    function visSjekkliste(enhet) {
-      const div = document.getElementById('tab-content');
-      div.innerHTML = '';
-
-      enhet.skap.forEach(skap => {
-        const seksjon = document.createElement('div');
-        seksjon.className = 'seksjon';
-        seksjon.innerHTML = `
-          <div class="skap-header" onclick="this.nextElementSibling.style.display = this.nextElementSibling.style.display === 'none' ? 'block' : 'none'">
-            ${skap.navn} <span style="float:right;font-size:12px;color:#666;">${skap.sjekk}</span>
-          </div>
-          <div class="skap-innhold">
-            ${
-              skap.varer.length
-                ? skap.varer.map(v => `<div class="vare">${v.navn} – ${v.antall} stk <span class="${v.status === 'ok' ? 'ok' : 'mangler'}">${v.status === 'ok' ? '✔️ Alt OK' : '❌ Mangler'}</span></div>`).join('')
-                : '<i>Ingen registrerte varer</i>'
-            }
-          </div>
-        `;
-        div.appendChild(seksjon);
-      });
-    }
-
-    document.addEventListener('DOMContentLoaded', byggOversikt);
-  </script>
-</body>
-</html>
