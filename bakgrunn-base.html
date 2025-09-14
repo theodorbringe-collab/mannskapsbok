@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Depot – Hierarkisk</title>
+  <title>Depot – Med Utstyr</title>
   <style>
     body {
       font-family: 'Roboto', sans-serif;
@@ -49,9 +49,6 @@
       padding: 10px 0;
       border-top: 1px solid #ddd;
     }
-    .list-item:first-child {
-      border-top: none;
-    }
     .badge {
       background: #e53935;
       color: white;
@@ -75,209 +72,276 @@
       font-size: 14px;
       margin-right: 10px;
     }
+    .toggle-header {
+      cursor: pointer;
+      font-weight: bold;
+    }
+    .hidden {
+      display: none;
+    }
+    .utstyr-liste {
+      margin-left: 40px;
+      margin-top: 5px;
+      font-size: 14px;
+    }
   </style>
 </head>
 <body>
 
-  <div class="top-bar">
-    <button class="btn" onclick="window.location.href='index.html'">← Tilbake</button>
-    <div>
-      <button class="btn" onclick="toggleEditMode()">🛠️ Rediger</button>
-      <button class="btn" onclick="lagreStruktur()">💾 Lagre</button>
-    </div>
+<div class="top-bar">
+  <button class="btn" onclick="window.location.href='index.html'">← Tilbake</button>
+  <div>
+    <button class="btn" onclick="toggleEditMode()">🛠️ Rediger</button>
+    <button class="btn" onclick="lagreStruktur()">💾 Lagre</button>
   </div>
+</div>
 
-  <div id="cardsContainer"></div>
+<div id="cardsContainer"></div>
 
-  <script>
-    let editMode = false;
-    const STORAGE_KEY = "depotCardsStruct";
-    const DATE_KEY_PREFIX = "lastChecked_";
+<script>
+  let editMode = false;
+  const STORAGE_KEY = "depotCardsStruct";
+  const DATE_KEY_PREFIX = "lastChecked_";
 
-    let structure = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [
-      {
-        navn: "Stasjon Austevoll",
-        undermeny: [
-          {
-            id: "1",
-            navn: "Ambulansebåt 581",
-            undermeny: [
-              {
-                id: "2",
-                navn: "Bil 19 – SV93802",
-                undermeny: [
-                  { id: "3", navn: "Båre 123" }
-                ]
-              }
-            ]
-          }
-        ]
+  let structure = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [
+    {
+      navn: "Stasjon Austevoll",
+      undermeny: [
+        {
+          id: "1",
+          navn: "Ambulansebåt 581",
+          utstyr: ["Båre", "Hjertestarter"],
+          undermeny: [
+            {
+              id: "2",
+              navn: "Bil 19 – SV93802",
+              utstyr: [],
+              undermeny: [
+                { id: "3", navn: "Båre 123", utstyr: [] }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ];
+
+  function toggleEditMode() {
+    editMode = !editMode;
+    renderCards();
+  }
+
+  function lagreStruktur() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(structure));
+    alert("Struktur lagret!");
+    editMode = false;
+    renderCards();
+  }
+
+  function lagreSjekk(id) {
+    const now = new Date().toISOString();
+    localStorage.setItem(DATE_KEY_PREFIX + id, now);
+    renderCards();
+  }
+
+  function dagerSiden(id) {
+    const datoStr = localStorage.getItem(DATE_KEY_PREFIX + id);
+    if (!datoStr) return "–";
+    const dato = new Date(datoStr);
+    const nå = new Date();
+    const diff = Math.floor((nå - dato) / (1000 * 60 * 60 * 24));
+    return diff === 0 ? "I dag" : `${diff} dager`;
+  }
+
+  function renderUndermeny(items, parent, level = 1) {
+    items.forEach(item => {
+      const wrapper = document.createElement("div");
+
+      const header = document.createElement("div");
+      header.className = "list-item toggle-header";
+      header.style.marginLeft = `${level * 20}px`;
+      header.onclick = () => {
+        content.classList.toggle("hidden");
+      };
+
+      const left = document.createElement("div");
+      const badge = document.createElement("span");
+      badge.className = "badge";
+      badge.textContent = dagerSiden(item.id || item.navn);
+      left.appendChild(badge);
+
+      if (editMode) {
+        const input = document.createElement("input");
+        input.value = item.navn;
+        input.className = "edit-input";
+        input.onchange = e => item.navn = e.target.value;
+        left.appendChild(input);
+      } else {
+        left.appendChild(document.createTextNode(item.navn));
       }
-    ];
 
-    function toggleEditMode() {
-      editMode = !editMode;
-      renderCards();
-    }
+      header.appendChild(left);
 
-    function lagreStruktur() {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(structure));
-      alert("Struktur lagret!");
-      editMode = false;
-      renderCards();
-    }
+      const right = document.createElement("div");
 
-    function lagreSjekk(id) {
-      const now = new Date().toISOString();
-      localStorage.setItem(DATE_KEY_PREFIX + id, now);
-      renderCards();
-    }
+      const okBtn = document.createElement("button");
+      okBtn.className = "green-btn";
+      okBtn.textContent = "Alt OK";
+      okBtn.onclick = (e) => {
+        e.stopPropagation();
+        lagreSjekk(item.id || item.navn);
+      };
+      right.appendChild(okBtn);
 
-    function dagerSiden(id) {
-      const datoStr = localStorage.getItem(DATE_KEY_PREFIX + id);
-      if (!datoStr) return "–";
-      const dato = new Date(datoStr);
-      const nå = new Date();
-      const diff = Math.floor((nå - dato) / (1000 * 60 * 60 * 24));
-      return diff === 0 ? "I dag" : `${diff} dager`;
-    }
+      if (editMode) {
+        const delBtn = document.createElement("button");
+        delBtn.textContent = "X";
+        delBtn.className = "btn";
+        delBtn.onclick = (e) => {
+          e.stopPropagation();
+          items.splice(items.indexOf(item), 1);
+          renderCards();
+        };
+        right.appendChild(delBtn);
+      }
 
-    function renderUndermeny(items, parent, level = 1) {
-      items.forEach(item => {
-        const li = document.createElement("div");
-        li.className = "list-item";
-        li.style.marginLeft = `${level * 30}px`;
+      header.appendChild(right);
+      wrapper.appendChild(header);
 
-        const left = document.createElement("div");
-        const badge = document.createElement("span");
-        badge.className = "badge";
-        badge.textContent = dagerSiden(item.id || item.navn);
-        left.appendChild(badge);
+      const content = document.createElement("div");
+      content.className = "hidden";
 
+      // Utstyrsliste
+      const utstyrList = document.createElement("div");
+      utstyrList.className = "utstyr-liste";
+
+      const utstyr = item.utstyr || [];
+      utstyr.forEach((u, i) => {
+        const line = document.createElement("div");
+        line.textContent = u;
         if (editMode) {
-          const input = document.createElement("input");
-          input.value = item.navn;
-          input.className = "edit-input";
-          input.onchange = e => item.navn = e.target.value;
-          left.appendChild(input);
-        } else {
-          left.appendChild(document.createTextNode(item.navn));
-        }
-
-        li.appendChild(left);
-
-        const right = document.createElement("div");
-
-        const okBtn = document.createElement("button");
-        okBtn.className = "green-btn";
-        okBtn.textContent = "Alt OK";
-        okBtn.onclick = () => lagreSjekk(item.id || item.navn);
-        right.appendChild(okBtn);
-
-        if (editMode) {
-          const delBtn = document.createElement("button");
-          delBtn.textContent = "X";
-          delBtn.className = "btn";
-          delBtn.onclick = () => {
-            items.splice(items.indexOf(item), 1);
+          const del = document.createElement("button");
+          del.textContent = "X";
+          del.className = "btn";
+          del.style.marginLeft = "10px";
+          del.onclick = () => {
+            utstyr.splice(i, 1);
             renderCards();
           };
-          right.appendChild(delBtn);
+          line.appendChild(del);
         }
-
-        li.appendChild(right);
-        parent.appendChild(li);
-
-        // Legg til undermeny-knapp
-        if (editMode) {
-          const leggTil = document.createElement("button");
-          leggTil.className = "btn";
-          leggTil.textContent = "➕ Legg til undermeny";
-          leggTil.style.marginLeft = `${(level + 1) * 30}px`;
-          leggTil.onclick = () => {
-            const navn = prompt("Navn på ny undermeny:");
-            if (navn) {
-              if (!item.undermeny) item.undermeny = [];
-              item.undermeny.push({ id: Date.now(), navn });
-              renderCards();
-            }
-          };
-          parent.appendChild(leggTil);
-        }
-
-        if (item.undermeny) {
-          renderUndermeny(item.undermeny, parent, level + 1);
-        }
-      });
-    }
-
-    function renderCards() {
-      const cont = document.getElementById("cardsContainer");
-      cont.innerHTML = "";
-
-      structure.forEach((oversikt, oi) => {
-        const card = document.createElement("div");
-        card.className = "card";
-
-        const h3 = document.createElement("h3");
-
-        if (editMode) {
-          const input = document.createElement("input");
-          input.value = oversikt.navn;
-          input.className = "edit-input";
-          input.onchange = e => oversikt.navn = e.target.value;
-          h3.appendChild(input);
-
-          const delBtn = document.createElement("button");
-          delBtn.textContent = "X";
-          delBtn.className = "btn";
-          delBtn.onclick = () => {
-            structure.splice(oi, 1);
-            renderCards();
-          };
-          h3.appendChild(delBtn);
-        } else {
-          h3.textContent = oversikt.navn;
-        }
-
-        card.appendChild(h3);
-
-        renderUndermeny(oversikt.undermeny, card);
-
-        if (editMode) {
-          const leggTil = document.createElement("button");
-          leggTil.className = "btn";
-          leggTil.textContent = "➕ Legg til undermeny";
-          leggTil.onclick = () => {
-            const navn = prompt("Navn på ny undermeny:");
-            if (navn) {
-              oversikt.undermeny.push({ id: Date.now(), navn });
-              renderCards();
-            }
-          };
-          card.appendChild(leggTil);
-        }
-
-        cont.appendChild(card);
+        utstyrList.appendChild(line);
       });
 
       if (editMode) {
-        const leggTilOversikt = document.createElement("button");
-        leggTilOversikt.className = "btn";
-        leggTilOversikt.textContent = "➕ Legg til oversikt";
-        leggTilOversikt.onclick = () => {
-          const navn = prompt("Navn på ny oversikt:");
-          if (navn) {
-            structure.push({ navn, undermeny: [] });
+        const leggTilUtstyr = document.createElement("button");
+        leggTilUtstyr.className = "btn";
+        leggTilUtstyr.textContent = "➕ Legg til utstyr";
+        leggTilUtstyr.onclick = () => {
+          const nytt = prompt("Navn på utstyr:");
+          if (nytt) {
+            if (!item.utstyr) item.utstyr = [];
+            item.utstyr.push(nytt);
             renderCards();
           }
         };
-        cont.appendChild(leggTilOversikt);
+        utstyrList.appendChild(leggTilUtstyr);
       }
-    }
 
-    document.addEventListener("DOMContentLoaded", renderCards);
-  </script>
+      content.appendChild(utstyrList);
+
+      // Legg til undermeny-knapp
+      if (editMode) {
+        const leggTil = document.createElement("button");
+        leggTil.className = "btn";
+        leggTil.textContent = "➕ Legg til undermeny";
+        leggTil.onclick = () => {
+          const navn = prompt("Navn på ny undermeny:");
+          if (navn) {
+            if (!item.undermeny) item.undermeny = [];
+            item.undermeny.push({ id: Date.now(), navn, utstyr: [] });
+            renderCards();
+          }
+        };
+        content.appendChild(leggTil);
+      }
+
+      if (item.undermeny) {
+        renderUndermeny(item.undermeny, content, level + 1);
+      }
+
+      wrapper.appendChild(content);
+      parent.appendChild(wrapper);
+    });
+  }
+
+  function renderCards() {
+    const cont = document.getElementById("cardsContainer");
+    cont.innerHTML = "";
+
+    structure.forEach((oversikt, oi) => {
+      const card = document.createElement("div");
+      card.className = "card";
+
+      const h3 = document.createElement("h3");
+
+      if (editMode) {
+        const input = document.createElement("input");
+        input.value = oversikt.navn;
+        input.className = "edit-input";
+        input.onchange = e => oversikt.navn = e.target.value;
+        h3.appendChild(input);
+
+        const delBtn = document.createElement("button");
+        delBtn.textContent = "X";
+        delBtn.className = "btn";
+        delBtn.onclick = () => {
+          structure.splice(oi, 1);
+          renderCards();
+        };
+        h3.appendChild(delBtn);
+      } else {
+        h3.textContent = oversikt.navn;
+      }
+
+      card.appendChild(h3);
+
+      renderUndermeny(oversikt.undermeny, card);
+
+      if (editMode) {
+        const leggTil = document.createElement("button");
+        leggTil.className = "btn";
+        leggTil.textContent = "➕ Legg til undermeny";
+        leggTil.onclick = () => {
+          const navn = prompt("Navn på ny undermeny:");
+          if (navn) {
+            oversikt.undermeny.push({ id: Date.now(), navn, utstyr: [] });
+            renderCards();
+          }
+        };
+        card.appendChild(leggTil);
+      }
+
+      cont.appendChild(card);
+    });
+
+    if (editMode) {
+      const leggTilOversikt = document.createElement("button");
+      leggTilOversikt.className = "btn";
+      leggTilOversikt.textContent = "➕ Legg til oversikt";
+      leggTilOversikt.onclick = () => {
+        const navn = prompt("Navn på ny oversikt:");
+        if (navn) {
+          structure.push({ navn, undermeny: [], utstyr: [] });
+          renderCards();
+        }
+      };
+      cont.appendChild(leggTilOversikt);
+    }
+  }
+
+  document.addEventListener("DOMContentLoaded", renderCards);
+</script>
 
 </body>
 </html>
