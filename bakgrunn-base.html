@@ -345,3 +345,133 @@
 
 </body>
 </html>
+<!DOCTYPE html>
+<html lang="no">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Depot med dra-og-slipp</title>
+  <style>
+    /* enkel styling */
+    .card { background: #fff; padding: 20px; margin-bottom: 20px; border-radius: 8px; }
+    .list-item { display: flex; justify-content: space-between; align-items: center; padding: 8px; border: 1px solid #ccc; margin-bottom: 4px; cursor: grab; }
+    .handle { cursor: grab; margin-right: 10px; }
+    .utstyr-linje { margin-left: 30px; }
+    .btn { padding: 4px 8px; margin-left: 5px; }
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+  <div>
+    <button onclick="toggleEditMode()">Rediger</button>
+    <button onclick="lagreStruktur()">Lagre</button>
+  </div>
+  <div id="cardsContainer"></div>
+
+  <!-- Legg inn SortableJS via CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+
+  <script>
+    let editMode = false;
+    const STORAGE_KEY = "depotStruct2";
+
+    // Eksempel-struktur
+    let structure = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [
+      { navn: "Oversikt A", type: "oversikt", undermeny: [], utstyr: [] }
+    ];
+
+    function toggleEditMode() {
+      editMode = !editMode;
+      renderCards();
+    }
+
+    function lagreStruktur() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(structure));
+      alert("Laget struktur!");
+      editMode = false;
+      renderCards();
+    }
+
+    function renderCards() {
+      const container = document.getElementById("cardsContainer");
+      container.innerHTML = "";
+
+      structure.forEach((oversikt, oi) => {
+        const card = document.createElement("div");
+        card.className = "card";
+
+        // Overskrift
+        const h = document.createElement("h3");
+        h.textContent = oversikt.navn;
+        card.appendChild(h);
+
+        // Undermeny container
+        const umCont = document.createElement("div");
+        umCont.id = `oversikt-${oi}`;
+        oversikt.undermeny.forEach((um, ui) => {
+          const item = document.createElement("div");
+          item.className = "list-item";
+          item.setAttribute("data-oi", oi);
+          item.setAttribute("data-ui", ui);
+
+          // Dra-handle
+          const handle = document.createElement("span");
+          handle.className = "handle";
+          handle.textContent = "☰";
+          item.appendChild(handle);
+
+          const nameSpan = document.createElement("span");
+          nameSpan.textContent = um.navn;
+          item.appendChild(nameSpan);
+
+          if (editMode) {
+            const del = document.createElement("button");
+            del.textContent = "X";
+            del.onclick = () => {
+              oversikt.undermeny.splice(ui, 1);
+              renderCards();
+            };
+            item.appendChild(del);
+          }
+          umCont.appendChild(item);
+        });
+
+        card.appendChild(umCont);
+
+        if (editMode) {
+          const btnAdd = document.createElement("button");
+          btnAdd.textContent = "➕ Legg til undermeny";
+          btnAdd.onclick = () => {
+            const navn = prompt("Navn på undermeny:");
+            if (navn) {
+              // spørr hvilken type?
+              const type = prompt("Type: vanlig / utstyr");
+              const ny = { navn, type: type === "utstyr" ? "utstyr" : "vanlig", undermeny: [], utstyr: [] };
+              oversikt.undermeny.push(ny);
+              renderCards();
+            }
+          };
+          card.appendChild(btnAdd);
+        }
+
+        container.appendChild(card);
+
+        // Sett opp Sortable for denne undermeny-listen
+        new Sortable(umCont, {
+          handle: '.handle',
+          animation: 150,
+          onEnd: function(evt) {
+            // evt.oldIndex, evt.newIndex
+            const { oldIndex, newIndex } = evt;
+            const moved = oversikt.undermeny.splice(oldIndex, 1)[0];
+            oversikt.undermeny.splice(newIndex, 0, moved);
+            lagreStruktur();
+          }
+        });
+      });
+    }
+
+    document.addEventListener("DOMContentLoaded", renderCards);
+  </script>
+</body>
+</html>
