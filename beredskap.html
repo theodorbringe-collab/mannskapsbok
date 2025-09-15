@@ -34,37 +34,32 @@
       color: white;
       display: flex;
       flex-direction: column;
-      gap: 0.5rem;
+      gap: 0.6rem;
       transition: 0.3s;
       box-shadow: 0 6px 14px rgba(0,0,0,0.1);
     }
 
     .green { background: #2e7d32; }
-    .red { background: #c62828; }
-    .gray { background: #616161; }
+    .red   { background: #c62828; }
+    .gray  { background: #616161; }
 
-    .vessel h2 {
-      margin: 0;
-      font-size: 1.2rem;
-    }
-
-    .vessel input[type="text"],
+    .vessel input,
     .vessel select,
     .vessel textarea {
       width: 100%;
-      padding: 0.5rem;
+      padding: 0.6rem;
       font-size: 0.95rem;
       border-radius: 6px;
       border: 1px solid #ccc;
-      background: white;
-      color: black;
-      outline: none;
+      background: #fff;
+      color: #000;
       font-weight: 500;
     }
 
-    .vessel input::placeholder,
-    .vessel textarea::placeholder {
-      color: #888;
+    .vessel textarea[disabled] {
+      background: #eee;
+      color: #333;
+      resize: none;
     }
 
     .btns {
@@ -78,15 +73,15 @@
       padding: 0.5rem;
       border: none;
       border-radius: 6px;
-      font-size: 0.85rem;
+      font-size: 0.9rem;
       cursor: pointer;
-      background: rgba(255,255,255,0.2);
-      color: white;
-      transition: 0.2s;
+      background: #ffffff33;
+      color: #fff;
+      transition: background 0.2s;
     }
 
     .btn:hover {
-      background: rgba(255,255,255,0.35);
+      background: #ffffff55;
     }
 
     #newVesselBtn {
@@ -115,10 +110,6 @@
       border-radius: 10px;
       width: 90%;
       max-width: 400px;
-    }
-
-    #modalBox h3 {
-      margin-top: 0;
     }
 
     #modalBox input {
@@ -162,9 +153,11 @@
     const statusOptions = [
       { text: 'I drift', color: 'green' },
       { text: 'I drift – Beredskap på henger', color: 'green' },
+      { text: 'I drift – på sjø', color: 'green' },
       { text: 'Ute av drift teknisk', color: 'red' },
       { text: 'Ute av drift Mannskapsmangel', color: 'red' },
       { text: 'På verksted', color: 'gray' },
+      { text: 'På lager', color: 'gray' }
     ];
 
     let vessels = JSON.parse(localStorage.getItem('vessels')) || [
@@ -184,6 +177,9 @@
       container.innerHTML = '';
 
       vessels.forEach((vessel, i) => {
+        const kommentar = vessel.kommentar || '';
+        const avvik = vessel.avvik || 'Ingen avvik';
+
         const div = document.createElement('div');
         div.className = `vessel ${statusOptions[vessel.status].color}`;
         div.innerHTML = `
@@ -193,8 +189,8 @@
               <option value="${idx}" ${idx == vessel.status ? 'selected' : ''}>${s.text}</option>
             `).join('')}
           </select>
-          <textarea placeholder="Kommentar..." onchange="endreKommentar(${i}, this.value)">${vessel.kommentar}</textarea>
-          <textarea placeholder="Avvik..." disabled>${vessel.avvik}</textarea>
+          <textarea placeholder="Kommentar..." onchange="endreKommentar(${i}, this.value)">${kommentar}</textarea>
+          <textarea disabled>${avvik}</textarea>
           <div class="btns">
             <button class="btn" onclick="registrerAvvik(${i})">➕ Avvik</button>
             <button class="btn" onclick="slett(${i})">🗑 Slett</button>
