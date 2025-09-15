@@ -8,7 +8,7 @@
     body {
       font-family: 'Segoe UI', sans-serif;
       margin: 0;
-      background: #eef2f3;
+      background: #f4f4f4;
       padding: 2rem;
       display: flex;
       flex-direction: column;
@@ -17,6 +17,7 @@
 
     h1 {
       color: #0d47a1;
+      margin-bottom: 1.5rem;
     }
 
     .fleet {
@@ -28,36 +29,44 @@
     }
 
     .vessel {
-      background: rgba(255,255,255,0.9);
-      backdrop-filter: blur(6px);
       border-radius: 12px;
       padding: 1rem;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-      border-left: 6px solid transparent;
+      color: white;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
       transition: 0.3s;
+      box-shadow: 0 6px 14px rgba(0,0,0,0.1);
     }
 
-    .vessel.green { border-color: #4CAF50; }
-    .vessel.red { border-color: #f44336; }
-    .vessel.gray { border-color: #9E9E9E; }
+    .green { background: #2e7d32; }
+    .red { background: #c62828; }
+    .gray { background: #616161; }
 
     .vessel h2 {
       margin: 0;
       font-size: 1.2rem;
-      color: #333;
     }
 
+    .vessel input[type="text"],
     .vessel select,
     .vessel textarea {
-      margin-top: 0.5rem;
       width: 100%;
       padding: 0.5rem;
-      border-radius: 6px;
-      border: 1px solid #ccc;
       font-size: 0.95rem;
+      border: none;
+      border-radius: 6px;
+      background: rgba(255,255,255,0.2);
+      color: white;
+      outline: none;
     }
 
-    .buttons {
+    .vessel input::placeholder,
+    .vessel textarea::placeholder {
+      color: #eee;
+    }
+
+    .btns {
       display: flex;
       gap: 0.5rem;
       margin-top: 0.5rem;
@@ -65,50 +74,31 @@
 
     .btn {
       flex: 1;
-      background: linear-gradient(45deg, #0d47a1, #1976d2);
-      color: white;
-      border: none;
       padding: 0.5rem;
+      border: none;
       border-radius: 6px;
+      font-size: 0.85rem;
       cursor: pointer;
-      font-size: 0.9rem;
-    }
-
-    .btn.secondary {
-      background: #e0e0e0;
-      color: #333;
+      background: rgba(255,255,255,0.2);
+      color: white;
+      transition: 0.2s;
     }
 
     .btn:hover {
-      opacity: 0.9;
-    }
-
-    .avvik, .kommentar {
-      font-size: 0.85rem;
-      margin-top: 0.5rem;
-      color: #444;
-    }
-
-    .avvik:before {
-      content: "⚠️ ";
-    }
-
-    .kommentar:before {
-      content: "💬 ";
+      background: rgba(255,255,255,0.35);
     }
 
     #newVesselBtn {
       margin: 2rem 0;
-      background: #388e3c;
+      padding: 0.7rem 1.2rem;
+      background: #0d47a1;
       color: white;
       border: none;
-      padding: 0.6rem 1rem;
       border-radius: 6px;
       font-size: 1rem;
       cursor: pointer;
     }
 
-    /* Modal */
     #modal {
       position: fixed;
       inset: 0;
@@ -124,7 +114,6 @@
       border-radius: 10px;
       width: 90%;
       max-width: 400px;
-      box-shadow: 0 6px 18px rgba(0,0,0,0.2);
     }
 
     #modalBox h3 {
@@ -147,8 +136,8 @@
       border: none;
       border-radius: 6px;
       font-size: 1rem;
+      cursor: pointer;
     }
-
   </style>
 </head>
 <body>
@@ -159,7 +148,7 @@
 
   <div class="fleet" id="fleetContainer"></div>
 
-  <!-- Modal for avvik -->
+  <!-- Modal -->
   <div id="modal">
     <div id="modalBox">
       <h3>Registrer avvik</h3>
@@ -185,7 +174,7 @@
 
     let currentAvvikIndex = null;
 
-    function saveVessels() {
+    function save() {
       localStorage.setItem('vessels', JSON.stringify(vessels));
     }
 
@@ -193,44 +182,46 @@
       const container = document.getElementById('fleetContainer');
       container.innerHTML = '';
 
-      vessels.forEach((vessel, index) => {
+      vessels.forEach((vessel, i) => {
         const div = document.createElement('div');
         div.className = `vessel ${statusOptions[vessel.status].color}`;
         div.innerHTML = `
-          <h2>${vessel.name}</h2>
-          <select data-index="${index}">
-            ${statusOptions.map((opt, i) => `
-              <option value="${i}" ${vessel.status === i ? 'selected' : ''}>${opt.text}</option>
+          <input type="text" value="${vessel.name}" onchange="endreNavn(${i}, this.value)">
+          <select onchange="endreStatus(${i}, this.value)">
+            ${statusOptions.map((s, idx) => `
+              <option value="${idx}" ${idx == vessel.status ? 'selected' : ''}>${s.text}</option>
             `).join('')}
           </select>
-
-          ${vessel.kommentar ? `<div class="kommentar">${vessel.kommentar}</div>` : ''}
-          ${vessel.avvik ? `<div class="avvik">${vessel.avvik}</div>` : ''}
-
-          <div class="buttons">
-            <button class="btn secondary" onclick="endreKommentar(${index})">✏️ Kommentar</button>
-            <button class="btn" onclick="registrerAvvik(${index})">➕ Avvik</button>
+          <textarea placeholder="Kommentar..." onchange="endreKommentar(${i}, this.value)">${vessel.kommentar}</textarea>
+          <textarea placeholder="Avvik..." disabled style="opacity: 0.9;">${vessel.avvik}</textarea>
+          <div class="btns">
+            <button class="btn" onclick="registrerAvvik(${i})">➕ Avvik</button>
+            <button class="btn" onclick="slett(${i})">🗑 Slett</button>
           </div>
         `;
         container.appendChild(div);
       });
-
-      document.querySelectorAll('select').forEach(select => {
-        select.addEventListener('change', e => {
-          const i = e.target.dataset.index;
-          vessels[i].status = parseInt(e.target.value);
-          saveVessels();
-          render();
-        });
-      });
     }
 
-    function endreKommentar(index) {
-      const tekst = prompt("Skriv inn kommentar for fartøyet:", vessels[index].kommentar || '');
-      if (tekst !== null) {
-        vessels[index].kommentar = tekst.trim();
-        saveVessels();
-        render();
+    function endreStatus(index, val) {
+      vessels[index].status = parseInt(val);
+      save(); render();
+    }
+
+    function endreNavn(index, navn) {
+      vessels[index].name = navn;
+      save(); render();
+    }
+
+    function endreKommentar(index, tekst) {
+      vessels[index].kommentar = tekst;
+      save();
+    }
+
+    function slett(index) {
+      if (confirm("Slett dette fartøyet?")) {
+        vessels.splice(index, 1);
+        save(); render();
       }
     }
 
@@ -241,27 +232,23 @@
     }
 
     function lagreAvvik() {
-      const tekst = document.getElementById('avvikInput').value.trim();
-      if (tekst && currentAvvikIndex !== null) {
-        vessels[currentAvvikIndex].avvik = tekst;
-        saveVessels();
-        render();
+      const txt = document.getElementById('avvikInput').value.trim();
+      if (txt && currentAvvikIndex !== null) {
+        vessels[currentAvvikIndex].avvik = txt;
+        save(); render();
         document.getElementById('modal').style.display = 'none';
       }
     }
 
     document.getElementById('modal').addEventListener('click', e => {
-      if (e.target.id === 'modal') {
-        e.target.style.display = 'none';
-      }
+      if (e.target.id === 'modal') e.target.style.display = 'none';
     });
 
     document.getElementById('newVesselBtn').addEventListener('click', () => {
       const navn = prompt("Navn på nytt fartøy:");
       if (navn) {
-        vessels.push({ name: navn.trim(), status: 0, kommentar: '', avvik: '' });
-        saveVessels();
-        render();
+        vessels.push({ name: navn, status: 0, kommentar: '', avvik: '' });
+        save(); render();
       }
     });
 
