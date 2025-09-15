@@ -141,4 +141,105 @@
     <h2>🚨 RC Bjørgvin</h2>
     <div class="nav-link" onclick="goTo('index.html')">Dashboard</div>
     <div class="nav-link" onclick="goTo('bakgrunn-base.html')">Depot</div>
-    <div class="nav-link" onclick="goTo('vakter.html')">Vakte
+    <div class="nav-link" onclick="goTo('vakter.html')">Vakter</div>
+    <div class="nav-link" onclick="goTo('kalender.html')">Kalender</div>
+    <div class="nav-link" onclick="goTo('gjoremaal.html')">Gjøremål</div>
+    <div class="nav-link" onclick="goTo('faktura.html')">Faktura</div>
+    <div class="nav-link" onclick="goTo('varsling.html')">Varsling</div>
+    <div class="nav-link" onclick="goTo('elev.html')">Mannskapsbok</div>
+    <div class="nav-link" onclick="goTo('beredskap.html')">Beredskap</div> <!-- ✅ OPPDATERT -->
+  </div>
+
+  <!-- Innhold -->
+  <div class="main">
+    <!-- Hero -->
+    <div class="hero">
+      <div class="hero-text">
+        <h1>RC Bjørgvin</h1>
+        <p>System for frivillige og beredskap</p>
+      </div>
+    </div>
+
+    <!-- Varsel -->
+    <div class="alert-box" id="depotAlert">
+      Lagerbeholdning under minimum: <strong id="lavCount">0</strong> vare(r) må etterfylles.
+    </div>
+
+    <!-- Moduler -->
+    <div class="grid">
+      <div class="card" onclick="goTo('bakgrunn-base.html')">
+        <div class="icon">📦</div>
+        <h3>Depot</h3>
+      </div>
+      <div class="card" onclick="goTo('elev.html')">
+        <div class="icon">📘</div>
+        <h3>Mannskapsbok</h3>
+      </div>
+      <div class="card" onclick="goTo('vakter.html')">
+        <div class="icon">👥</div>
+        <h3>Vakter</h3>
+      </div>
+      <div class="card" onclick="goTo('kalender.html')">
+        <div class="icon">📅</div>
+        <h3>Kalender</h3>
+      </div>
+      <div class="card" onclick="goTo('gjoremaal.html')">
+        <div class="icon">✅</div>
+        <h3>Gjøremål</h3>
+      </div>
+      <div class="card" onclick="goTo('faktura.html')">
+        <div class="icon">🧾</div>
+        <h3>Faktura</h3>
+      </div>
+      <div class="card" onclick="goTo('varsling.html')">
+        <div class="icon">🔔</div>
+        <h3>Varsling</h3>
+      </div>
+      <div class="card" onclick="goTo('beredskap.html')"> <!-- ✅ OPPDATERT -->
+        <div class="icon">🛟</div>
+        <h3>Beredskap RC Bjørgvin</h3>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const lagerdata = {
+      "Depot A": {
+        "Bekledning": [
+          { navn: "Uniform", antall: 10, status: "ok" },
+          { navn: "Vester", antall: 2, status: "lav" }
+        ]
+      },
+      "Depot B": {
+        "Verneutstyr": [
+          { navn: "Hjelm", antall: 1, status: "lav" }
+        ]
+      }
+    };
+
+    function countLavBeholdning() {
+      let count = 0;
+      for (let område in lagerdata) {
+        for (let kategori in lagerdata[område]) {
+          lagerdata[område][kategori].forEach(vare => {
+            if (vare.status === "lav") count++;
+          });
+        }
+      }
+      return count;
+    }
+
+    function oppdaterVarsel() {
+      const ant = countLavBeholdning();
+      document.getElementById('lavCount').textContent = ant;
+    }
+
+    function goTo(page) {
+      window.location.href = page;
+    }
+
+    document.addEventListener("DOMContentLoaded", oppdaterVarsel);
+  </script>
+
+</body>
+</html>
