@@ -15,15 +15,24 @@
       align-items: center;
     }
 
-    h1, h2 {
+    h1 {
       color: #0d47a1;
       margin-bottom: 1rem;
     }
 
-    iframe {
+    a.button-link {
+      text-decoration: none;
       margin-bottom: 2rem;
-      border: 2px solid #ccc;
-      border-radius: 8px;
+    }
+
+    .status-button {
+      padding: 0.6rem 1.2rem;
+      background-color: #0d47a1;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 1rem;
+      cursor: pointer;
     }
 
     .fleet {
@@ -145,9 +154,10 @@
 
   <h1>Beredskap RC Bjørgvin</h1>
 
-  <!-- 🔴 STATUSBILDE -->
-  <h2>Status – RC Bergen</h2>
-  <iframe id="statusIframe" width="600" height="300"></iframe>
+  <!-- 🔵 STATUS-KNAPP -->
+  <a href="https://public.kystportal.no/rkh.asp?_side=3" target="_blank" class="button-link">
+    <button class="status-button">🔍 Åpne statusbilde (Kystportal)</button>
+  </a>
 
   <button id="newVesselBtn">➕ Legg til nytt fartøy</button>
 
@@ -261,14 +271,6 @@
         save(); render();
       }
     });
-
-    function oppdaterIframe() {
-      const iframe = document.getElementById("statusIframe");
-      iframe.src = "https://public.kystportal.no/rkh.asp?_side=3&t=" + new Date().getTime();
-    }
-
-    oppdaterIframe();
-    setInterval(oppdaterIframe, 60000); // hver 60 sekunder
 
     render();
   </script>
