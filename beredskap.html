@@ -1,1 +1,138 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+  <meta charset="UTF-8">
+  <title>Beredskap RC Bjørgvin</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 2rem;
+      background-color: #f4f4f4;
+    }
+    h1 {
+      color: #333;
+    }
+    .vessel {
+      padding: 1rem;
+      margin: 1rem 0;
+      border-radius: 5px;
+      color: white;
+    }
+    .green { background-color: #4CAF50; }
+    .red { background-color: #f44336; }
+    .gray { background-color: #9E9E9E; }
+
+    .vessel select {
+      margin-top: 0.5rem;
+    }
+
+    #new-vessel-form {
+      margin-top: 2rem;
+      padding: 1rem;
+      background: #fff;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+    }
+
+    label, input, button {
+      display: block;
+      margin: 0.5rem 0;
+    }
+
+    input, select {
+      padding: 0.4rem;
+      width: 100%;
+    }
+
+    button {
+      background-color: #2196F3;
+      color: white;
+      border: none;
+      padding: 0.6rem;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <h1>Beredskap RC Bjørgvin</h1>
+  <div id="vessels-list"></div>
+
+  <form id="new-vessel-form">
+    <h2>Legg til nytt fartøy</h2>
+    <label for="vessel-name">Navn på fartøy:</label>
+    <input type="text" id="vessel-name" required>
+    <button type="submit">Legg til</button>
+  </form>
+
+  <script>
+    const statusOptions = [
+      { text: 'I drift', color: 'green' },
+      { text: 'I drift – Beredskap på henger', color: 'green' },
+      { text: 'Ute av drift teknisk', color: 'red' },
+      { text: 'Ute av drift Mannskapsmangel', color: 'red' },
+      { text: 'På verksted', color: 'gray' },
+    ];
+
+    const initialVessels = [
+      { name: 'RC Bjørgvin', status: 0 },
+      { name: 'Rescurunner junior 1', status: 0 },
+      { name: 'Rescurunner Junior 2', status: 0 }
+    ];
+
+    function getVessels() {
+      return JSON.parse(localStorage.getItem('vessels')) || initialVessels;
+    }
+
+    function saveVessels(vessels) {
+      localStorage.setItem('vessels', JSON.stringify(vessels));
+    }
+
+    function renderVessels() {
+      const list = document.getElementById('vessels-list');
+      const vessels = getVessels();
+      list.innerHTML = '';
+
+      vessels.forEach((vessel, index) => {
+        const vesselDiv = document.createElement('div');
+        vesselDiv.className = `vessel ${statusOptions[vessel.status].color}`;
+        vesselDiv.innerHTML = `
+          <strong>${vessel.name}</strong><br>
+          <select data-index="${index}">
+            ${statusOptions.map((opt, i) => `
+              <option value="${i}" ${i === vessel.status ? 'selected' : ''}>${opt.text}</option>
+            `).join('')}
+          </select>
+        `;
+        list.appendChild(vesselDiv);
+      });
+
+      document.querySelectorAll('select').forEach(select => {
+        select.addEventListener('change', (e) => {
+          const vessels = getVessels();
+          const i = e.target.getAttribute('data-index');
+          vessels[i].status = parseInt(e.target.value);
+          saveVessels(vessels);
+          renderVessels();
+        });
+      });
+    }
+
+    document.getElementById('new-vessel-form').addEventListener('submit', function(e) {
+      e.preventDefault();
+      const nameInput = document.getElementById('vessel-name');
+      const name = nameInput.value.trim();
+      if (name) {
+        const vessels = getVessels();
+        vessels.push({ name, status: 0 });
+        saveVessels(vessels);
+        nameInput.value = '';
+        renderVessels();
+      }
+    });
+
+    // Initial render
+    renderVessels();
+  </script>
+</body>
+</html>
 
