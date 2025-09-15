@@ -54,16 +54,17 @@
       width: 100%;
       padding: 0.5rem;
       font-size: 0.95rem;
-      border: none;
       border-radius: 6px;
-      background: rgba(255,255,255,0.2);
-      color: white;
+      border: 1px solid #ccc;
+      background: white;
+      color: black;
       outline: none;
+      font-weight: 500;
     }
 
     .vessel input::placeholder,
     .vessel textarea::placeholder {
-      color: #eee;
+      color: #888;
     }
 
     .btns {
@@ -193,7 +194,7 @@
             `).join('')}
           </select>
           <textarea placeholder="Kommentar..." onchange="endreKommentar(${i}, this.value)">${vessel.kommentar}</textarea>
-          <textarea placeholder="Avvik..." disabled style="opacity: 0.9;">${vessel.avvik}</textarea>
+          <textarea placeholder="Avvik..." disabled>${vessel.avvik}</textarea>
           <div class="btns">
             <button class="btn" onclick="registrerAvvik(${i})">➕ Avvik</button>
             <button class="btn" onclick="slett(${i})">🗑 Slett</button>
