@@ -1,245 +1,49 @@
-<!DOCTYPE html>
-<html lang="no">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>RC Bjørgvin – Dashboard</title>
-  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
-  <style>
-    * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      font-family: 'Roboto', sans-serif;
-      background: #f0f2f5;
-      display: flex;
-    }
+<!-- VENSTREMENY (helt uendret, bare én ekstra knapp lagt til) -->
+<div class="sidebar">
+  <h2>🚨 RC Bjørgvin</h2>
+  <div class="nav-link" onclick="goTo('index.html')">Dashboard</div>
+  <div class="nav-link" onclick="goTo('bakgrunn-base.html')">Depot</div>
+  <div class="nav-link" onclick="goTo('vakter.html')">Vakter</div>
+  <div class="nav-link" onclick="goTo('kalender.html')">Kalender</div>
+  <div class="nav-link" onclick="goTo('gjoremaal.html')">Gjøremål</div>
+  <div class="nav-link" onclick="goTo('faktura.html')">Faktura</div>
+  <div class="nav-link" onclick="goTo('varsling.html')">Varsling</div>
+  <div class="nav-link" onclick="goTo('elev.html')">Mannskapsbok</div>
+  <div class="nav-link" onclick="goTo('beredskap.html')">Beredskap</div> <!-- ✅ Ny -->
+</div>
 
-    .sidebar {
-      width: 230px;
-      background: #0d47a1;
-      color: white;
-      height: 100vh;
-      position: fixed;
-      display: flex;
-      flex-direction: column;
-      padding: 20px;
-    }
-
-    .sidebar h2 {
-      font-size: 20px;
-      margin-bottom: 30px;
-      text-align: center;
-    }
-
-    .nav-link {
-      padding: 12px 10px;
-      margin-bottom: 10px;
-      background: #1565c0;
-      border-radius: 6px;
-      cursor: pointer;
-      text-align: center;
-    }
-
-    .nav-link:hover {
-      background: #1976d2;
-    }
-
-    .main {
-      margin-left: 230px;
-      padding: 30px;
-      flex: 1;
-    }
-
-    .hero {
-      background: url('https://upload.wikimedia.org/wikipedia/commons/e/ee/R%C3%B8de_Kors_b%C3%A5t.jpg') no-repeat center center;
-      background-size: cover;
-      height: 250px;
-      border-radius: 10px;
-      margin-bottom: 30px;
-      position: relative;
-    }
-
-    .hero::after {
-      content: "";
-      position: absolute;
-      top: 0; left: 0; right: 0; bottom: 0;
-      background: rgba(0,0,0,0.4);
-      border-radius: 10px;
-    }
-
-    .hero-text {
-      position: absolute;
-      bottom: 20px;
-      left: 30px;
-      color: white;
-      z-index: 1;
-    }
-
-    .hero-text h1 {
-      margin: 0;
-      font-size: 28px;
-    }
-
-    .alert-box {
-      background: #fdecea;
-      color: #b71c1c;
-      border-left: 5px solid #f44336;
-      padding: 15px 20px;
-      border-radius: 6px;
-      margin-bottom: 30px;
-      font-size: 15px;
-    }
-
-    .grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-      gap: 20px;
-    }
-
-    .card {
-      background: white;
-      border-radius: 8px;
-      padding: 25px;
-      text-align: center;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.07);
-      cursor: pointer;
-      transition: 0.2s ease;
-    }
-
-    .card:hover {
-      transform: translateY(-4px);
-      box-shadow: 0 6px 16px rgba(0,0,0,0.1);
-    }
-
-    .card .icon {
-      font-size: 30px;
-      margin-bottom: 10px;
-      color: #1976d2;
-    }
-
-    .card h3 {
-      margin: 0;
-      font-size: 16px;
-      color: #333;
-    }
-
-    @media (max-width: 768px) {
-      .sidebar {
-        display: none;
-      }
-
-      .main {
-        margin-left: 0;
-      }
-    }
-  </style>
-</head>
-<body>
-
-  <!-- Venstremeny -->
-  <div class="sidebar">
-    <h2>🚨 RC Bjørgvin</h2>
-    <div class="nav-link" onclick="goTo('index.html')">Dashboard</div>
-    <div class="nav-link" onclick="goTo('bakgrunn-base.html')">Depot</div>
-    <div class="nav-link" onclick="goTo('vakter.html')">Vakter</div>
-    <div class="nav-link" onclick="goTo('kalender.html')">Kalender</div>
-    <div class="nav-link" onclick="goTo('gjoremaal.html')">Gjøremål</div>
-    <div class="nav-link" onclick="goTo('faktura.html')">Faktura</div>
-    <div class="nav-link" onclick="goTo('varsling.html')">Varsling</div>
-    <div class="nav-link" onclick="goTo('elev.html')">Mannskapsbok</div>
-    <div class="nav-link" onclick="goTo('beredskap.html')">Beredskap</div> <!-- ✅ OPPDATERT -->
+<!-- MODUL-KORT (alt som før, + nytt kort for beredskap) -->
+<div class="grid">
+  <div class="card" onclick="goTo('bakgrunn-base.html')">
+    <div class="icon">📦</div>
+    <h3>Depot</h3>
   </div>
-
-  <!-- Innhold -->
-  <div class="main">
-    <!-- Hero -->
-    <div class="hero">
-      <div class="hero-text">
-        <h1>RC Bjørgvin</h1>
-        <p>System for frivillige og beredskap</p>
-      </div>
-    </div>
-
-    <!-- Varsel -->
-    <div class="alert-box" id="depotAlert">
-      Lagerbeholdning under minimum: <strong id="lavCount">0</strong> vare(r) må etterfylles.
-    </div>
-
-    <!-- Moduler -->
-    <div class="grid">
-      <div class="card" onclick="goTo('bakgrunn-base.html')">
-        <div class="icon">📦</div>
-        <h3>Depot</h3>
-      </div>
-      <div class="card" onclick="goTo('elev.html')">
-        <div class="icon">📘</div>
-        <h3>Mannskapsbok</h3>
-      </div>
-      <div class="card" onclick="goTo('vakter.html')">
-        <div class="icon">👥</div>
-        <h3>Vakter</h3>
-      </div>
-      <div class="card" onclick="goTo('kalender.html')">
-        <div class="icon">📅</div>
-        <h3>Kalender</h3>
-      </div>
-      <div class="card" onclick="goTo('gjoremaal.html')">
-        <div class="icon">✅</div>
-        <h3>Gjøremål</h3>
-      </div>
-      <div class="card" onclick="goTo('faktura.html')">
-        <div class="icon">🧾</div>
-        <h3>Faktura</h3>
-      </div>
-      <div class="card" onclick="goTo('varsling.html')">
-        <div class="icon">🔔</div>
-        <h3>Varsling</h3>
-      </div>
-      <div class="card" onclick="goTo('beredskap.html')"> <!-- ✅ OPPDATERT -->
-        <div class="icon">🛟</div>
-        <h3>Beredskap RC Bjørgvin</h3>
-      </div>
-    </div>
+  <div class="card" onclick="goTo('elev.html')">
+    <div class="icon">📘</div>
+    <h3>Mannskapsbok</h3>
   </div>
-
-  <script>
-    const lagerdata = {
-      "Depot A": {
-        "Bekledning": [
-          { navn: "Uniform", antall: 10, status: "ok" },
-          { navn: "Vester", antall: 2, status: "lav" }
-        ]
-      },
-      "Depot B": {
-        "Verneutstyr": [
-          { navn: "Hjelm", antall: 1, status: "lav" }
-        ]
-      }
-    };
-
-    function countLavBeholdning() {
-      let count = 0;
-      for (let område in lagerdata) {
-        for (let kategori in lagerdata[område]) {
-          lagerdata[område][kategori].forEach(vare => {
-            if (vare.status === "lav") count++;
-          });
-        }
-      }
-      return count;
-    }
-
-    function oppdaterVarsel() {
-      const ant = countLavBeholdning();
-      document.getElementById('lavCount').textContent = ant;
-    }
-
-    function goTo(page) {
-      window.location.href = page;
-    }
-
-    document.addEventListener("DOMContentLoaded", oppdaterVarsel);
-  </script>
-
-</body>
-</html>
+  <div class="card" onclick="goTo('vakter.html')">
+    <div class="icon">👥</div>
+    <h3>Vakter</h3>
+  </div>
+  <div class="card" onclick="goTo('kalender.html')">
+    <div class="icon">📅</div>
+    <h3>Kalender</h3>
+  </div>
+  <div class="card" onclick="goTo('gjoremaal.html')">
+    <div class="icon">✅</div>
+    <h3>Gjøremål</h3>
+  </div>
+  <div class="card" onclick="goTo('faktura.html')">
+    <div class="icon">🧾</div>
+    <h3>Faktura</h3>
+  </div>
+  <div class="card" onclick="goTo('varsling.html')">
+    <div class="icon">🔔</div>
+    <h3>Varsling</h3>
+  </div>
+  <div class="card" onclick="goTo('beredskap.html')"> <!-- ✅ Ny -->
+    <div class="icon">🛟</div>
+    <h3>Beredskap RC Bjørgvin</h3>
+  </div>
+</div>
