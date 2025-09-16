@@ -20,19 +20,15 @@
       margin-bottom: 1rem;
     }
 
-    a.button-link {
-      text-decoration: none;
-      margin-bottom: 2rem;
-    }
-
-    .status-button {
-      padding: 0.6rem 1.2rem;
-      background-color: #0d47a1;
+    .status-button, #newVesselBtn, #newPersonBtn {
+      padding: 0.7rem 1.2rem;
+      background: #0d47a1;
       color: white;
       border: none;
       border-radius: 6px;
       font-size: 1rem;
       cursor: pointer;
+      margin: 0.5rem 0;
     }
 
     .fleet {
@@ -73,18 +69,35 @@
       box-sizing: border-box;
     }
 
-    .vessel textarea[disabled] {
-      background: #eee;
-      color: #333;
-      resize: none;
+    .avvik-list {
+      background: #fff;
+      color: #000;
+      padding: 0.5rem;
+      border-radius: 6px;
+      max-height: 120px;
+      overflow-y: auto;
+      font-size: 0.85rem;
+    }
+    .avvik-item {
+      display: flex;
+      justify-content: space-between;
+      border-bottom: 1px solid #ddd;
+      padding: 0.2rem 0;
+    }
+    .avvik-item button {
+      background: #c62828;
+      border: none;
+      color: white;
+      font-size: 0.75rem;
+      padding: 0.2rem 0.5rem;
+      border-radius: 4px;
+      cursor: pointer;
     }
 
     .btns {
       display: flex;
       gap: 0.5rem;
-      margin-top: 0.5rem;
     }
-
     .btn {
       flex: 1;
       padding: 0.5rem;
@@ -94,61 +107,9 @@
       cursor: pointer;
       background: #ffffff33;
       color: #fff;
-      transition: background 0.2s;
     }
 
-    .btn:hover {
-      background: #ffffff55;
-    }
-
-    #newVesselBtn {
-      margin: 2rem 0;
-      padding: 0.7rem 1.2rem;
-      background: #0d47a1;
-      color: white;
-      border: none;
-      border-radius: 6px;
-      font-size: 1rem;
-      cursor: pointer;
-    }
-
-    #modal {
-      position: fixed;
-      inset: 0;
-      background: rgba(0,0,0,0.5);
-      display: none;
-      align-items: center;
-      justify-content: center;
-    }
-
-    #modalBox {
-      background: white;
-      padding: 2rem;
-      border-radius: 10px;
-      width: 90%;
-      max-width: 400px;
-    }
-
-    #modalBox input {
-      width: 100%;
-      padding: 0.6rem;
-      margin-bottom: 1rem;
-      border-radius: 6px;
-      border: 1px solid #ccc;
-    }
-
-    #modalBox button {
-      width: 100%;
-      padding: 0.6rem;
-      background: #0d47a1;
-      color: white;
-      border: none;
-      border-radius: 6px;
-      font-size: 1rem;
-      cursor: pointer;
-    }
-
-    /* 🔵 Beredskap Vaktelefon */
+    /* 🔵 Vaktelefon */
     #vaktelefon {
       margin-top: 3rem;
       padding: 1rem;
@@ -158,12 +119,6 @@
       width: 100%;
       max-width: 600px;
     }
-
-    #vaktelefon h2 {
-      margin-top: 0;
-      color: #0d47a1;
-    }
-
     .vaktperson {
       display: flex;
       justify-content: space-between;
@@ -171,7 +126,6 @@
       padding: 0.5rem 0;
       border-bottom: 1px solid #ddd;
     }
-
     .toggleVakt {
       padding: 0.4rem 1rem;
       border: none;
@@ -181,10 +135,8 @@
       font-weight: bold;
       margin-left: 1rem;
     }
-
     .toggleVakt.green { background: #2e7d32; }
     .toggleVakt.red   { background: #c62828; }
-
     .removeBtn {
       background: #c62828;
       color: white;
@@ -195,41 +147,19 @@
       font-size: 0.8rem;
       margin-left: 0.5rem;
     }
-
-    #newPersonBtn {
-      margin-top: 1rem;
-      padding: 0.6rem 1rem;
-      background: #0d47a1;
-      color: white;
-      border: none;
-      border-radius: 6px;
-      cursor: pointer;
-    }
   </style>
 </head>
 <body>
-
   <h1>Beredskap RC Bjørgvin</h1>
 
-  <!-- 🔵 STATUS-KNAPP -->
-  <a href="https://public.kystportal.no/rkh.asp?_side=3" target="_blank" class="button-link">
+  <a href="https://public.kystportal.no/rkh.asp?_side=3" target="_blank">
     <button class="status-button">🔍 Åpne statusbilde (Kystportal)</button>
   </a>
 
   <button id="newVesselBtn">➕ Legg til nytt fartøy</button>
-
   <div class="fleet" id="fleetContainer"></div>
 
-  <!-- 🔧 MODAL FOR AVVIK -->
-  <div id="modal">
-    <div id="modalBox">
-      <h3>Registrer avvik</h3>
-      <input type="text" id="avvikInput" placeholder="Eks: Mangler O2">
-      <button onclick="lagreAvvik()">Lagre</button>
-    </div>
-  </div>
-
-  <!-- 📱 Beredskap Vaktelefon -->
+  <!-- 📱 Vaktelefon -->
   <div id="vaktelefon">
     <h2>Beredskap – Vaktelefon</h2>
     <div id="vakContainer"></div>
@@ -249,7 +179,6 @@
 
     let vessels = JSON.parse(localStorage.getItem('vessels')) || [];
     let vaktpersoner = JSON.parse(localStorage.getItem('vaktpersoner')) || [];
-    let currentAvvikIndex = null;
 
     function save() {
       localStorage.setItem('vessels', JSON.stringify(vessels));
@@ -260,17 +189,10 @@
       // 🚤 Fartøy
       const container = document.getElementById('fleetContainer');
       container.innerHTML = '';
-
       if (vessels.length === 0) {
         container.innerHTML = "<p>Ingen fartøy registrert.</p>";
       }
-
       vessels.forEach((vessel, i) => {
-        const kommentar = vessel.kommentar || '';
-        const avvikListe = vessel.avvik && vessel.avvik.length > 0
-          ? vessel.avvik.map((a, j) => `• [${a.tid}] ${a.tekst}`).join('\n')
-          : 'Ingen avvik';
-
         const div = document.createElement('div');
         div.className = `vessel ${statusOptions[vessel.status].color}`;
         div.innerHTML = `
@@ -280,24 +202,36 @@
               <option value="${idx}" ${idx == vessel.status ? 'selected' : ''}>${s.text}</option>
             `).join('')}
           </select>
-          <textarea placeholder="Kommentar..." onchange="endreKommentar(${i}, this.value)">${kommentar}</textarea>
-          <textarea disabled>${avvikListe}</textarea>
+          <textarea placeholder="Kommentar..." onchange="endreKommentar(${i}, this.value)">${vessel.kommentar || ''}</textarea>
+          <div class="avvik-list" id="avvikList-${i}">
+            ${vessel.avvik && vessel.avvik.length > 0 ? '' : '<em>Ingen avvik</em>'}
+          </div>
           <div class="btns">
             <button class="btn" onclick="registrerAvvik(${i})">➕ Avvik</button>
-            <button class="btn" onclick="slett(${i})">🗑 Slett</button>
+            <button class="btn" onclick="slettFartoy(${i})">🗑 Slett fartøy</button>
           </div>
         `;
         container.appendChild(div);
+
+        // Render avvik
+        if (vessel.avvik) {
+          const avvikDiv = div.querySelector(`#avvikList-${i}`);
+          vessel.avvik.forEach((a, j) => {
+            const item = document.createElement('div');
+            item.className = "avvik-item";
+            item.innerHTML = `<span>[${a.tid}] ${a.tekst}</span>
+                              <button onclick="slettAvvik(${i},${j})">X</button>`;
+            avvikDiv.appendChild(item);
+          });
+        }
       });
 
       // 📱 Vaktelefon
       const vakContainer = document.getElementById('vakContainer');
       vakContainer.innerHTML = '';
-
       if (vaktpersoner.length === 0) {
         vakContainer.innerHTML = "<p>Ingen personer registrert.</p>";
       }
-
       vaktpersoner.forEach((p, idx) => {
         const row = document.createElement('div');
         row.className = "vaktperson";
@@ -316,81 +250,40 @@
     }
 
     // 🚤 Fartøy-funksjoner
-    function endreStatus(index, val) {
-      vessels[index].status = parseInt(val);
-      save(); render();
+    function endreStatus(i, val) { vessels[i].status = parseInt(val); save(); render(); }
+    function endreNavn(i, navn) { vessels[i].name = navn; save(); render(); }
+    function endreKommentar(i, txt) { vessels[i].kommentar = txt; save(); }
+    function slettFartoy(i) {
+      if (confirm("Slett fartøy?")) { vessels.splice(i,1); save(); render(); }
     }
-
-    function endreNavn(index, navn) {
-      vessels[index].name = navn;
-      save(); render();
-    }
-
-    function endreKommentar(index, tekst) {
-      vessels[index].kommentar = tekst;
-      save();
-    }
-
-    function slett(index) {
-      if (confirm("Slett dette fartøyet?")) {
-        vessels.splice(index, 1);
-        save(); render();
-      }
-    }
-
-    function registrerAvvik(index) {
-      currentAvvikIndex = index;
-      document.getElementById('avvikInput').value = '';
-      document.getElementById('modal').style.display = 'flex';
-    }
-
-    function lagreAvvik() {
-      const txt = document.getElementById('avvikInput').value.trim();
-      if (txt && currentAvvikIndex !== null) {
+    function registrerAvvik(i) {
+      const txt = prompt("Beskriv avvik:");
+      if (txt) {
         const nå = new Date();
-        const tidspunkt = nå.toLocaleDateString('no-NO') + ' ' +
-                          nå.toLocaleTimeString('no-NO', {hour: '2-digit', minute: '2-digit'});
-        vessels[currentAvvikIndex].avvik.push({ tekst: txt, tid: tidspunkt });
+        const tidspunkt = nå.toLocaleDateString('no-NO') + ' ' + nå.toLocaleTimeString('no-NO',{hour:'2-digit',minute:'2-digit'});
+        vessels[i].avvik.push({ tekst: txt, tid: tidspunkt });
         save(); render();
-        document.getElementById('modal').style.display = 'none';
       }
+    }
+    function slettAvvik(i,j) {
+      vessels[i].avvik.splice(j,1);
+      save(); render();
     }
 
     // 📱 Vaktelefon-funksjoner
-    function toggleVakt(index) {
-      vaktpersoner[index].aktiv = !vaktpersoner[index].aktiv;
-      save(); render();
-    }
-
-    function removePerson(index) {
-      if (confirm("Fjern denne personen fra vaktelefonlisten?")) {
-        vaktpersoner.splice(index, 1);
-        save(); render();
-      }
-    }
+    function toggleVakt(i) { vaktpersoner[i].aktiv = !vaktpersoner[i].aktiv; save(); render(); }
+    function removePerson(i) { if (confirm("Fjern person?")) { vaktpersoner.splice(i,1); save(); render(); } }
 
     // 🖱️ Event Listeners
-    document.getElementById('modal').addEventListener('click', e => {
-      if (e.target.id === 'modal') e.target.style.display = 'none';
-    });
-
     document.getElementById('newVesselBtn').addEventListener('click', () => {
       const navn = prompt("Navn på nytt fartøy:");
-      if (navn) {
-        vessels.push({ name: navn, status: 0, kommentar: '', avvik: [] });
-        save(); render();
-      }
+      if (navn) { vessels.push({ name: navn, status: 0, kommentar: '', avvik: [] }); save(); render(); }
     });
-
     document.getElementById('newPersonBtn').addEventListener('click', () => {
-      const navn = prompt("Navn på ny person til vaktelefon:");
-      if (navn) {
-        vaktpersoner.push({ navn: navn, aktiv: false });
-        save(); render();
-      }
+      const navn = prompt("Navn på ny person:");
+      if (navn) { vaktpersoner.push({ navn: navn, aktiv: false }); save(); render(); }
     });
 
-    // Første rendering
     render();
   </script>
 </body>
