@@ -247,17 +247,8 @@
       { text: 'På lager', color: 'gray' }
     ];
 
-    let vessels = JSON.parse(localStorage.getItem('vessels')) || [
-      { name: 'RC Bjørgvin', status: 0, kommentar: '', avvik: [] },
-      { name: 'Rescurunner junior 1', status: 0, kommentar: '', avvik: [] },
-      { name: 'Rescurunner Junior 2', status: 0, kommentar: '', avvik: [] }
-    ];
-
-    let vaktpersoner = JSON.parse(localStorage.getItem('vaktpersoner')) || [
-      { navn: "Ola Nordmann", aktiv: true },
-      { navn: "Kari Crew", aktiv: false }
-    ];
-
+    let vessels = JSON.parse(localStorage.getItem('vessels')) || [];
+    let vaktpersoner = JSON.parse(localStorage.getItem('vaktpersoner')) || [];
     let currentAvvikIndex = null;
 
     function save() {
@@ -266,13 +257,18 @@
     }
 
     function render() {
+      // 🚤 Fartøy
       const container = document.getElementById('fleetContainer');
       container.innerHTML = '';
+
+      if (vessels.length === 0) {
+        container.innerHTML = "<p>Ingen fartøy registrert.</p>";
+      }
 
       vessels.forEach((vessel, i) => {
         const kommentar = vessel.kommentar || '';
         const avvikListe = vessel.avvik && vessel.avvik.length > 0
-          ? vessel.avvik.map(a => `• [${a.tid}] ${a.tekst}`).join('\n')
+          ? vessel.avvik.map((a, j) => `• [${a.tid}] ${a.tekst}`).join('\n')
           : 'Ingen avvik';
 
         const div = document.createElement('div');
@@ -294,9 +290,14 @@
         container.appendChild(div);
       });
 
-      // 👉 Render vaktelefon
+      // 📱 Vaktelefon
       const vakContainer = document.getElementById('vakContainer');
       vakContainer.innerHTML = '';
+
+      if (vaktpersoner.length === 0) {
+        vakContainer.innerHTML = "<p>Ingen personer registrert.</p>";
+      }
+
       vaktpersoner.forEach((p, idx) => {
         const row = document.createElement('div');
         row.className = "vaktperson";
@@ -314,6 +315,7 @@
       });
     }
 
+    // 🚤 Fartøy-funksjoner
     function endreStatus(index, val) {
       vessels[index].status = parseInt(val);
       save(); render();
@@ -354,6 +356,7 @@
       }
     }
 
+    // 📱 Vaktelefon-funksjoner
     function toggleVakt(index) {
       vaktpersoner[index].aktiv = !vaktpersoner[index].aktiv;
       save(); render();
@@ -366,6 +369,7 @@
       }
     }
 
+    // 🖱️ Event Listeners
     document.getElementById('modal').addEventListener('click', e => {
       if (e.target.id === 'modal') e.target.style.display = 'none';
     });
@@ -386,6 +390,7 @@
       }
     });
 
+    // Første rendering
     render();
   </script>
 </body>
