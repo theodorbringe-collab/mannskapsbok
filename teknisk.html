@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+  <meta charset="UTF-8">
+  <title>Teknisk RC Bjørgvin</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      margin: 0;
+      background: #f4f4f4;
+      padding: 2rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    h1 { color:#0d47a1; margin-bottom:1rem; }
+    h2 { margin-top:2rem; color:#333; }
+    button {
+      cursor:pointer;
+      padding:0.5rem 1rem;
+      border:none;
+      border-radius:6px;
+      margin:0.2rem;
+    }
+    .addBtn { background:#0d47a1; color:white; }
+    .saveBtn { background:#2e7d32; color:white; }
+    .deleteBtn { background:#c62828; color:white; }
+    .editBtn { background:#ff9800; color:white; }
+    .list {
+      background:white;
+      width:100%;
+      max-width:600px;
+      margin-top:1rem;
+      border-radius:8px;
+      padding:1rem;
+      box-shadow:0 6px 14px rgba(0,0,0,0.1);
+    }
+    .item {
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      border-bottom:1px solid #eee;
+      padding:0.5rem 0;
+      flex-wrap:wrap;
+    }
+    .item span {
+      flex:1 1 auto;
+      margin-right:0.5rem;
+    }
+    .meta {
+      font-size:0.8rem;
+      color:#555;
+    }
+  </style>
+</head>
+<body>
+  <h1>Teknisk RC Bjørgvin</h1>
+
+  <h2>🔧 Verkstedsliste</h2>
+  <button class="addBtn" onclick="addItem('verksted')">➕ Legg til verksted-oppgave</button>
+  <div class="list" id="verkstedList"></div>
+
+  <h2>📝 Plukkliste</h2>
+  <button class="addBtn" onclick="addItem('plukk')">➕ Legg til plukk-oppgave</button>
+  <div class="list" id="plukkList"></div>
+
+  <script>
+    let verksted = JSON.parse(localStorage.getItem('verksted')) || [];
+    let plukk = JSON.parse(localStorage.getItem('plukk')) || [];
+
+    function save() {
+      localStorage.setItem('verksted', JSON.stringify(verksted));
+      localStorage.setItem('plukk', JSON.stringify(plukk));
+    }
+
+    function render() {
+      renderList('verksted', verksted);
+      renderList('plukk', plukk);
+    }
+
+    function renderList(type, data) {
+      const container = document.getElementById(type+'List');
+      container.innerHTML = data.length === 0 ? "<p><em>Ingen oppgaver registrert.</em></p>" : "";
+      data.forEach((item, idx) => {
+        const div = document.createElement('div');
+        div.className="item";
+        div.innerHTML=`
+          <span><strong>${item.text}</strong><br>
+            <span class="meta">Lagt inn: ${item.added}</span><br>
+            ${item.deadline ? `<span class="meta">Frist: ${item.deadline}</span>` : ""}
+          </span>
+          <div>
+            <button class="editBtn" onclick="editItem('${type}',${idx})">Rediger</button>
+            <button class="deleteBtn" onclick="deleteItem('${type}',${idx})">Slett</button>
+          </div>
+        `;
+        container.appendChild(div);
+      });
+    }
+
+    function addItem(type) {
+      const text = prompt("Oppgave:");
+      if (!text) return;
+      const deadline = prompt("Frist (valgfritt, f.eks. 20.09.2025):");
+      const now = new Date();
+      const added = now.toLocaleDateString('no-NO')+" "+now.toLocaleTimeString('no-NO',{hour:'2-digit',minute:'2-digit'});
+      const item = { text, deadline, added };
+      if (type==='verksted') verksted.push(item);
+      else plukk.push(item);
+      save(); render();
+    }
+
+    function editItem(type, idx) {
+      const list = type==='verksted'? verksted : plukk;
+      const current = list[idx];
+      const newText = prompt("Rediger oppgave:", current.text);
+      if (!newText) return;
+      const newDeadline = prompt("Rediger frist (tom for ingen):", current.deadline || "");
+      list[idx].text=newText;
+      list[idx].deadline=newDeadline;
+      save(); render();
+    }
+
+    function deleteItem(type, idx) {
+      if (!confirm("Vil du slette oppgaven?")) return;
+      if (type==='verksted') verksted.splice(idx,1);
+      else plukk.splice(idx,1);
+      save(); render();
+    }
+
+    render();
+  </script>
+</body>
+</html>
